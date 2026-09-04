@@ -6,7 +6,8 @@ import {
   Recycle,
   Sprout,
   Zap,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react'
 
 import './App.css'
@@ -43,10 +44,6 @@ function Attendance({ onBack, onManageStaff }) {
 
     const today = getTodayDate()
 
-    // --------------------------------
-    // Load active RWA staff
-    // --------------------------------
-
     const {
       data: staffData,
       error: staffError
@@ -63,10 +60,6 @@ function Attendance({ onBack, onManageStaff }) {
       return
     }
 
-    // --------------------------------
-    // Load today's saved RWA attendance
-    // --------------------------------
-
     const {
       data: attendanceData,
       error: attendanceError
@@ -81,10 +74,6 @@ function Attendance({ onBack, onManageStaff }) {
       setLoading(false)
       return
     }
-
-    // --------------------------------
-    // Load today's Noida Authority sweepers
-    // --------------------------------
 
     const {
       data: externalStaffData,
@@ -103,10 +92,6 @@ function Attendance({ onBack, onManageStaff }) {
       return
     }
 
-    // --------------------------------
-    // Merge saved attendance with staff
-    // --------------------------------
-
     const attendanceStaff = staffData.map((person) => {
 
       const savedAttendance = attendanceData.find(
@@ -115,7 +100,6 @@ function Attendance({ onBack, onManageStaff }) {
 
       return {
         ...person,
-
         present: savedAttendance
           ? savedAttendance.present
           : true
@@ -140,10 +124,6 @@ function Attendance({ onBack, onManageStaff }) {
     setLoading(false)
   }
 
-  // --------------------------------
-  // Toggle RWA Staff Attendance
-  // --------------------------------
-
   const toggleAttendance = (index) => {
     setStaff((current) =>
       current.map((person, i) =>
@@ -158,10 +138,6 @@ function Attendance({ onBack, onManageStaff }) {
 
     setDirty(true)
   }
-
-  // --------------------------------
-  // Noida Authority Sweeper Counter
-  // --------------------------------
 
   const decreaseAuthoritySweepers = () => {
     setAuthoritySweepers((count) =>
@@ -179,28 +155,17 @@ function Attendance({ onBack, onManageStaff }) {
     setDirty(true)
   }
 
-  // --------------------------------
-  // Save Attendance
-  // --------------------------------
-
   const saveAttendance = async () => {
     setSaving(true)
     setError(null)
 
     const today = getTodayDate()
 
-    // --------------------------------
-    // Save RWA staff attendance
-    // --------------------------------
-
     const attendanceRecords = staff.map((person) => ({
       attendance_date: today,
       staff_id: person.id,
-
-      // Snapshot values preserve historical data
       staff_name: person.name,
       profession: person.profession,
-
       present: person.present,
       updated_at: new Date().toISOString()
     }))
@@ -222,10 +187,6 @@ function Attendance({ onBack, onManageStaff }) {
       setSaving(false)
       return
     }
-
-    // --------------------------------
-    // Save Noida Authority sweepers
-    // --------------------------------
 
     const {
       error: externalStaffSaveError
@@ -257,10 +218,6 @@ function Attendance({ onBack, onManageStaff }) {
     alert('Attendance saved successfully')
   }
 
-  // --------------------------------
-  // Profession Icons
-  // --------------------------------
-
   const getProfessionIcon = (profession) => {
     const props = {
       size: 22,
@@ -268,7 +225,6 @@ function Attendance({ onBack, onManageStaff }) {
     }
 
     switch (profession) {
-
       case 'Supervisor':
         return <UserRound {...props} />
 
@@ -298,10 +254,6 @@ function Attendance({ onBack, onManageStaff }) {
   const absentCount =
     staff.length - presentCount
 
-  // --------------------------------
-  // WhatsApp Attendance Report
-  // --------------------------------
-
   const shareOnWhatsApp = () => {
 
     const dateText = new Date().toLocaleDateString('en-IN', {
@@ -327,9 +279,7 @@ function Attendance({ onBack, onManageStaff }) {
       const profession =
         pad(person.profession, 16)
 
-      return (
-        `${no}  ${name}${profession}${attendanceIcon}`
-      )
+      return `${no}  ${name}${profession}${attendanceIcon}`
     })
 
     const table = [
@@ -363,124 +313,95 @@ function Attendance({ onBack, onManageStaff }) {
     )
   }
 
-  // --------------------------------
-  // Loading
-  // --------------------------------
-
   if (loading) {
     return (
-      <div className="app">
-
-        <main className="dashboard">
-          <p>
-            Loading staff...
-          </p>
+      <div className="app-shell">
+        <main className="page-content">
+          <p>Loading staff...</p>
         </main>
-
       </div>
     )
   }
-
-  // --------------------------------
-  // Error
-  // --------------------------------
 
   if (error) {
     return (
-      <div className="app">
-
-        <main className="dashboard">
-
-          <p>
-            Error loading staff: {error}
-          </p>
-
+      <div className="app-shell">
+        <main className="page-content">
+          <p>Error loading staff: {error}</p>
         </main>
-
       </div>
     )
   }
 
-  // --------------------------------
-  // Attendance Screen
-  // --------------------------------
-
   return (
-    <div className="app">
+    <div className="app-shell">
 
-      <header className="header attendance-header">
+      <header className="app-hero compact-hero">
 
-        <button
-          className="back-button"
-          onClick={onBack}
-        >
-          ←
-        </button>
+        <div className="screen-header-row">
 
-        <div className="attendance-header-title">
+          <button
+            className="back-icon-button"
+            onClick={onBack}
+            title="Back"
+          >
+            ←
+          </button>
 
-          <h1>
-            Staff Attendance
-          </h1>
-
-          <p>
-            RWA Pocket-A
-          </p>
+          <div>
+            <h1>RWA Pocket-A</h1>
+            <p>Sector -105 Noida</p>
+          </div>
 
         </div>
 
-        <button
-          className="manage-staff-button"
-          onClick={onManageStaff}
-          title="Manage Staff"
-        >
-          <Settings size={20} />
-        </button>
+        <div className="screen-title-row">
 
-      </header>
+          <div>
+            <h2>Staff Attendance</h2>
 
-      <main className="dashboard">
-
-        <div className="attendance-title">
-
-          <h2>
-            Today's Attendance
-          </h2>
-
-          <p>
-            {new Date().toLocaleDateString(
-              'en-IN',
-              {
+            <span>
+              {new Date().toLocaleDateString('en-IN', {
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric',
-              }
-            )}
-          </p>
+              })}
+            </span>
+          </div>
+
+          <button
+            className="header-action-button"
+            onClick={onManageStaff}
+            title="Manage Staff"
+          >
+            <Settings size={19} />
+          </button>
 
         </div>
 
-        {/* --------------------------------
-            RWA Staff Attendance Table
-        -------------------------------- */}
+      </header>
+
+      <main className="page-content">
+
+        <div className="section-heading">
+
+          <Users size={22} strokeWidth={1.8} />
+
+          <div>
+            <h2>Today's Attendance</h2>
+            <p>Mark attendance for all RWA staff</p>
+          </div>
+
+        </div>
 
         <div className="attendance-table">
 
           <div className="attendance-row attendance-table-header">
 
             <div></div>
-
-            <div>
-              Name
-            </div>
-
-            <div>
-              Profession
-            </div>
-
-            <div>
-              Att.
-            </div>
+            <div>Name</div>
+            <div>Profession</div>
+            <div>Att.</div>
 
           </div>
 
@@ -492,23 +413,15 @@ function Attendance({ onBack, onManageStaff }) {
             >
 
               <div className="employee-icon-wrap">
-
-                {getProfessionIcon(
-                  person.profession
-                )}
-
+                {getProfessionIcon(person.profession)}
               </div>
 
               <div className="employee-name">
-
                 {person.name}
-
               </div>
 
               <div className="employee-profession">
-
                 {person.profession}
-
               </div>
 
               <div>
@@ -523,12 +436,10 @@ function Attendance({ onBack, onManageStaff }) {
                     toggleAttendance(index)
                   }
                 >
-
                   {person.present
                     ? '✅'
                     : '❌'
                   }
-
                 </button>
 
               </div>
@@ -538,10 +449,6 @@ function Attendance({ onBack, onManageStaff }) {
           ))}
 
         </div>
-
-        {/* --------------------------------
-            RWA Staff Summary
-        -------------------------------- */}
 
         <div className="attendance-summary">
 
@@ -559,22 +466,11 @@ function Attendance({ onBack, onManageStaff }) {
 
         </div>
 
-        {/* --------------------------------
-            Noida Authority Sweepers
-        -------------------------------- */}
-
         <div className="external-staff-card">
 
           <div>
-
-            <h3>
-              Noida Authority Sweepers
-            </h3>
-
-            <p>
-              Working today
-            </p>
-
+            <h3>Noida Authority Sweepers</h3>
+            <p>Working today</p>
           </div>
 
           <div className="counter-control">
@@ -601,10 +497,6 @@ function Attendance({ onBack, onManageStaff }) {
 
         </div>
 
-        {/* --------------------------------
-            Save Attendance
-        -------------------------------- */}
-
         <button
           className="save-attendance-button"
           onClick={saveAttendance}
@@ -613,24 +505,15 @@ function Attendance({ onBack, onManageStaff }) {
             (saved && !dirty)
           }
         >
-
           {saving
             ? 'Saving...'
-
             : !saved
               ? 'Save Attendance'
-
               : dirty
                 ? 'Update Attendance'
-
                 : 'Attendance Saved'
           }
-
         </button>
-
-        {/* --------------------------------
-            WhatsApp Share
-        -------------------------------- */}
 
         <button
           className="whatsapp-button"
@@ -640,12 +523,16 @@ function Attendance({ onBack, onManageStaff }) {
             dirty
           }
         >
-
           🟢 Share on WhatsApp
-
         </button>
 
       </main>
+
+      <footer className="app-footer">
+        <strong>RWA Pocket-A</strong>
+        <span>•</span>
+        <span>Sector -105 Noida</span>
+      </footer>
 
     </div>
   )

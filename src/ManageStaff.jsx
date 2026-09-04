@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Pencil, Plus } from 'lucide-react'
+import {
+  Pencil,
+  Plus,
+  Users,
+  UserRound,
+  Wrench,
+  Sparkles,
+  Recycle,
+  Sprout,
+  Zap
+} from 'lucide-react'
+
 import { supabase } from './supabase'
 import './App.css'
 
@@ -100,7 +111,7 @@ function ManageStaff({ onBack }) {
     const { error } = await supabase
       .from('staff')
       .insert({
-        name: name,
+        name,
         profession: newStaff.profession,
         active: true,
         display_order: nextDisplayOrder
@@ -133,10 +144,40 @@ function ManageStaff({ onBack }) {
     })
   }
 
+  const getProfessionIcon = (profession) => {
+    const props = {
+      size: 20,
+      strokeWidth: 1.8
+    }
+
+    switch (profession) {
+      case 'Supervisor':
+        return <UserRound {...props} />
+
+      case 'Electrician':
+        return <Zap {...props} />
+
+      case 'Plumber':
+        return <Wrench {...props} />
+
+      case 'Gardener':
+        return <Sprout {...props} />
+
+      case 'Sweeper':
+        return <Sparkles {...props} />
+
+      case 'Housekeeping':
+        return <Recycle {...props} />
+
+      default:
+        return <UserRound {...props} />
+    }
+  }
+
   if (loading) {
     return (
-      <div className="app">
-        <main className="dashboard">
+      <div className="app-shell">
+        <main className="page-content">
           <p>Loading staff...</p>
         </main>
       </div>
@@ -144,43 +185,67 @@ function ManageStaff({ onBack }) {
   }
 
   return (
-    <div className="app">
+    <div className="app-shell">
 
-      <header className="header attendance-header">
+      <header className="app-hero compact-hero">
 
-        <button className="back-button" onClick={onBack}>
-          ←
-        </button>
+        <div className="screen-header-row">
 
-        <div>
-          <h1>Manage Staff</h1>
-          <p>RWA Pocket-A</p>
+          <button
+            className="back-icon-button"
+            onClick={onBack}
+            title="Back"
+          >
+            ←
+          </button>
+
+          <div>
+            <h1>RWA Pocket-A</h1>
+            <p>Sector -105 Noida</p>
+          </div>
+
+        </div>
+
+        <div className="screen-title-row">
+
+          <div>
+            <h2>Manage Staff</h2>
+            <span>View and update staff details</span>
+          </div>
+
         </div>
 
       </header>
 
-      <main className="dashboard">
+      <main className="page-content">
 
         {error && (
-          <p className="error-message">
+          <p className="login-error">
             {error}
           </p>
         )}
 
         {!editingStaff && !addingStaff && (
           <>
+
             <div className="manage-title">
 
-              <div>
-                <h2>Staff Profiles</h2>
-                <p>Update staff details when required</p>
+              <div className="section-heading">
+
+                <Users size={22} strokeWidth={1.8} />
+
+                <div>
+                  <h2>Staff Profiles</h2>
+                  <p>View and update staff details</p>
+                </div>
+
               </div>
 
               <button
                 className="add-staff-button"
                 onClick={() => setAddingStaff(true)}
               >
-                <Plus size={18} />
+                <Plus size={17} />
                 Add Staff
               </button>
 
@@ -191,22 +256,38 @@ function ManageStaff({ onBack }) {
               {staff.map((person) => (
 
                 <div
-                  className="staff-profile-card"
+                  className={`staff-profile-card ${
+                    !person.active ? 'staff-profile-inactive' : ''
+                  }`}
                   key={person.id}
                 >
 
-                  <div>
-                    <h3>{person.name}</h3>
+                  <div className="staff-profile-info">
 
-                    <p>
-                      {person.profession}
-                      {!person.active && ' • Inactive'}
-                    </p>
+                    <div className="staff-profile-icon">
+                      {getProfessionIcon(person.profession)}
+                    </div>
+
+                    <div>
+                      <h3>{person.name}</h3>
+
+                      <p>
+                        {person.profession}
+
+                        {!person.active && (
+                          <span className="inactive-label">
+                            {' '}• Inactive
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
                   </div>
 
                   <button
                     className="edit-staff-button"
                     onClick={() => handleEdit(person)}
+                    title="Edit Staff"
                   >
                     <Pencil size={17} />
                   </button>
@@ -216,6 +297,7 @@ function ManageStaff({ onBack }) {
               ))}
 
             </div>
+
           </>
         )}
 
@@ -223,7 +305,16 @@ function ManageStaff({ onBack }) {
 
           <div className="edit-staff-card">
 
-            <h2>Edit Staff Profile</h2>
+            <div className="section-heading">
+
+              <Pencil size={21} strokeWidth={1.8} />
+
+              <div>
+                <h2>Edit Staff Profile</h2>
+                <p>Update employee details</p>
+              </div>
+
+            </div>
 
             <label>Name</label>
 
@@ -277,7 +368,10 @@ function ManageStaff({ onBack }) {
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving
+                ? 'Saving...'
+                : 'Save Changes'
+              }
             </button>
 
             <button
@@ -296,7 +390,16 @@ function ManageStaff({ onBack }) {
 
           <div className="edit-staff-card">
 
-            <h2>Add Staff</h2>
+            <div className="section-heading">
+
+              <Plus size={22} strokeWidth={1.8} />
+
+              <div>
+                <h2>Add Staff</h2>
+                <p>Create a new staff profile</p>
+              </div>
+
+            </div>
 
             <label>Name</label>
 
@@ -336,7 +439,10 @@ function ManageStaff({ onBack }) {
               onClick={handleAddStaff}
               disabled={saving}
             >
-              {saving ? 'Adding...' : 'Add Staff'}
+              {saving
+                ? 'Adding...'
+                : 'Add Staff'
+              }
             </button>
 
             <button
@@ -352,6 +458,12 @@ function ManageStaff({ onBack }) {
         )}
 
       </main>
+
+      <footer className="app-footer">
+        <strong>RWA Pocket-A</strong>
+        <span>•</span>
+        <span>Sector -105 Noida</span>
+      </footer>
 
     </div>
   )
