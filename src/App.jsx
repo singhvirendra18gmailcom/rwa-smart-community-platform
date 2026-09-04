@@ -1,121 +1,89 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
 import './App.css'
 
+import Attendance from './Attendance'
+import ManageStaff from './ManageStaff'
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [screen, setScreen] = useState('dashboard')
 
+  // Manage Staff screen
+  if (screen === 'manage-staff') {
+    return (
+      <ManageStaff
+        onBack={() => setScreen('attendance')}
+      />
+    )
+  }
+
+  // Staff Attendance screen
+  if (screen === 'attendance') {
+    return (
+      <Attendance
+        onBack={() => setScreen('dashboard')}
+        onManageStaff={() => setScreen('manage-staff')}
+      />
+    )
+  }
+
+  // Supervisor Dashboard
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="app">
+
+      <header className="header">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <h1>RWA Pocket-A</h1>
+          <p>RWA AI</p>
         </div>
+      </header>
+
+      <main className="dashboard">
+
+        <div className="welcome">
+          <h2>Supervisor Dashboard</h2>
+          <p>Select an activity</p>
+        </div>
+
+        {/* NIGHT PATROL */}
+       <button
+        className="card patrol"
+        onClick={() => {
+          window.location.href =
+            'https://rwa-pocket-a.singh-virendra18.workers.dev/?view=report'
+        }}
+      >
+        <span className="icon">🌙</span>
+
+        <div className="cardText">
+          <h3>Night Patrol Report</h3>
+          <p>View and share last night's patrol report</p>
+        </div>
+
+        <span className="arrow">›</span>
+      </button>
+
+        {/* STAFF ATTENDANCE */}
         <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+          className="card attendance"
+          onClick={() => setScreen('attendance')}
         >
-          Count is {count}
+          <span className="icon">👥</span>
+
+          <div className="cardText">
+            <h3>Staff Attendance</h3>
+            <p>Mark today's attendance and share on WhatsApp</p>
+          </div>
+
+          <span className="arrow">›</span>
         </button>
-      </section>
 
-      <div className="ticks"></div>
+      </main>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <footer>
+        RWA Pocket-A Sector -105 Noida
+      </footer>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </div>
   )
 }
 
