@@ -1,13 +1,54 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
+import { supabase } from './supabase'
+import Login from './Login'
 import Attendance from './Attendance'
 import ManageStaff from './ManageStaff'
 
 function App() {
+  const [session, setSession] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
+
   const [screen, setScreen] = useState('dashboard')
 
-  // Manage Staff screen
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setAuthLoading(false)
+    })
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+      setAuthLoading(false)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setScreen('dashboard')
+  }
+
+  if (authLoading) {
+    return (
+      <div className="app">
+        <main className="dashboard">
+          <p>Loading...</p>
+        </main>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <Login />
+  }
+
   if (screen === 'manage-staff') {
     return (
       <ManageStaff
@@ -16,7 +57,6 @@ function App() {
     )
   }
 
-  // Staff Attendance screen
   if (screen === 'attendance') {
     return (
       <Attendance
@@ -26,15 +66,23 @@ function App() {
     )
   }
 
-  // Supervisor Dashboard
   return (
     <div className="app">
 
-      <header className="header">
+      <header className="header dashboard-header">
+
         <div>
           <h1>RWA Pocket-A</h1>
           <p>RWA AI</p>
         </div>
+
+        <button
+          className="logout-button"
+          onClick={handleLogout}
+        >
+          Logout
+        </button>
+
       </header>
 
       <main className="dashboard">
@@ -44,25 +92,23 @@ function App() {
           <p>Select an activity</p>
         </div>
 
-        {/* NIGHT PATROL */}
-       <button
-        className="card patrol"
-        onClick={() => {
-          window.location.href =
-            'https://rwa-pocket-a.singh-virendra18.workers.dev/?view=report'
-        }}
-      >
-        <span className="icon">🌙</span>
+        <button
+          className="card patrol"
+          onClick={() => {
+            window.location.href =
+              'https://rwa-pocket-a.singh-virendra18.workers.dev/?view=report'
+          }}
+        >
+          <span className="icon">🌙</span>
 
-        <div className="cardText">
-          <h3>Night Patrol Report</h3>
-          <p>View and share last night's patrol report</p>
-        </div>
+          <div className="cardText">
+            <h3>Night Patrol Report</h3>
+            <p>View and share last night's patrol report</p>
+          </div>
 
-        <span className="arrow">›</span>
-      </button>
+          <span className="arrow">›</span>
+        </button>
 
-        {/* STAFF ATTENDANCE */}
         <button
           className="card attendance"
           onClick={() => setScreen('attendance')}
