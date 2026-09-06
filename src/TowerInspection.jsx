@@ -712,7 +712,6 @@ function createSummaryReportCanvas({
 function createTowerReportCanvas({
   towerName,
   date,
-  attentionLines,
   rows,
   remarks,
   distance,
@@ -720,11 +719,21 @@ function createTowerReportCanvas({
   const width = 1080
   const margin = 58
   const cardWidth = width - margin * 2
-  const attentionRows = Math.max(1, attentionLines.length)
-  const attentionHeight = 118 + attentionRows * 54
+  const rowHeights = rows.map((row) => (row.subValue ? 98 : 72))
+  const tableHeight = 106 + rowHeights.reduce((total, value) => total + value, 0)
   const remarksHeight = remarks ? 130 : 0
-  const tableHeight = 105 + rows.length * 70
-  const height = 690 + attentionHeight + tableHeight + remarksHeight
+  const noteHeight = 132
+  const footerHeight = 150
+  const height =
+    320 +
+    tableHeight +
+    remarksHeight +
+    28 +
+    92 +
+    28 +
+    noteHeight +
+    28 +
+    footerHeight
 
   const canvas = document.createElement('canvas')
   canvas.width = width
@@ -751,39 +760,6 @@ function createTowerReportCanvas({
 
   let y = 292
 
-  const hasAttention = attentionLines.length > 0
-
-  roundedRect(
-    ctx,
-    margin,
-    y,
-    cardWidth,
-    attentionHeight,
-    25,
-    hasAttention ? '#fff4ed' : '#ecfdf3',
-    hasAttention ? '#f9dbaf' : '#abefc6'
-  )
-
-  ctx.fillStyle = hasAttention ? '#b42318' : '#027a48'
-  ctx.font = '700 34px Arial'
-  ctx.fillText(
-    hasAttention ? 'ATTENTION REQUIRED' : 'SATISFACTORY',
-    margin + 34,
-    y + 50
-  )
-
-  ctx.font = '600 28px Arial'
-
-  if (hasAttention) {
-    attentionLines.forEach((line, index) => {
-      ctx.fillText(`• ${line}`, margin + 46, y + 104 + index * 54)
-    })
-  } else {
-    ctx.fillText('No issues reported', margin + 46, y + 104)
-  }
-
-  y += attentionHeight + 28
-
   roundedRect(ctx, margin, y, cardWidth, tableHeight, 25, '#ffffff', '#d6dee8')
 
   ctx.fillStyle = '#173f67'
@@ -792,13 +768,13 @@ function createTowerReportCanvas({
 
   let rowY = y + 112
 
-  rows.forEach(({ label, value, issue }, index) => {
+  rows.forEach(({ label, value, subValue, issue }, index) => {
     if (index > 0) {
       ctx.strokeStyle = '#eaecf0'
       ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.moveTo(margin + 32, rowY - 38)
-      ctx.lineTo(width - margin - 32, rowY - 38)
+      ctx.moveTo(margin + 32, rowY - 39)
+      ctx.lineTo(width - margin - 32, rowY - 39)
       ctx.stroke()
     }
 
@@ -810,9 +786,15 @@ function createTowerReportCanvas({
     ctx.fillStyle = issue ? '#b42318' : '#027a48'
     ctx.font = '700 29px Arial'
     ctx.fillText(value, width - margin - 42, rowY)
-    ctx.textAlign = 'left'
 
-    rowY += 70
+    if (subValue) {
+      ctx.fillStyle = '#027a48'
+      ctx.font = '600 25px Arial'
+      ctx.fillText(subValue, width - margin - 42, rowY + 35)
+    }
+
+    ctx.textAlign = 'left'
+    rowY += rowHeights[index]
   })
 
   y += tableHeight + 28
@@ -844,7 +826,25 @@ function createTowerReportCanvas({
   )
   ctx.textAlign = 'left'
 
-  y += 132
+  y += 120
+
+  roundedRect(ctx, margin, y, cardWidth, noteHeight, 20, '#eef6ff', '#b8d8f8')
+
+  ctx.fillStyle = '#173f67'
+  ctx.font = '700 26px Arial'
+  ctx.fillText('Note:', margin + 32, y + 43)
+
+  ctx.font = '400 25px Arial'
+  drawWrappedText(
+    ctx,
+    'This report has also been shared with the RWA for review and further action, wherever required.',
+    margin + 118,
+    y + 43,
+    cardWidth - 160,
+    33
+  )
+
+  y += noteHeight + 28
 
   ctx.fillStyle = '#667085'
   ctx.font = '400 24px Arial'
@@ -2486,12 +2486,6 @@ function TowerInspection({ onBack }) {
     setInfoMessage('')
 
     try {
-      const attentionLines =
-        buildAttentionLines(
-          location,
-          inspection
-        )
-
       const camera =
         inspection.camera_working ??
         inspection.camera_led_working
@@ -2519,7 +2513,8 @@ function TowerInspection({ onBack }) {
           value: inspection.mopping_done
             ? 'Done'
             : 'Not Done',
-          issue: false,
+          issue:
+            inspection.mopping_done === false,
         },
         {
           label: 'Camera',
@@ -2536,7 +2531,7 @@ function TowerInspection({ onBack }) {
           issue: led === false,
         },
         {
-          label: 'Tower Lights',
+          label: 'Tower Lights (Inside Tower)',
           value: `${inspection.lights_working_count}/9 Working`,
           issue:
             inspection.lights_working_count < 9,
@@ -2550,11 +2545,15 @@ function TowerInspection({ onBack }) {
             inspection.water_leakage === true,
         },
         {
-          label: 'Street Lights',
+          label: 'Street Lights (Near Tower)',
           value:
             streetFailures.length === 0
-              ? '8/8 Working'
-              : `${8 - streetFailures.length}/8 Working`,
+              ? 'All Working'
+              : `${streetFailures.length} Not Working`,
+          subValue:
+            streetFailures.length === 0
+              ? null
+              : 'Rest All Working',
           issue:
             streetFailures.length > 0,
         },
@@ -2564,7 +2563,6 @@ function TowerInspection({ onBack }) {
         createTowerReportCanvas({
           towerName: location.name,
           date: formatDate(today),
-          attentionLines,
           rows,
           remarks:
             inspection.remarks || '',
@@ -2593,7 +2591,9 @@ function TowerInspection({ onBack }) {
         )
       }
     } catch (err) {
-      if (err?.name === 'AbortError') {
+      if (
+        err?.name === 'AbortError'
+      ) {
         return
       }
 
