@@ -180,6 +180,435 @@ function inspectionHasIssue(type, inspection) {
   )
 }
 
+
+function roundedRect(ctx, x, y, width, height, radius, fill, stroke = null) {
+  ctx.beginPath()
+  ctx.roundRect(x, y, width, height, radius)
+
+  if (fill) {
+    ctx.fillStyle = fill
+    ctx.fill()
+  }
+
+  if (stroke) {
+    ctx.strokeStyle = stroke
+    ctx.lineWidth = 2
+    ctx.stroke()
+  }
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const words = String(text || '').split(/\s+/).filter(Boolean)
+  const lines = []
+  let currentLine = ''
+
+  words.forEach((word) => {
+    const candidate = currentLine ? `${currentLine} ${word}` : word
+
+    if (
+      currentLine &&
+      ctx.measureText(candidate).width > maxWidth
+    ) {
+      lines.push(currentLine)
+      currentLine = word
+    } else {
+      currentLine = candidate
+    }
+  })
+
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+
+  return lines.length > 0 ? lines : ['']
+}
+
+function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+  const lines = wrapText(ctx, text, maxWidth)
+
+  lines.forEach((line, index) => {
+    ctx.fillText(line, x, y + index * lineHeight)
+  })
+
+  return y + lines.length * lineHeight
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob)
+        } else {
+          reject(new Error('Unable to create report image.'))
+        }
+      },
+      'image/png',
+      1
+    )
+  })
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = filename
+
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 1000)
+}
+
+async function shareImageBlob(blob, filename, title) {
+  const file = new File([blob], filename, {
+    type: 'image/png',
+  })
+
+  if (
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({ files: [file] })
+  ) {
+    await navigator.share({
+      title,
+      files: [file],
+    })
+
+    return 'shared'
+  }
+
+  downloadBlob(blob, filename)
+  return 'downloaded'
+}
+
+function createSummaryReportCanvas({
+  date,
+  cameraText,
+  ledText,
+  streetLightIssues,
+  garbageText,
+  completedTowers,
+  totalTowers,
+  completedParks,
+  totalParks,
+  allComplete,
+}) {
+  const width = 1080
+  const margin = 58
+  const cardWidth = width - margin * 2
+  const streetRows = Math.max(1, streetLightIssues.length)
+  const attentionHeight = 360 + (streetRows - 1) * 62
+  const height = 1050 + attentionHeight
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = '#f4f7fb'
+  ctx.fillRect(0, 0, width, height)
+
+  roundedRect(ctx, margin, 46, cardWidth, 200, 30, '#173f67')
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '700 42px Arial'
+  ctx.fillText('RWA POCKET-A', width / 2, 104)
+
+  ctx.font = '700 49px Arial'
+  ctx.fillText('DAILY INSPECTION SUMMARY', width / 2, 164)
+
+  ctx.font = '400 31px Arial'
+  ctx.fillText(date, width / 2, 214)
+  ctx.textAlign = 'left'
+
+  let y = 282
+
+  roundedRect(
+    ctx,
+    margin,
+    y,
+    cardWidth,
+    attentionHeight,
+    26,
+    '#ffffff',
+    '#d6dee8'
+  )
+
+  ctx.fillStyle = '#b42318'
+  ctx.font = '700 35px Arial'
+  ctx.fillText('ATTENTION REQUIRED', margin + 34, y + 54)
+
+  const labelX = margin + 36
+  const valueX = margin + 340
+  let rowY = y + 120
+
+  function drawKeyRow(label, value, isProblem) {
+    ctx.fillStyle = '#344054'
+    ctx.font = '600 29px Arial'
+    ctx.fillText(label, labelX, rowY)
+
+    ctx.fillStyle = isProblem ? '#b42318' : '#027a48'
+    ctx.font = '700 29px Arial'
+    ctx.fillText(value, valueX, rowY)
+
+    rowY += 64
+  }
+
+  drawKeyRow('Camera', cameraText, cameraText !== 'All Working')
+  drawKeyRow('LED', ledText, ledText !== 'All Working')
+
+  ctx.fillStyle = '#344054'
+  ctx.font = '600 29px Arial'
+  ctx.fillText('Street Lights', labelX, rowY)
+
+  if (streetLightIssues.length === 0) {
+    ctx.fillStyle = '#027a48'
+    ctx.font = '700 29px Arial'
+    ctx.fillText('All Working', valueX, rowY)
+    rowY += 64
+  } else {
+    ctx.fillStyle = '#b42318'
+    ctx.font = '700 28px Arial'
+
+    streetLightIssues.forEach((issue, index) => {
+      ctx.fillText(issue, valueX, rowY + index * 62)
+    })
+
+    rowY += streetLightIssues.length * 62
+  }
+
+  drawKeyRow('Garbage Disposal', garbageText, garbageText !== 'Yes')
+
+  y += attentionHeight + 28
+
+  roundedRect(
+    ctx,
+    margin,
+    y,
+    cardWidth,
+    104,
+    22,
+    allComplete ? '#ecfdf3' : '#fffaeb',
+    allComplete ? '#abefc6' : '#fedf89'
+  )
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = allComplete ? '#027a48' : '#b54708'
+  ctx.font = '700 31px Arial'
+  ctx.fillText(
+    allComplete
+      ? 'Rest everything else is OK.'
+      : 'Remaining inspected items are OK.',
+    width / 2,
+    y + 64
+  )
+  ctx.textAlign = 'left'
+
+  y += 134
+
+  roundedRect(ctx, margin, y, cardWidth, 238, 26, '#ffffff', '#d6dee8')
+
+  ctx.fillStyle = '#173f67'
+  ctx.font = '700 35px Arial'
+  ctx.fillText('INSPECTION PROGRESS', margin + 34, y + 54)
+
+  ctx.fillStyle = '#344054'
+  ctx.font = '600 31px Arial'
+  ctx.fillText('Towers', margin + 44, y + 120)
+  ctx.fillText('Parks', margin + 44, y + 188)
+
+  ctx.textAlign = 'right'
+  ctx.fillStyle = '#027a48'
+  ctx.font = '700 35px Arial'
+  ctx.fillText(`${completedTowers}/${totalTowers}`, width - margin - 48, y + 120)
+  ctx.fillText(`${completedParks}/${totalParks}`, width - margin - 48, y + 188)
+  ctx.textAlign = 'left'
+
+  y += 282
+
+  ctx.fillStyle = '#667085'
+  ctx.font = '400 24px Arial'
+
+  const footerEndY = drawWrappedText(
+    ctx,
+    REPORT_FOOTER,
+    margin + 22,
+    y,
+    cardWidth - 44,
+    34
+  )
+
+  ctx.fillStyle = '#344054'
+  ctx.font = '700 25px Arial'
+  ctx.fillText('Supervisor • RWA Pocket-A', margin + 22, footerEndY + 28)
+
+  return canvas
+}
+
+function createTowerReportCanvas({
+  towerName,
+  date,
+  attentionLines,
+  rows,
+  remarks,
+  distance,
+}) {
+  const width = 1080
+  const margin = 58
+  const cardWidth = width - margin * 2
+  const attentionRows = Math.max(1, attentionLines.length)
+  const attentionHeight = 118 + attentionRows * 54
+  const remarksHeight = remarks ? 130 : 0
+  const tableHeight = 105 + rows.length * 70
+  const height = 690 + attentionHeight + tableHeight + remarksHeight
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = '#f4f7fb'
+  ctx.fillRect(0, 0, width, height)
+
+  roundedRect(ctx, margin, 46, cardWidth, 210, 30, '#173f67')
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '700 42px Arial'
+  ctx.fillText('RWA POCKET-A', width / 2, 104)
+
+  ctx.font = '700 49px Arial'
+  ctx.fillText(`${towerName.toUpperCase()} DAILY INSPECTION`, width / 2, 166)
+
+  ctx.font = '400 31px Arial'
+  ctx.fillText(date, width / 2, 218)
+  ctx.textAlign = 'left'
+
+  let y = 292
+
+  const hasAttention = attentionLines.length > 0
+
+  roundedRect(
+    ctx,
+    margin,
+    y,
+    cardWidth,
+    attentionHeight,
+    25,
+    hasAttention ? '#fff4ed' : '#ecfdf3',
+    hasAttention ? '#f9dbaf' : '#abefc6'
+  )
+
+  ctx.fillStyle = hasAttention ? '#b42318' : '#027a48'
+  ctx.font = '700 34px Arial'
+  ctx.fillText(
+    hasAttention ? 'ATTENTION REQUIRED' : 'SATISFACTORY',
+    margin + 34,
+    y + 50
+  )
+
+  ctx.font = '600 28px Arial'
+
+  if (hasAttention) {
+    attentionLines.forEach((line, index) => {
+      ctx.fillText(`• ${line}`, margin + 46, y + 104 + index * 54)
+    })
+  } else {
+    ctx.fillText('No issues reported', margin + 46, y + 104)
+  }
+
+  y += attentionHeight + 28
+
+  roundedRect(ctx, margin, y, cardWidth, tableHeight, 25, '#ffffff', '#d6dee8')
+
+  ctx.fillStyle = '#173f67'
+  ctx.font = '700 35px Arial'
+  ctx.fillText('INSPECTION STATUS', margin + 34, y + 51)
+
+  let rowY = y + 112
+
+  rows.forEach(({ label, value, issue }, index) => {
+    if (index > 0) {
+      ctx.strokeStyle = '#eaecf0'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(margin + 32, rowY - 38)
+      ctx.lineTo(width - margin - 32, rowY - 38)
+      ctx.stroke()
+    }
+
+    ctx.fillStyle = '#475467'
+    ctx.font = '600 29px Arial'
+    ctx.fillText(label, margin + 42, rowY)
+
+    ctx.textAlign = 'right'
+    ctx.fillStyle = issue ? '#b42318' : '#027a48'
+    ctx.font = '700 29px Arial'
+    ctx.fillText(value, width - margin - 42, rowY)
+    ctx.textAlign = 'left'
+
+    rowY += 70
+  })
+
+  y += tableHeight + 28
+
+  if (remarks) {
+    roundedRect(ctx, margin, y, cardWidth, 105, 20, '#ffffff', '#d6dee8')
+
+    ctx.fillStyle = '#344054'
+    ctx.font = '700 27px Arial'
+    ctx.fillText('Remarks:', margin + 32, y + 42)
+
+    ctx.font = '400 27px Arial'
+    drawWrappedText(ctx, remarks, margin + 165, y + 42, cardWidth - 215, 32)
+
+    y += 133
+  }
+
+  roundedRect(ctx, margin, y, cardWidth, 92, 20, '#ecfdf3', '#abefc6')
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#027a48'
+  ctx.font = '700 29px Arial'
+  ctx.fillText(
+    distance != null
+      ? `QR + GPS Verified • ${Math.round(distance)} m`
+      : 'QR + GPS Verified',
+    width / 2,
+    y + 57
+  )
+  ctx.textAlign = 'left'
+
+  y += 132
+
+  ctx.fillStyle = '#667085'
+  ctx.font = '400 24px Arial'
+
+  const footerEndY = drawWrappedText(
+    ctx,
+    REPORT_FOOTER,
+    margin + 22,
+    y,
+    cardWidth - 44,
+    34
+  )
+
+  ctx.fillStyle = '#344054'
+  ctx.font = '700 25px Arial'
+  ctx.fillText('Supervisor • RWA Pocket-A', margin + 22, footerEndY + 28)
+
+  return canvas
+}
+
 function InspectionToggle({
   icon,
   label,
@@ -1786,153 +2215,7 @@ function TowerInspection({ onBack }) {
     )
   }
 
-  function buildTowerShareMessage(
-    location,
-    inspection
-  ) {
-    const attentionLines =
-      buildAttentionLines(
-        location,
-        inspection
-      )
-
-    const streetFailures =
-      getStreetLightFailures(
-        inspection.street_light_status
-      )
-
-    const camera =
-      inspection.camera_working ??
-      inspection.camera_led_working
-
-    const led =
-      inspection.led_screen_working ??
-      inspection.camera_led_working
-
-    const attentionText =
-      attentionLines.length > 0
-        ? attentionLines
-            .map(
-              (line) =>
-                `• ${line}`
-            )
-            .join('\n')
-        : 'No issues reported'
-
-    const rows = [
-      [
-        'Sweeping',
-        inspection.sweeping_done
-          ? 'Done'
-          : 'Not Done',
-      ],
-      [
-        'Mopping',
-        inspection.mopping_done
-          ? 'Done'
-          : 'Not Done',
-      ],
-      [
-        'Camera',
-        camera
-          ? 'Working'
-          : 'Not Working',
-      ],
-      [
-        'LED Screen',
-        led
-          ? 'Working'
-          : 'Not Working',
-      ],
-      [
-        'Tower Lights',
-        `${inspection.lights_working_count}/9 Working`,
-      ],
-      [
-        'Water Leakage',
-        inspection.water_leakage
-          ? 'Yes'
-          : 'No',
-      ],
-      [
-        'Street Lights',
-        streetFailures.length === 0
-          ? '8/8 Working'
-          : `${
-              8 -
-              streetFailures.length
-            }/8 Working`,
-      ],
-    ]
-
-    const tableText =
-      rows
-        .map(
-          ([item, status]) =>
-            `${padText(item)}${status}`
-        )
-        .join('\n')
-
-    const remarksText =
-      inspection.remarks
-        ? `\nRemarks: ${inspection.remarks}`
-        : ''
-
-    return `RWA POCKET-A
-${location.name.toUpperCase()} DAILY INSPECTION
-${formatDate(today)}
-
-ATTENTION REQUIRED
------------------------
-${attentionText}
------------------------
-
-INSPECTION STATUS
-Item            Status
------------------------
-${tableText}
------------------------${remarksText}
-
-QR + GPS Verified
-${REPORT_FOOTER}
-
-Supervisor
-RWA Pocket-A`
-  }
-
-  async function shareText(message) {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          text: message,
-        })
-
-        return
-      } catch (err) {
-        if (
-          err?.name === 'AbortError'
-        ) {
-          return
-        }
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(
-        message
-      )
-
-      setInfoMessage(
-        'Report copied. Open WhatsApp and paste it.'
-      )
-    } catch {
-      setError(
-        'Unable to share or copy report.'
-      )
-    }
-  }
-
-  function shareReport(
+  async function shareTowerImage(
     location,
     inspection
   ) {
@@ -1943,12 +2226,127 @@ RWA Pocket-A`
       return
     }
 
-    shareText(
-      buildTowerShareMessage(
-        location,
-        inspection
+    setError('')
+    setInfoMessage('')
+
+    try {
+      const attentionLines =
+        buildAttentionLines(
+          location,
+          inspection
+        )
+
+      const camera =
+        inspection.camera_working ??
+        inspection.camera_led_working
+
+      const led =
+        inspection.led_screen_working ??
+        inspection.camera_led_working
+
+      const streetFailures =
+        getStreetLightFailures(
+          inspection.street_light_status
+        )
+
+      const rows = [
+        {
+          label: 'Sweeping',
+          value: inspection.sweeping_done
+            ? 'Done'
+            : 'Not Done',
+          issue:
+            inspection.sweeping_done === false,
+        },
+        {
+          label: 'Mopping',
+          value: inspection.mopping_done
+            ? 'Done'
+            : 'Not Done',
+          issue: false,
+        },
+        {
+          label: 'Camera',
+          value: camera
+            ? 'Working'
+            : 'Not Working',
+          issue: camera === false,
+        },
+        {
+          label: 'LED Screen',
+          value: led
+            ? 'Working'
+            : 'Not Working',
+          issue: led === false,
+        },
+        {
+          label: 'Tower Lights',
+          value: `${inspection.lights_working_count}/9 Working`,
+          issue:
+            inspection.lights_working_count < 9,
+        },
+        {
+          label: 'Water Leakage',
+          value: inspection.water_leakage
+            ? 'Yes'
+            : 'No',
+          issue:
+            inspection.water_leakage === true,
+        },
+        {
+          label: 'Street Lights',
+          value:
+            streetFailures.length === 0
+              ? '8/8 Working'
+              : `${8 - streetFailures.length}/8 Working`,
+          issue:
+            streetFailures.length > 0,
+        },
+      ]
+
+      const canvas =
+        createTowerReportCanvas({
+          towerName: location.name,
+          date: formatDate(today),
+          attentionLines,
+          rows,
+          remarks:
+            inspection.remarks || '',
+          distance:
+            inspection.distance_from_tower_m,
+        })
+
+      const blob =
+        await canvasToBlob(canvas)
+
+      const safeName =
+        location.name
+          .replace(/\s+/g, '-')
+          .toLowerCase()
+
+      const result =
+        await shareImageBlob(
+          blob,
+          `${safeName}-inspection-${today}.png`,
+          `${location.name} Daily Inspection`
+        )
+
+      if (result === 'downloaded') {
+        setInfoMessage(
+          'Report image downloaded. You can now share it on WhatsApp.'
+        )
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        return
+      }
+
+      console.error(err)
+
+      setError(
+        'Unable to generate or share the tower report image.'
       )
-    )
+    }
   }
 
   function openReport(location) {
@@ -2210,87 +2608,86 @@ RWA Pocket-A`
       : 'No'
   }
 
-  function buildSummaryMessage() {
-    const summary =
-      buildSummaryData()
+  async function shareSummaryImage() {
+    setError('')
+    setInfoMessage('')
 
-    const completedTowers =
-      towerLocations.filter(
-        (location) =>
-          Boolean(
-            getInspection(location)?.saved_at
-          )
-      ).length
+    try {
+      const summary =
+        buildSummaryData()
 
-    const completedParks =
-      parkLocations.filter(
-        (location) =>
-          Boolean(
-            getInspection(location)?.saved_at
-          )
-      ).length
-
-    const allInspectionsComplete =
-      completedTowers ===
-        towerLocations.length &&
-      completedParks ===
-        parkLocations.length
-
-    const streetLightText =
-      summary.streetLightIssues.length > 0
-        ? summary.streetLightIssues
-            .map(
-              (item, index) =>
-                index === 0
-                  ? item
-                  : `${' '.repeat(14)}${item}`
+      const completedTowers =
+        towerLocations.filter(
+          (location) =>
+            Boolean(
+              getInspection(location)?.saved_at
             )
-            .join('\n')
-        : allInspectionsComplete
-        ? 'All Working'
-        : `No issue (${completedCount}/${allLocations.length} checked)`
+        ).length
 
-    const overallStatusText =
-      allInspectionsComplete
-        ? 'Rest everything else is OK.'
-        : 'Remaining inspected items are OK.'
+      const completedParks =
+        parkLocations.filter(
+          (location) =>
+            Boolean(
+              getInspection(location)?.saved_at
+            )
+        ).length
 
-    return `RWA POCKET-A
-DAILY INSPECTION SUMMARY
-${formatDate(today)}
+      const allComplete =
+        completedTowers ===
+          towerLocations.length &&
+        completedParks ===
+          parkLocations.length
 
-ATTENTION REQUIRED
-Item          Status
------------------------
-Camera        ${getCameraSummaryText(summary)}
-LED           ${getLedSummaryText(summary)}
-Street Lights ${streetLightText}
-Garbage       ${getGarbageSummaryText()}
------------------------
+      const canvas =
+        createSummaryReportCanvas({
+          date: formatDate(today),
+          cameraText:
+            getCameraSummaryText(summary),
+          ledText:
+            getLedSummaryText(summary),
+          streetLightIssues:
+            summary.streetLightIssues,
+          garbageText:
+            getGarbageSummaryText(),
+          completedTowers,
+          totalTowers:
+            towerLocations.length,
+          completedParks,
+          totalParks:
+            parkLocations.length,
+          allComplete,
+        })
 
-${overallStatusText}
+      const blob =
+        await canvasToBlob(canvas)
 
-INSPECTION PROGRESS
-Type          Done
------------------------
-Towers        ${completedTowers}/${towerLocations.length}
-Parks         ${completedParks}/${parkLocations.length}
------------------------
+      const result =
+        await shareImageBlob(
+          blob,
+          `rwa-pocket-a-daily-inspection-${today}.png`,
+          'RWA Pocket-A Daily Inspection Summary'
+        )
 
-${REPORT_FOOTER}
+      if (result === 'downloaded') {
+        setInfoMessage(
+          'Summary image downloaded. You can now share it on WhatsApp.'
+        )
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        return
+      }
 
-Supervisor
-RWA Pocket-A`
+      console.error(err)
+
+      setError(
+        'Unable to generate or share the summary report image.'
+      )
+    }
   }
 
   function openSummary() {
     setScreen('summary')
-  }
-
-  function shareSummary() {
-    shareText(
-      buildSummaryMessage()
-    )
   }
 
   if (screen === 'list') {
@@ -2471,7 +2868,7 @@ RWA Pocket-A`
                         openReport
                       }
                       onShare={
-                        shareReport
+                        shareTowerImage
                       }
                     />
                   )
@@ -2500,7 +2897,7 @@ RWA Pocket-A`
                         openReport
                       }
                       onShare={
-                        shareReport
+                        shareTowerImage
                       }
                     />
                   )
@@ -2524,10 +2921,10 @@ RWA Pocket-A`
                   type="button"
                   className="share-summary-button"
                   onClick={
-                    shareSummary
+                    shareSummaryImage
                   }
                 >
-                  📲 Share Summary
+                  🖼️ Share Summary Image
                 </button>
 
               </div>
@@ -3235,14 +3632,14 @@ RWA Pocket-A`
                   )
 
                 if (inspection) {
-                  shareReport(
+                  shareTowerImage(
                     selectedLocation,
                     inspection
                   )
                 }
               }}
             >
-              📲 Share Tower Report
+              🖼️ Share Tower Report Image
             </button>
           )}
 
@@ -3523,13 +3920,13 @@ RWA Pocket-A`
               type="button"
               className="share-inspection-button"
               onClick={() =>
-                shareReport(
+                shareTowerImage(
                   selectedLocation,
                   inspection
                 )
               }
             >
-              📲 Share Tower Report
+              🖼️ Share Tower Report Image
             </button>
           )}
 
@@ -3798,10 +4195,10 @@ RWA Pocket-A`
               width: '100%',
             }}
             onClick={
-              shareSummary
+              shareSummaryImage
             }
           >
-            📲 Share Summary with RWA Members
+            🖼️ Share Summary Image with RWA Members
           </button>
 
           <button
