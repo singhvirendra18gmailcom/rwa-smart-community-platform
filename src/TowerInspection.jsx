@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
-
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from './supabase'
 import './TowerInspection.css'
@@ -38,88 +32,51 @@ const REPORT_FOOTER =
   'Powered by the RWA Pocket-A in-house App — a step towards smarter, transparent & technology-driven RWA management.'
 
 function getIndiaDate() {
-  const parts =
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Kolkata',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(new Date())
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
 
-  const year =
-    parts.find(
-      (part) => part.type === 'year'
-    )?.value
-
-  const month =
-    parts.find(
-      (part) => part.type === 'month'
-    )?.value
-
-  const day =
-    parts.find(
-      (part) => part.type === 'day'
-    )?.value
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
 
   return `${year}-${month}-${day}`
 }
 
 function formatDate(dateString) {
-  if (!dateString) {
-    return ''
-  }
+  if (!dateString) return ''
 
-  return new Intl.DateTimeFormat(
-    'en-GB',
-    {
-      timeZone: 'Asia/Kolkata',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }
-  ).format(
-    new Date(
-      `${dateString}T12:00:00+05:30`
-    )
-  )
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(`${dateString}T12:00:00+05:30`))
 }
 
 function formatTime(dateString) {
-  if (!dateString) {
-    return ''
-  }
+  if (!dateString) return ''
 
-  return new Intl.DateTimeFormat(
-    'en-IN',
-    {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    }
-  ).format(new Date(dateString))
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(dateString))
 }
 
-function calculateDistance(
-  lat1,
-  lon1,
-  lat2,
-  lon2
-) {
+function calculateDistance(lat1, lon1, lat2, lon2) {
   const earthRadiusM = 6371000
+  const toRadians = (value) => (value * Math.PI) / 180
 
-  const toRadians = (value) =>
-    (value * Math.PI) / 180
-
-  const dLat =
-    toRadians(lat2 - lat1)
-
-  const dLon =
-    toRadians(lon2 - lon1)
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
 
   const a =
-    Math.sin(dLat / 2) *
-      Math.sin(dLat / 2) +
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRadians(lat1)) *
       Math.cos(toRadians(lat2)) *
       Math.sin(dLon / 2) *
@@ -136,58 +93,26 @@ function calculateDistance(
 }
 
 function extractQrToken(decodedText) {
-  if (!decodedText) {
-    return null
+  if (!decodedText) return null
+
+  const value = decodedText.trim()
+
+  if (value.startsWith('RWA-TOWER:')) {
+    return value.substring('RWA-TOWER:'.length).trim()
   }
 
-  const value =
-    decodedText.trim()
-
-  if (
-    value.startsWith(
-      'RWA-TOWER:'
-    )
-  ) {
-    return value
-      .substring(
-        'RWA-TOWER:'.length
-      )
-      .trim()
-  }
-
-  if (
-    value.startsWith(
-      'RWA-PARK:'
-    )
-  ) {
-    return value
-      .substring(
-        'RWA-PARK:'.length
-      )
-      .trim()
+  if (value.startsWith('RWA-PARK:')) {
+    return value.substring('RWA-PARK:'.length).trim()
   }
 
   try {
-    const url =
-      new URL(value)
+    const url = new URL(value)
 
-    const towerToken =
-      url.searchParams.get(
-        'tower'
-      )
+    const towerToken = url.searchParams.get('tower')
+    if (towerToken) return towerToken.trim()
 
-    if (towerToken) {
-      return towerToken.trim()
-    }
-
-    const parkToken =
-      url.searchParams.get(
-        'park'
-      )
-
-    if (parkToken) {
-      return parkToken.trim()
-    }
+    const parkToken = url.searchParams.get('park')
+    if (parkToken) return parkToken.trim()
   } catch {
     // Plain text QR.
   }
@@ -195,72 +120,36 @@ function extractQrToken(decodedText) {
   return value
 }
 
-function normaliseStreetLights(
-  value
-) {
-  if (
-    Array.isArray(value) &&
-    value.length === 8
-  ) {
-    return value.map(
-      (item) => item !== false
-    )
+function normaliseStreetLights(value) {
+  if (Array.isArray(value) && value.length === 8) {
+    return value.map((item) => item !== false)
   }
 
-  return [
-    ...DEFAULT_STREET_LIGHTS,
-  ]
+  return [...DEFAULT_STREET_LIGHTS]
 }
 
-function getStreetLightFailures(
-  status
-) {
-  return normaliseStreetLights(
-    status
-  )
-    .map(
-      (
-        working,
-        index
-      ) => ({
-        working,
-        index,
-        label:
-          STREET_LIGHT_POSITIONS[
-            index
-          ],
-      })
-    )
-    .filter(
-      (light) =>
-        !light.working
-    )
+function getStreetLightFailures(status) {
+  return normaliseStreetLights(status)
+    .map((working, index) => ({
+      working,
+      index,
+      label: STREET_LIGHT_POSITIONS[index],
+    }))
+    .filter((light) => !light.working)
 }
 
-function inspectionHasIssue(
-  type,
-  inspection
-) {
-  if (!inspection) {
-    return false
-  }
+function inspectionHasIssue(type, inspection) {
+  if (!inspection) return false
 
   if (type === 'park') {
     return (
-      inspection.sweeping_done ===
-        false ||
-      inspection.grass_properly_cut ===
-        false ||
-      inspection.benches_well_placed ===
-        false ||
-      inspection.swings_not_broken ===
-        false ||
-      inspection.watering_needed ===
-        true ||
-      inspection.street_lights_all_lit ===
-        false ||
-      inspection.other_issue ===
-        true
+      inspection.sweeping_done === false ||
+      inspection.grass_properly_cut === false ||
+      inspection.benches_well_placed === false ||
+      inspection.swings_not_broken === false ||
+      inspection.watering_needed === true ||
+      inspection.street_lights_all_lit === false ||
+      inspection.other_issue === true
     )
   }
 
@@ -278,22 +167,15 @@ function inspectionHasIssue(
     ).length
 
   return (
-    inspection.sweeping_done ===
-      false ||
+    inspection.sweeping_done === false ||
     camera === false ||
     led === false ||
-    inspection.water_leakage ===
-      true ||
+    inspection.water_leakage === true ||
     streetFailureCount > 0 ||
-    inspection.other_issue ===
-      true ||
+    inspection.other_issue === true ||
     (
-      inspection
-        .lights_working_count !==
-        null &&
-      inspection
-        .lights_working_count <
-        9
+      inspection.lights_working_count !== null &&
+      inspection.lights_working_count < 9
     )
   )
 }
@@ -314,9 +196,7 @@ function InspectionToggle({
           {icon}
         </span>
 
-        <strong>
-          {label}
-        </strong>
+        <strong>{label}</strong>
       </div>
 
       <div className="inspection-toggle-row">
@@ -324,13 +204,9 @@ function InspectionToggle({
         <button
           type="button"
           className={`inspection-option inspection-option-good ${
-            value === true
-              ? 'selected'
-              : ''
+            value === true ? 'selected' : ''
           }`}
-          onClick={() =>
-            onChange(true)
-          }
+          onClick={() => onChange(true)}
         >
           ✅ {positiveText}
         </button>
@@ -338,13 +214,9 @@ function InspectionToggle({
         <button
           type="button"
           className={`inspection-option inspection-option-bad ${
-            value === false
-              ? 'selected'
-              : ''
+            value === false ? 'selected' : ''
           }`}
-          onClick={() =>
-            onChange(false)
-          }
+          onClick={() => onChange(false)}
         >
           ❌ {negativeText}
         </button>
@@ -361,16 +233,10 @@ function StreetLightMap({
   readOnly = false,
   onToggle,
 }) {
-  const lights =
-    normaliseStreetLights(
-      status
-    )
+  const lights = normaliseStreetLights(status)
 
   const failedCount =
-    lights.filter(
-      (working) =>
-        !working
-    ).length
+    lights.filter((working) => !working).length
 
   return (
     <div className="street-light-section">
@@ -378,13 +244,8 @@ function StreetLightMap({
       <div className="street-light-heading">
 
         <div>
-          <strong>
-            💡 Nearby Street Lights
-          </strong>
-
-          <p>
-            Approximate positions
-          </p>
+          <strong>💡 Nearby Street Lights</strong>
+          <p>Approximate positions</p>
         </div>
 
         <span
@@ -403,46 +264,31 @@ function StreetLightMap({
 
       {!readOnly && (
         <div className="street-light-help">
-          Tap the approximate position
-          where a light is not working.
+          Tap the approximate position where a light is not working.
         </div>
       )}
 
       <div className="street-light-map">
 
-        {lights.map(
-          (
-            working,
-            index
-          ) => (
-            <button
-              key={index}
-              type="button"
-              disabled={readOnly}
-              className={`street-light-dot street-light-dot-${
-                index + 1
-              } ${
-                working
-                  ? 'working'
-                  : 'not-working'
-              }`}
-              onClick={() =>
-                onToggle?.(
-                  index
-                )
-              }
-            />
-          )
-        )}
+        {lights.map((working, index) => (
+          <button
+            key={index}
+            type="button"
+            disabled={readOnly}
+            className={`street-light-dot street-light-dot-${
+              index + 1
+            } ${
+              working
+                ? 'working'
+                : 'not-working'
+            }`}
+            onClick={() => onToggle?.(index)}
+          />
+        ))}
 
         <div className="street-light-tower">
-          <span>
-            🏢
-          </span>
-
-          <strong>
-            {locationName}
-          </strong>
+          <span>🏢</span>
+          <strong>{locationName}</strong>
         </div>
 
       </div>
@@ -458,17 +304,11 @@ function InspectionLocationRow({
   onReport,
   onShare,
 }) {
-  const completed =
-    Boolean(
-      inspection?.saved_at
-    )
+  const completed = Boolean(inspection?.saved_at)
 
   const issue =
     completed &&
-    inspectionHasIssue(
-      location.type,
-      inspection
-    )
+    inspectionHasIssue(location.type, inspection)
 
   return (
     <div
@@ -484,17 +324,12 @@ function InspectionLocationRow({
       <div className="inspection-location-main">
 
         <div className="inspection-location-icon">
-          {location.type ===
-          'park'
-            ? '🌳'
-            : '🏢'}
+          {location.type === 'park' ? '🌳' : '🏢'}
         </div>
 
         <div className="inspection-location-info">
 
-          <strong>
-            {location.name}
-          </strong>
+          <strong>{location.name}</strong>
 
           <span
             className={`inspection-location-status ${
@@ -522,9 +357,7 @@ function InspectionLocationRow({
           <button
             type="button"
             className="location-scan-button"
-            onClick={() =>
-              onScan(location)
-            }
+            onClick={() => onScan(location)}
           >
             📷 Scan QR
           </button>
@@ -535,9 +368,7 @@ function InspectionLocationRow({
             <button
               type="button"
               className="location-rescan-button"
-              onClick={() =>
-                onScan(location)
-              }
+              onClick={() => onScan(location)}
             >
               📷 Scan Again
             </button>
@@ -545,23 +376,17 @@ function InspectionLocationRow({
             <button
               type="button"
               className="location-report-button"
-              onClick={() =>
-                onReport(location)
-              }
+              onClick={() => onReport(location)}
             >
               📄 Report
             </button>
 
-            {location.type ===
-              'tower' && (
+            {location.type === 'tower' && (
               <button
                 type="button"
                 className="location-share-button"
                 onClick={() =>
-                  onShare(
-                    location,
-                    inspection
-                  )
+                  onShare(location, inspection)
                 }
               >
                 📲 Share
@@ -576,262 +401,194 @@ function InspectionLocationRow({
   )
 }
 
-function TowerInspection({
-  onBack,
-}) {
+function TowerInspection({ onBack }) {
   const today =
-    useMemo(
-      () => getIndiaDate(),
-      []
-    )
+    useMemo(() => getIndiaDate(), [])
 
-  const scannerRef =
-    useRef(null)
+  const scannerRef = useRef(null)
+  const scanLockedRef = useRef(false)
 
-  const scanLockedRef =
-    useRef(false)
+  const [screen, setScreen] = useState('list')
 
-  const [
-    screen,
-    setScreen,
-  ] =
-    useState('list')
-
-  const [
-    towers,
-    setTowers,
-  ] =
-    useState([])
-
-  const [
-    parks,
-    setParks,
-  ] =
-    useState([])
+  const [towers, setTowers] = useState([])
+  const [parks, setParks] = useState([])
 
   const [
     towerInspections,
     setTowerInspections,
-  ] =
-    useState([])
+  ] = useState([])
 
   const [
     parkInspections,
     setParkInspections,
-  ] =
-    useState([])
+  ] = useState([])
 
   const [
     societyGarbageDisposed,
     setSocietyGarbageDisposed,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     societySaving,
     setSocietySaving,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     societySaved,
     setSocietySaved,
-  ] =
-    useState(false)
+  ] = useState(false)
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(true)
+  const [loading, setLoading] = useState(true)
 
   const [
     selectedLocation,
     setSelectedLocation,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     scannerActive,
     setScannerActive,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     scannerStarting,
     setScannerStarting,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     gpsLoading,
     setGpsLoading,
-  ] =
-    useState(false)
+  ] = useState(false)
 
-  const [
-    error,
-    setError,
-  ] =
-    useState('')
-
-  const [
-    infoMessage,
-    setInfoMessage,
-  ] =
-    useState('')
+  const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
 
   const [
     gpsFailureReason,
     setGpsFailureReason,
-  ] =
-    useState('')
+  ] = useState('')
 
   const [
     qrScannedAt,
     setQrScannedAt,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     scanLatitude,
     setScanLatitude,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     scanLongitude,
     setScanLongitude,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     gpsAccuracy,
     setGpsAccuracy,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     distanceFromLocation,
     setDistanceFromLocation,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     sweepingDone,
     setSweepingDone,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     moppingDone,
     setMoppingDone,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     cameraWorking,
     setCameraWorking,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     ledScreenWorking,
     setLedScreenWorking,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     lightsWorkingCount,
     setLightsWorkingCount,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     waterLeakage,
     setWaterLeakage,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     streetLightStatus,
     setStreetLightStatus,
-  ] =
-    useState([
-      ...DEFAULT_STREET_LIGHTS,
-    ])
+  ] = useState([
+    ...DEFAULT_STREET_LIGHTS,
+  ])
 
   const [
     grassProperlyCut,
     setGrassProperlyCut,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     benchesWellPlaced,
     setBenchesWellPlaced,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     swingsNotBroken,
     setSwingsNotBroken,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     wateringNeeded,
     setWateringNeeded,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     parkStreetLightsAllLit,
     setParkStreetLightsAllLit,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   const [
     parkStreetLightsNotLitCount,
     setParkStreetLightsNotLitCount,
-  ] =
-    useState(0)
+  ] = useState(0)
 
   const [
     otherIssue,
     setOtherIssue,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     otherIssueDetails,
     setOtherIssueDetails,
-  ] =
-    useState('')
+  ] = useState('')
 
   const [
     remarks,
     setRemarks,
-  ] =
-    useState('')
+  ] = useState('')
 
   const [
     saving,
     setSaving,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     saved,
     setSaved,
-  ] =
-    useState(false)
+  ] = useState(false)
 
   const [
     savedAt,
     setSavedAt,
-  ] =
-    useState(null)
+  ] = useState(null)
 
   useEffect(() => {
     loadDashboard()
@@ -845,32 +602,22 @@ function TowerInspection({
       return
     }
 
-    let cancelled =
-      false
+    let cancelled = false
 
     async function openScanner() {
       try {
-        setScannerStarting(
-          true
-        )
-
+        setScannerStarting(true)
         setError('')
-
-        scanLockedRef.current =
-          false
+        scanLockedRef.current = false
 
         const scanner =
-          new Html5Qrcode(
-            'tower-qr-reader'
-          )
+          new Html5Qrcode('tower-qr-reader')
 
-        scannerRef.current =
-          scanner
+        scannerRef.current = scanner
 
         await scanner.start(
           {
-            facingMode:
-              'environment',
+            facingMode: 'environment',
           },
           {
             fps: 10,
@@ -893,33 +640,20 @@ function TowerInspection({
           'Unable to open camera. Please allow camera permission and try again.'
         )
 
-        setScannerActive(
-          false
-        )
+        setScannerActive(false)
       } finally {
-        setScannerStarting(
-          false
-        )
+        setScannerStarting(false)
       }
     }
 
     const timer =
-      window.setTimeout(
-        openScanner,
-        100
-      )
+      window.setTimeout(openScanner, 100)
 
     return () => {
       cancelled = true
-
-      window.clearTimeout(
-        timer
-      )
+      window.clearTimeout(timer)
     }
-  }, [
-    scannerActive,
-    screen,
-  ])
+  }, [scannerActive, screen])
 
   useEffect(() => {
     return () => {
@@ -927,9 +661,7 @@ function TowerInspection({
     }
   }, [])
 
-  function mapTower(
-    tower
-  ) {
+  function mapTower(tower) {
     return {
       id: tower.id,
       type: 'tower',
@@ -944,9 +676,7 @@ function TowerInspection({
     }
   }
 
-  function mapPark(
-    park
-  ) {
+  function mapPark(park) {
     return {
       id: park.id,
       type: 'park',
@@ -970,57 +700,39 @@ function TowerInspection({
         towerResponse,
         parkResponse,
         societyResponse,
-      ] =
-        await Promise.all([
-          supabase
-            .from('towers')
-            .select('*')
-            .eq('active', true)
-            .order(
-              'display_order',
-              {
-                ascending: true,
-              }
-            ),
+      ] = await Promise.all([
+        supabase
+          .from('towers')
+          .select('*')
+          .eq('active', true)
+          .order('display_order', {
+            ascending: true,
+          }),
 
-          supabase
-            .from('parks')
-            .select('*')
-            .eq('active', true)
-            .order(
-              'display_order',
-              {
-                ascending: true,
-              }
-            ),
+        supabase
+          .from('parks')
+          .select('*')
+          .eq('active', true)
+          .order('display_order', {
+            ascending: true,
+          }),
 
-          supabase
-            .from(
-              'society_daily_inspections'
-            )
-            .select('*')
-            .eq(
-              'inspection_date',
-              today
-            )
-            .maybeSingle(),
-        ])
+        supabase
+          .from('society_daily_inspections')
+          .select('*')
+          .eq('inspection_date', today)
+          .maybeSingle(),
+      ])
 
-      if (
-        towerResponse.error
-      ) {
+      if (towerResponse.error) {
         throw towerResponse.error
       }
 
-      if (
-        parkResponse.error
-      ) {
+      if (parkResponse.error) {
         throw parkResponse.error
       }
 
-      if (
-        societyResponse.error
-      ) {
+      if (societyResponse.error) {
         throw societyResponse.error
       }
 
@@ -1030,111 +742,62 @@ function TowerInspection({
       const parkData =
         parkResponse.data || []
 
-      setTowers(
-        towerData
-      )
-
-      setParks(
-        parkData
-      )
+      setTowers(towerData)
+      setParks(parkData)
 
       setSocietyGarbageDisposed(
-        societyResponse.data
-          ?.garbage_disposed ??
+        societyResponse.data?.garbage_disposed ??
           null
       )
 
       setSocietySaved(
         Boolean(
-          societyResponse.data
-            ?.saved_at
+          societyResponse.data?.saved_at
         )
       )
 
       const towerIds =
-        towerData.map(
-          (tower) =>
-            tower.id
-        )
+        towerData.map((tower) => tower.id)
 
       const parkIds =
-        parkData.map(
-          (park) =>
-            park.id
-        )
+        parkData.map((park) => park.id)
 
-      if (
-        towerIds.length > 0
-      ) {
+      if (towerIds.length > 0) {
         const {
           data,
-          error:
-            inspectionError,
-        } =
-          await supabase
-            .from(
-              'tower_daily_inspections'
-            )
-            .select('*')
-            .eq(
-              'inspection_date',
-              today
-            )
-            .in(
-              'tower_id',
-              towerIds
-            )
+          error: inspectionError,
+        } = await supabase
+          .from('tower_daily_inspections')
+          .select('*')
+          .eq('inspection_date', today)
+          .in('tower_id', towerIds)
 
-        if (
-          inspectionError
-        ) {
+        if (inspectionError) {
           throw inspectionError
         }
 
-        setTowerInspections(
-          data || []
-        )
+        setTowerInspections(data || [])
       } else {
-        setTowerInspections(
-          []
-        )
+        setTowerInspections([])
       }
 
-      if (
-        parkIds.length > 0
-      ) {
+      if (parkIds.length > 0) {
         const {
           data,
-          error:
-            parkError,
-        } =
-          await supabase
-            .from(
-              'park_daily_inspections'
-            )
-            .select('*')
-            .eq(
-              'inspection_date',
-              today
-            )
-            .in(
-              'park_id',
-              parkIds
-            )
+          error: parkError,
+        } = await supabase
+          .from('park_daily_inspections')
+          .select('*')
+          .eq('inspection_date', today)
+          .in('park_id', parkIds)
 
-        if (
-          parkError
-        ) {
+        if (parkError) {
           throw parkError
         }
 
-        setParkInspections(
-          data || []
-        )
+        setParkInspections(data || [])
       } else {
-        setParkInspections(
-          []
-        )
+        setParkInspections([])
       }
     } catch (err) {
       console.error(err)
@@ -1149,17 +812,12 @@ function TowerInspection({
   }
 
   async function stopScanner() {
-    const scanner =
-      scannerRef.current
+    const scanner = scannerRef.current
 
-    if (!scanner) {
-      return
-    }
+    if (!scanner) return
 
     try {
-      if (
-        scanner.isScanning
-      ) {
+      if (scanner.isScanning) {
         await scanner.stop()
       }
     } catch (err) {
@@ -1175,46 +833,31 @@ function TowerInspection({
       // Already cleared.
     }
 
-    scannerRef.current =
-      null
+    scannerRef.current = null
   }
 
-  function getInspection(
-    location
-  ) {
-    if (!location) {
-      return null
-    }
+  function getInspection(location) {
+    if (!location) return null
 
-    if (
-      location.type ===
-      'park'
-    ) {
+    if (location.type === 'park') {
       return parkInspections.find(
         (inspection) =>
-          inspection.park_id ===
-          location.id
+          inspection.park_id === location.id
       )
     }
 
     return towerInspections.find(
       (inspection) =>
-        inspection.tower_id ===
-        location.id
+        inspection.tower_id === location.id
     )
   }
 
   function resetForm() {
     setSweepingDone(null)
     setMoppingDone(null)
-
     setCameraWorking(null)
     setLedScreenWorking(null)
-
-    setLightsWorkingCount(
-      null
-    )
-
+    setLightsWorkingCount(null)
     setWaterLeakage(null)
 
     setStreetLightStatus([
@@ -1226,24 +869,14 @@ function TowerInspection({
     setSwingsNotBroken(null)
     setWateringNeeded(null)
 
-    setParkStreetLightsAllLit(
-      null
-    )
-
-    setParkStreetLightsNotLitCount(
-      0
-    )
+    setParkStreetLightsAllLit(null)
+    setParkStreetLightsNotLitCount(0)
 
     setOtherIssue(false)
-
-    setOtherIssueDetails(
-      ''
-    )
-
+    setOtherIssueDetails('')
     setRemarks('')
 
     setSaved(false)
-
     setSavedAt(null)
 
     setInfoMessage('')
@@ -1252,12 +885,9 @@ function TowerInspection({
   function setTowerDefaultValues() {
     setSweepingDone(true)
     setMoppingDone(true)
-
     setCameraWorking(true)
     setLedScreenWorking(true)
-
     setLightsWorkingCount(9)
-
     setWaterLeakage(false)
 
     setStreetLightStatus([
@@ -1265,11 +895,7 @@ function TowerInspection({
     ])
 
     setOtherIssue(false)
-
-    setOtherIssueDetails(
-      ''
-    )
-
+    setOtherIssueDetails('')
     setRemarks('')
   }
 
@@ -1280,10 +906,7 @@ function TowerInspection({
     resetForm()
 
     if (!inspection) {
-      if (
-        location.type ===
-        'tower'
-      ) {
+      if (location.type === 'tower') {
         setTowerDefaultValues()
       }
 
@@ -1294,10 +917,7 @@ function TowerInspection({
       inspection.sweeping_done
     )
 
-    if (
-      location.type ===
-      'tower'
-    ) {
+    if (location.type === 'tower') {
       setMoppingDone(
         inspection.mopping_done
       )
@@ -1315,74 +935,59 @@ function TowerInspection({
       )
 
       setLightsWorkingCount(
-        inspection
-          .lights_working_count
+        inspection.lights_working_count
       )
 
       setWaterLeakage(
-        inspection.water_leakage ??
-          false
+        inspection.water_leakage ?? false
       )
 
       setStreetLightStatus(
         normaliseStreetLights(
-          inspection
-            .street_light_status
+          inspection.street_light_status
         )
       )
     } else {
       setGrassProperlyCut(
-        inspection
-          .grass_properly_cut
+        inspection.grass_properly_cut
       )
 
       setBenchesWellPlaced(
-        inspection
-          .benches_well_placed
+        inspection.benches_well_placed
       )
 
       setSwingsNotBroken(
-        inspection
-          .swings_not_broken
+        inspection.swings_not_broken
       )
 
       setWateringNeeded(
-        inspection
-          .watering_needed
+        inspection.watering_needed
       )
 
       setParkStreetLightsAllLit(
-        inspection
-          .street_lights_all_lit
+        inspection.street_lights_all_lit
       )
 
       setParkStreetLightsNotLitCount(
-        inspection
-          .street_lights_not_lit_count ||
+        inspection.street_lights_not_lit_count ||
           0
       )
     }
 
     setOtherIssue(
-      inspection.other_issue ??
-        false
+      inspection.other_issue ?? false
     )
 
     setOtherIssueDetails(
-      inspection
-        .other_issue_details ||
-        ''
+      inspection.other_issue_details || ''
     )
 
     setRemarks(
-      inspection.remarks ||
-        ''
+      inspection.remarks || ''
     )
 
     setSaved(
-      Boolean(
-        inspection.saved_at
-      )
+      Boolean(inspection.saved_at)
     )
 
     setSavedAt(
@@ -1390,70 +995,43 @@ function TowerInspection({
     )
   }
 
-  async function startLocationScan(
-    location
-  ) {
+  async function startLocationScan(location) {
     await stopScanner()
 
-    setSelectedLocation(
-      location
-    )
-
+    setSelectedLocation(location)
     resetForm()
 
     setQrScannedAt(null)
     setScanLatitude(null)
     setScanLongitude(null)
     setGpsAccuracy(null)
-
-    setDistanceFromLocation(
-      null
-    )
-
-    setGpsFailureReason(
-      ''
-    )
-
+    setDistanceFromLocation(null)
+    setGpsFailureReason('')
     setError('')
 
     setScreen('scanner')
-
-    setScannerActive(
-      true
-    )
+    setScannerActive(true)
   }
 
   async function handleQrScanned(
     decodedText
   ) {
-    if (
-      scanLockedRef.current
-    ) {
-      return
-    }
+    if (scanLockedRef.current) return
 
-    scanLockedRef.current =
-      true
+    scanLockedRef.current = true
 
     const token =
-      extractQrToken(
-        decodedText
-      )
+      extractQrToken(decodedText)
 
     const allLocationsForScan = [
-      ...towers.map(
-        mapTower
-      ),
-      ...parks.map(
-        mapPark
-      ),
+      ...towers.map(mapTower),
+      ...parks.map(mapPark),
     ]
 
     const scannedLocation =
       allLocationsForScan.find(
         (location) =>
-          location.qr_token ===
-          token
+          location.qr_token === token
       )
 
     if (!scannedLocation) {
@@ -1461,13 +1039,9 @@ function TowerInspection({
         'This is not a valid RWA Pocket-A inspection QR code.'
       )
 
-      window.setTimeout(
-        () => {
-          scanLockedRef.current =
-            false
-        },
-        1200
-      )
+      window.setTimeout(() => {
+        scanLockedRef.current = false
+      }, 1200)
 
       return
     }
@@ -1482,250 +1056,171 @@ function TowerInspection({
         `Wrong QR code. You selected ${selectedLocation.name}, but scanned ${scannedLocation.name}.`
       )
 
-      window.setTimeout(
-        () => {
-          scanLockedRef.current =
-            false
-        },
-        1500
-      )
+      window.setTimeout(() => {
+        scanLockedRef.current = false
+      }, 1500)
 
       return
     }
 
     await stopScanner()
 
-    setScannerActive(
-      false
-    )
-
+    setScannerActive(false)
     setError('')
 
     const scanTime =
-      new Date()
-        .toISOString()
+      new Date().toISOString()
 
-    setQrScannedAt(
-      scanTime
-    )
+    setQrScannedAt(scanTime)
 
     const existingInspection =
-      getInspection(
-        selectedLocation
-      )
+      getInspection(selectedLocation)
 
     populateForm(
       selectedLocation,
       existingInspection
     )
 
-    setScreen(
-      'verification'
-    )
+    setScreen('verification')
 
-    verifyGps(
-      selectedLocation
-    )
+    verifyGps(selectedLocation)
   }
 
-  function verifyGps(
-    location
-  ) {
-    if (!location) {
-      return
-    }
+  function verifyGps(location) {
+    if (!location) return
 
     setGpsLoading(true)
-
-    setGpsFailureReason(
-      ''
-    )
-
+    setGpsFailureReason('')
     setError('')
 
-    if (
-      !navigator.geolocation
-    ) {
+    if (!navigator.geolocation) {
       setGpsFailureReason(
         'GPS is not supported by this device/browser.'
       )
 
       setGpsLoading(false)
-
       return
     }
 
     if (
-      location.latitude ==
-        null ||
-      location.longitude ==
-        null
+      location.latitude == null ||
+      location.longitude == null
     ) {
       setGpsFailureReason(
         `GPS coordinates are not configured for ${location.name}.`
       )
 
       setGpsLoading(false)
-
       return
     }
 
-    navigator.geolocation
-      .getCurrentPosition(
-        (position) => {
-          const latitude =
-            position.coords
-              .latitude
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude =
+          position.coords.latitude
 
-          const longitude =
-            position.coords
-              .longitude
+        const longitude =
+          position.coords.longitude
 
-          const accuracy =
-            position.coords
-              .accuracy
+        const accuracy =
+          position.coords.accuracy
 
-          const distance =
-            calculateDistance(
-              latitude,
-              longitude,
-              Number(
-                location.latitude
-              ),
-              Number(
-                location.longitude
-              )
-            )
-
-          setScanLatitude(
-            latitude
+        const distance =
+          calculateDistance(
+            latitude,
+            longitude,
+            Number(location.latitude),
+            Number(location.longitude)
           )
 
-          setScanLongitude(
-            longitude
-          )
+        setScanLatitude(latitude)
+        setScanLongitude(longitude)
+        setGpsAccuracy(accuracy)
+        setDistanceFromLocation(distance)
 
-          setGpsAccuracy(
-            accuracy
-          )
-
-          setDistanceFromLocation(
-            distance
-          )
-
-          if (
-            accuracy >
-            MAX_GPS_ACCURACY_M
-          ) {
-            setGpsFailureReason(
-              `GPS accuracy is currently ±${Math.round(
-                accuracy
-              )} m. Please move to an open area and try again.`
-            )
-
-            setGpsLoading(
-              false
-            )
-
-            return
-          }
-
-          if (
-            distance >
-            Number(
-              location
-                .allowed_radius_m
-            )
-          ) {
-            setGpsFailureReason(
-              `You are approximately ${Math.round(
-                distance
-              )} m away from ${location.name}. Allowed distance is ${location.allowed_radius_m} m.`
-            )
-
-            setGpsLoading(
-              false
-            )
-
-            return
-          }
-
+        if (
+          accuracy >
+          MAX_GPS_ACCURACY_M
+        ) {
           setGpsFailureReason(
-            ''
+            `GPS accuracy is currently ±${Math.round(
+              accuracy
+            )} m. Please move to an open area and try again.`
           )
 
-          setGpsLoading(
-            false
-          )
-
-          setScreen('form')
-        },
-
-        (geoError) => {
-          console.error(
-            geoError
-          )
-
-          let message =
-            'Unable to obtain your current GPS location.'
-
-          if (
-            geoError.code ===
-            geoError.PERMISSION_DENIED
-          ) {
-            message =
-              'Location permission is blocked. Please allow location access and try again.'
-          }
-
-          if (
-            geoError.code ===
-            geoError.POSITION_UNAVAILABLE
-          ) {
-            message =
-              'GPS location is currently unavailable. Please move to an open area and try again.'
-          }
-
-          if (
-            geoError.code ===
-            geoError.TIMEOUT
-          ) {
-            message =
-              'GPS location request timed out. Please try again.'
-          }
-
-          setGpsFailureReason(
-            message
-          )
-
-          setGpsLoading(
-            false
-          )
-        },
-
-        {
-          enableHighAccuracy:
-            true,
-          timeout: 20000,
-          maximumAge: 0,
+          setGpsLoading(false)
+          return
         }
-      )
+
+        if (
+          distance >
+          Number(location.allowed_radius_m)
+        ) {
+          setGpsFailureReason(
+            `You are approximately ${Math.round(
+              distance
+            )} m away from ${location.name}. Allowed distance is ${location.allowed_radius_m} m.`
+          )
+
+          setGpsLoading(false)
+          return
+        }
+
+        setGpsFailureReason('')
+        setGpsLoading(false)
+        setScreen('form')
+      },
+
+      (geoError) => {
+        console.error(geoError)
+
+        let message =
+          'Unable to obtain your current GPS location.'
+
+        if (
+          geoError.code ===
+          geoError.PERMISSION_DENIED
+        ) {
+          message =
+            'Location permission is blocked. Please allow location access and try again.'
+        }
+
+        if (
+          geoError.code ===
+          geoError.POSITION_UNAVAILABLE
+        ) {
+          message =
+            'GPS location is currently unavailable. Please move to an open area and try again.'
+        }
+
+        if (
+          geoError.code ===
+          geoError.TIMEOUT
+        ) {
+          message =
+            'GPS location request timed out. Please try again.'
+        }
+
+        setGpsFailureReason(message)
+        setGpsLoading(false)
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
+      }
+    )
   }
 
   function isScanStillValid() {
-    if (!qrScannedAt) {
-      return false
-    }
+    if (!qrScannedAt) return false
 
     const scanTime =
-      new Date(
-        qrScannedAt
-      ).getTime()
+      new Date(qrScannedAt).getTime()
 
     const minutes =
-      (
-        Date.now() -
-        scanTime
-      ) /
+      (Date.now() - scanTime) /
       1000 /
       60
 
@@ -1736,35 +1231,26 @@ function TowerInspection({
   }
 
   const isPark =
-    selectedLocation?.type ===
-    'park'
+    selectedLocation?.type === 'park'
 
   const towerChecklistComplete =
     sweepingDone !== null &&
     moppingDone !== null &&
     cameraWorking !== null &&
-    ledScreenWorking !==
-      null &&
-    lightsWorkingCount !==
-      null &&
+    ledScreenWorking !== null &&
+    lightsWorkingCount !== null &&
     waterLeakage !== null
 
   const parkChecklistComplete =
     sweepingDone !== null &&
-    grassProperlyCut !==
-      null &&
-    benchesWellPlaced !==
-      null &&
-    swingsNotBroken !==
-      null &&
+    grassProperlyCut !== null &&
+    benchesWellPlaced !== null &&
+    swingsNotBroken !== null &&
     wateringNeeded !== null &&
-    parkStreetLightsAllLit !==
-      null &&
+    parkStreetLightsAllLit !== null &&
     (
-      parkStreetLightsAllLit ===
-        true ||
-      parkStreetLightsNotLitCount >
-        0
+      parkStreetLightsAllLit === true ||
+      parkStreetLightsNotLitCount > 0
     )
 
   const checklistComplete =
@@ -1780,61 +1266,40 @@ function TowerInspection({
   const hasIssue =
     isPark
       ? (
-          sweepingDone ===
-            false ||
-          grassProperlyCut ===
-            false ||
-          benchesWellPlaced ===
-            false ||
-          swingsNotBroken ===
-            false ||
-          wateringNeeded ===
-            true ||
-          parkStreetLightsAllLit ===
-            false ||
+          sweepingDone === false ||
+          grassProperlyCut === false ||
+          benchesWellPlaced === false ||
+          swingsNotBroken === false ||
+          wateringNeeded === true ||
+          parkStreetLightsAllLit === false ||
           otherIssue === true
         )
       : (
-          sweepingDone ===
-            false ||
-          cameraWorking ===
-            false ||
-          ledScreenWorking ===
-            false ||
-          waterLeakage ===
-            true ||
-          towerStreetFailures.length >
-            0 ||
-          otherIssue ===
-            true ||
+          sweepingDone === false ||
+          cameraWorking === false ||
+          ledScreenWorking === false ||
+          waterLeakage === true ||
+          towerStreetFailures.length > 0 ||
+          otherIssue === true ||
           (
-            lightsWorkingCount !==
-              null &&
-            lightsWorkingCount <
-              9
+            lightsWorkingCount !== null &&
+            lightsWorkingCount < 9
           )
         )
 
   function markChanged() {
     setSaved(false)
-
     setInfoMessage('')
   }
 
-  function toggleStreetLight(
-    index
-  ) {
+  function toggleStreetLight(index) {
     markChanged()
 
     setStreetLightStatus(
       (current) =>
         current.map(
-          (
-            working,
-            currentIndex
-          ) =>
-            currentIndex ===
-            index
+          (working, currentIndex) =>
+            currentIndex === index
               ? !working
               : working
         )
@@ -1846,9 +1311,7 @@ function TowerInspection({
 
     setLightsWorkingCount(
       (current) => {
-        if (
-          current === null
-        ) {
+        if (current === null) {
           return 8
         }
 
@@ -1865,9 +1328,7 @@ function TowerInspection({
 
     setLightsWorkingCount(
       (current) => {
-        if (
-          current === null
-        ) {
+        if (current === null) {
           return 9
         }
 
@@ -1895,15 +1356,13 @@ function TowerInspection({
     markChanged()
 
     setParkStreetLightsNotLitCount(
-      (current) =>
-        current + 1
+      (current) => current + 1
     )
   }
 
   async function saveSocietyGarbage() {
     if (
-      societyGarbageDisposed ===
-      null
+      societyGarbageDisposed === null
     ) {
       setError(
         'Please select Yes or No for Garbage Disposal.'
@@ -1913,16 +1372,13 @@ function TowerInspection({
     }
 
     setSocietySaving(true)
-
     setError('')
     setInfoMessage('')
 
     try {
       const {
         data: { user },
-      } =
-        await supabase.auth
-          .getUser()
+      } = await supabase.auth.getUser()
 
       if (!user) {
         throw new Error(
@@ -1931,37 +1387,26 @@ function TowerInspection({
       }
 
       const now =
-        new Date()
-          .toISOString()
+        new Date().toISOString()
 
       const {
-        error:
-          saveError,
-      } =
-        await supabase
-          .from(
-            'society_daily_inspections'
-          )
-          .upsert(
-            {
-              inspection_date:
-                today,
-
-              garbage_disposed:
-                societyGarbageDisposed,
-
-              inspected_by:
-                user.id,
-
-              saved_at: now,
-
-              updated_at: now,
-            },
-            {
-              onConflict:
-                'inspection_date',
-            }
-          )
+        error: saveError,
+      } = await supabase
+        .from('society_daily_inspections')
+        .upsert(
+          {
+            inspection_date: today,
+            garbage_disposed:
+              societyGarbageDisposed,
+            inspected_by: user.id,
+            saved_at: now,
+            updated_at: now,
+          },
+          {
+            onConflict:
+              'inspection_date',
+          }
+        )
 
       if (saveError) {
         throw saveError
@@ -1988,9 +1433,7 @@ function TowerInspection({
     setError('')
     setInfoMessage('')
 
-    if (
-      !isScanStillValid()
-    ) {
+    if (!isScanStillValid()) {
       setError(
         'QR/GPS verification has expired. Please scan the QR again.'
       )
@@ -1998,9 +1441,7 @@ function TowerInspection({
       return
     }
 
-    if (
-      !checklistComplete
-    ) {
+    if (!checklistComplete) {
       setError(
         'Please complete all required inspection items.'
       )
@@ -2024,9 +1465,7 @@ function TowerInspection({
     try {
       const {
         data: { user },
-      } =
-        await supabase.auth
-          .getUser()
+      } = await supabase.auth.getUser()
 
       if (!user) {
         throw new Error(
@@ -2035,97 +1474,78 @@ function TowerInspection({
       }
 
       const now =
-        new Date()
-          .toISOString()
+        new Date().toISOString()
 
       const commonData = {
-        inspection_date:
-          today,
-
+        inspection_date: today,
         sweeping_done:
           sweepingDone,
-
         other_issue:
           otherIssue,
-
         other_issue_details:
           otherIssue
             ? otherIssueDetails.trim()
             : null,
-
         remarks:
-          remarks.trim() ||
-          null,
-
+          remarks.trim() || null,
         inspected_by:
           user.id,
-
         qr_scanned_at:
           qrScannedAt,
-
         scan_latitude:
           scanLatitude,
-
         scan_longitude:
           scanLongitude,
-
         gps_accuracy_m:
           gpsAccuracy,
-
         gps_verified: true,
-
         saved_at: now,
-
         updated_at: now,
       }
 
       if (isPark) {
         const {
           data,
-          error:
-            saveError,
-        } =
-          await supabase
-            .from(
-              'park_daily_inspections'
-            )
-            .upsert(
-              {
-                ...commonData,
+          error: saveError,
+        } = await supabase
+          .from('park_daily_inspections')
+          .upsert(
+            {
+              ...commonData,
 
-                park_id:
-                  selectedLocation.id,
+              park_id:
+                selectedLocation.id,
 
-                grass_properly_cut:
-                  grassProperlyCut,
+              grass_properly_cut:
+                grassProperlyCut,
 
-                benches_well_placed:
-                  benchesWellPlaced,
+              benches_well_placed:
+                benchesWellPlaced,
 
-                swings_not_broken:
-                  swingsNotBroken,
+              swings_not_broken:
+                swingsNotBroken,
 
-                watering_needed:
-                  wateringNeeded,
+              watering_needed:
+                wateringNeeded,
 
-                street_lights_all_lit:
-                  parkStreetLightsAllLit,
+              street_lights_all_lit:
+                parkStreetLightsAllLit,
 
-                street_lights_not_lit_count:
-                  parkStreetLightsAllLit
-                    ? 0
-                    : parkStreetLightsNotLitCount,
+              street_lights_not_lit_count:
+                parkStreetLightsAllLit
+                  ? 0
+                  : parkStreetLightsNotLitCount,
 
-                distance_from_park_m:
-                  distanceFromLocation,
-              },
-              {
-                onConflict:
-                  'inspection_date,park_id',
-              }
-            )
-            .select()
-            .single()
+              distance_from_park_m:
+                distanceFromLocation,
+            },
+            {
+              onConflict:
+                'inspection_date,park_id',
+            }
+          )
+          .select()
+          .single()
 
         if (saveError) {
           throw saveError
@@ -2135,8 +1555,7 @@ function TowerInspection({
           (current) => [
             ...current.filter(
               (inspection) =>
-                inspection
-                  .park_id !==
+                inspection.park_id !==
                 selectedLocation.id
             ),
             data,
@@ -2145,48 +1564,44 @@ function TowerInspection({
       } else {
         const {
           data,
-          error:
-            saveError,
-        } =
-          await supabase
-            .from(
-              'tower_daily_inspections'
-            )
-            .upsert(
-              {
-                ...commonData,
+          error: saveError,
+        } = await supabase
+          .from('tower_daily_inspections')
+          .upsert(
+            {
+              ...commonData,
 
-                tower_id:
-                  selectedLocation.id,
+              tower_id:
+                selectedLocation.id,
 
-                mopping_done:
-                  moppingDone,
+              mopping_done:
+                moppingDone,
 
-                camera_working:
-                  cameraWorking,
+              camera_working:
+                cameraWorking,
 
-                led_screen_working:
-                  ledScreenWorking,
+              led_screen_working:
+                ledScreenWorking,
 
-                lights_working_count:
-                  lightsWorkingCount,
+              lights_working_count:
+                lightsWorkingCount,
 
-                water_leakage:
-                  waterLeakage,
+              water_leakage:
+                waterLeakage,
 
-                street_light_status:
-                  streetLightStatus,
+              street_light_status:
+                streetLightStatus,
 
-                distance_from_tower_m:
-                  distanceFromLocation,
-              },
-              {
-                onConflict:
-                  'inspection_date,tower_id',
-              }
-            )
-            .select()
-            .single()
+              distance_from_tower_m:
+                distanceFromLocation,
+            },
+            {
+              onConflict:
+                'inspection_date,tower_id',
+            }
+          )
+          .select()
+          .single()
 
         if (saveError) {
           throw saveError
@@ -2196,8 +1611,7 @@ function TowerInspection({
           (current) => [
             ...current.filter(
               (inspection) =>
-                inspection
-                  .tower_id !==
+                inspection.tower_id !==
                 selectedLocation.id
             ),
             data,
@@ -2206,7 +1620,6 @@ function TowerInspection({
       }
 
       setSaved(true)
-
       setSavedAt(now)
 
       setInfoMessage(
@@ -2230,14 +1643,9 @@ function TowerInspection({
   ) {
     const lines = []
 
-    if (
-      location.type ===
-      'park'
-    ) {
+    if (location.type === 'park') {
       if (
-        inspection
-          .sweeping_done ===
-        false
+        inspection.sweeping_done === false
       ) {
         lines.push(
           'Sweeping not done'
@@ -2245,9 +1653,7 @@ function TowerInspection({
       }
 
       if (
-        inspection
-          .grass_properly_cut ===
-        false
+        inspection.grass_properly_cut === false
       ) {
         lines.push(
           'Grass needs cutting'
@@ -2255,9 +1661,7 @@ function TowerInspection({
       }
 
       if (
-        inspection
-          .benches_well_placed ===
-        false
+        inspection.benches_well_placed === false
       ) {
         lines.push(
           'Benches need attention'
@@ -2265,9 +1669,7 @@ function TowerInspection({
       }
 
       if (
-        inspection
-          .swings_not_broken ===
-        false
+        inspection.swings_not_broken === false
       ) {
         lines.push(
           'Swing broken'
@@ -2275,9 +1677,7 @@ function TowerInspection({
       }
 
       if (
-        inspection
-          .watering_needed ===
-        true
+        inspection.watering_needed === true
       ) {
         lines.push(
           'Watering required'
@@ -2285,14 +1685,11 @@ function TowerInspection({
       }
 
       if (
-        inspection
-          .street_lights_all_lit ===
-        false
+        inspection.street_lights_all_lit === false
       ) {
         lines.push(
           `${
-            inspection
-              .street_lights_not_lit_count ||
+            inspection.street_lights_not_lit_count ||
             0
           } street light(s) not lit`
         )
@@ -2306,26 +1703,20 @@ function TowerInspection({
         inspection.led_screen_working ??
         inspection.camera_led_working
 
-      if (
-        camera === false
-      ) {
+      if (camera === false) {
         lines.push(
           'Camera not working'
         )
       }
 
-      if (
-        led === false
-      ) {
+      if (led === false) {
         lines.push(
           'LED Screen not working'
         )
       }
 
       if (
-        inspection
-          .water_leakage ===
-        true
+        inspection.water_leakage === true
       ) {
         lines.push(
           'Water leakage observed'
@@ -2334,40 +1725,29 @@ function TowerInspection({
 
       const streetIssues =
         getStreetLightFailures(
-          inspection
-            .street_light_status
+          inspection.street_light_status
         )
 
-      if (
-        streetIssues.length >
-        0
-      ) {
+      if (streetIssues.length > 0) {
         lines.push(
           `${streetIssues.length} street light(s) not working`
         )
       }
 
       if (
-        inspection
-          .lights_working_count !==
-          null &&
-        inspection
-          .lights_working_count <
-          9
+        inspection.lights_working_count !== null &&
+        inspection.lights_working_count < 9
       ) {
         lines.push(
           `${
             9 -
-            inspection
-              .lights_working_count
+            inspection.lights_working_count
           } tower light(s) not working`
         )
       }
 
       if (
-        inspection
-          .sweeping_done ===
-        false
+        inspection.sweeping_done === false
       ) {
         lines.push(
           'Sweeping not done'
@@ -2376,12 +1756,10 @@ function TowerInspection({
     }
 
     if (
-      inspection.other_issue ===
-      true
+      inspection.other_issue === true
     ) {
       lines.push(
-        inspection
-          .other_issue_details ||
+        inspection.other_issue_details ||
           'Other issue'
       )
     }
@@ -2391,7 +1769,7 @@ function TowerInspection({
 
   function padText(
     text,
-    length = 18
+    length = 16
   ) {
     const value =
       String(text)
@@ -2420,8 +1798,7 @@ function TowerInspection({
 
     const streetFailures =
       getStreetLightFailures(
-        inspection
-          .street_light_status
+        inspection.street_light_status
       )
 
     const camera =
@@ -2437,7 +1814,7 @@ function TowerInspection({
         ? attentionLines
             .map(
               (line) =>
-                `- ${line}`
+                `• ${line}`
             )
             .join('\n')
         : 'No issues reported'
@@ -2445,15 +1822,13 @@ function TowerInspection({
     const rows = [
       [
         'Sweeping',
-        inspection
-          .sweeping_done
+        inspection.sweeping_done
           ? 'Done'
           : 'Not Done',
       ],
       [
         'Mopping',
-        inspection
-          .mopping_done
+        inspection.mopping_done
           ? 'Done'
           : 'Not Done',
       ],
@@ -2475,18 +1850,18 @@ function TowerInspection({
       ],
       [
         'Water Leakage',
-        inspection
-          .water_leakage
+        inspection.water_leakage
           ? 'Yes'
           : 'No',
       ],
       [
         'Street Lights',
-        streetFailures.length ===
-        0
+        streetFailures.length === 0
           ? '8/8 Working'
-          : `${8 -
-              streetFailures.length}/8 Working`,
+          : `${
+              8 -
+              streetFailures.length
+            }/8 Working`,
       ],
     ]
 
@@ -2494,18 +1869,13 @@ function TowerInspection({
       rows
         .map(
           ([item, status]) =>
-            `${padText(
-              item
-            )}${status}`
+            `${padText(item)}${status}`
         )
         .join('\n')
 
     const remarksText =
       inspection.remarks
-        ? `
-
-Remarks
-${inspection.remarks}`
+        ? `\nRemarks: ${inspection.remarks}`
         : ''
 
     return `RWA POCKET-A
@@ -2513,31 +1883,25 @@ ${location.name.toUpperCase()} DAILY INSPECTION
 ${formatDate(today)}
 
 ATTENTION REQUIRED
---------------------------------
+-----------------------
 ${attentionText}
---------------------------------
+-----------------------
 
 INSPECTION STATUS
---------------------------------
-Item              Status
---------------------------------
+Item            Status
+-----------------------
 ${tableText}
---------------------------------${remarksText}
+-----------------------${remarksText}
 
 QR + GPS Verified
-
 ${REPORT_FOOTER}
 
 Supervisor
 RWA Pocket-A`
   }
 
-  async function shareText(
-    message
-  ) {
-    if (
-      navigator.share
-    ) {
+  async function shareText(message) {
+    if (navigator.share) {
       try {
         await navigator.share({
           text: message,
@@ -2546,8 +1910,7 @@ RWA Pocket-A`
         return
       } catch (err) {
         if (
-          err?.name ===
-          'AbortError'
+          err?.name === 'AbortError'
         ) {
           return
         }
@@ -2555,11 +1918,9 @@ RWA Pocket-A`
     }
 
     try {
-      await navigator
-        .clipboard
-        .writeText(
-          message
-        )
+      await navigator.clipboard.writeText(
+        message
+      )
 
       setInfoMessage(
         'Report copied. Open WhatsApp and paste it.'
@@ -2577,8 +1938,7 @@ RWA Pocket-A`
   ) {
     if (
       !inspection ||
-      location.type !==
-        'tower'
+      location.type !== 'tower'
     ) {
       return
     }
@@ -2591,21 +1951,13 @@ RWA Pocket-A`
     )
   }
 
-  function openReport(
-    location
-  ) {
+  function openReport(location) {
     const inspection =
-      getInspection(
-        location
-      )
+      getInspection(location)
 
-    if (!inspection) {
-      return
-    }
+    if (!inspection) return
 
-    setSelectedLocation(
-      location
-    )
+    setSelectedLocation(location)
 
     populateForm(
       location,
@@ -2621,12 +1973,9 @@ RWA Pocket-A`
     )
 
     setDistanceFromLocation(
-      location.type ===
-      'park'
-        ? inspection
-            .distance_from_park_m
-        : inspection
-            .distance_from_tower_m
+      location.type === 'park'
+        ? inspection.distance_from_park_m
+        : inspection.distance_from_tower_m
     )
 
     setScreen('report')
@@ -2635,13 +1984,8 @@ RWA Pocket-A`
   async function returnToList() {
     await stopScanner()
 
-    setScannerActive(
-      false
-    )
-
-    setSelectedLocation(
-      null
-    )
+    setScannerActive(false)
+    setSelectedLocation(null)
 
     resetForm()
 
@@ -2652,14 +1996,10 @@ RWA Pocket-A`
   }
 
   const towerLocations =
-    towers.map(
-      mapTower
-    )
+    towers.map(mapTower)
 
   const parkLocations =
-    parks.map(
-      mapPark
-    )
+    parks.map(mapPark)
 
   const allLocations = [
     ...towerLocations,
@@ -2670,9 +2010,7 @@ RWA Pocket-A`
     allLocations.filter(
       (location) =>
         Boolean(
-          getInspection(
-            location
-          )?.saved_at
+          getInspection(location)?.saved_at
         )
     ).length
 
@@ -2680,9 +2018,7 @@ RWA Pocket-A`
     allLocations.filter(
       (location) => {
         const inspection =
-          getInspection(
-            location
-          )
+          getInspection(location)
 
         return (
           Boolean(
@@ -2711,13 +2047,9 @@ RWA Pocket-A`
     towerLocations.forEach(
       (location) => {
         const inspection =
-          getInspection(
-            location
-          )
+          getInspection(location)
 
-        if (
-          !inspection?.saved_at
-        ) {
+        if (!inspection?.saved_at) {
           return
         }
 
@@ -2729,17 +2061,13 @@ RWA Pocket-A`
           inspection.led_screen_working ??
           inspection.camera_led_working
 
-        if (
-          camera === false
-        ) {
+        if (camera === false) {
           cameraIssues.push(
             location.name
           )
         }
 
-        if (
-          led === false
-        ) {
+        if (led === false) {
           ledIssues.push(
             location.name
           )
@@ -2747,13 +2075,10 @@ RWA Pocket-A`
 
         const failures =
           getStreetLightFailures(
-            inspection
-              .street_light_status
+            inspection.street_light_status
           )
 
-        if (
-          failures.length > 0
-        ) {
+        if (failures.length > 0) {
           streetLightIssues.push(
             `${location.name.replace(
               'Tower ',
@@ -2767,25 +2092,22 @@ RWA Pocket-A`
     parkLocations.forEach(
       (location) => {
         const inspection =
-          getInspection(
-            location
-          )
+          getInspection(location)
 
-        if (
-          !inspection?.saved_at
-        ) {
+        if (!inspection?.saved_at) {
           return
         }
 
         if (
-          inspection
-            .street_lights_all_lit ===
+          inspection.street_lights_all_lit ===
           false
         ) {
           streetLightIssues.push(
-            `${location.name} - ${
-              inspection
-                .street_lights_not_lit_count ||
+            `${location.name.replace(
+              'Park ',
+              'P'
+            )} - ${
+              inspection.street_lights_not_lit_count ||
               0
             } Not Lit`
           )
@@ -2804,8 +2126,7 @@ RWA Pocket-A`
     summary
   ) {
     if (
-      summary.cameraIssues.length >
-      0
+      summary.cameraIssues.length > 0
     ) {
       return (
         summary.cameraIssues
@@ -2825,9 +2146,7 @@ RWA Pocket-A`
       towerLocations.filter(
         (location) =>
           Boolean(
-            getInspection(
-              location
-            )?.saved_at
+            getInspection(location)?.saved_at
           )
       ).length
 
@@ -2835,7 +2154,7 @@ RWA Pocket-A`
       completedTowers <
       towerLocations.length
     ) {
-      return `No issue reported (${completedTowers}/${towerLocations.length} inspected)`
+      return `No issue (${completedTowers}/${towerLocations.length} checked)`
     }
 
     return 'All Working'
@@ -2845,8 +2164,7 @@ RWA Pocket-A`
     summary
   ) {
     if (
-      summary.ledIssues.length >
-      0
+      summary.ledIssues.length > 0
     ) {
       return (
         summary.ledIssues
@@ -2866,9 +2184,7 @@ RWA Pocket-A`
       towerLocations.filter(
         (location) =>
           Boolean(
-            getInspection(
-              location
-            )?.saved_at
+            getInspection(location)?.saved_at
           )
       ).length
 
@@ -2876,7 +2192,7 @@ RWA Pocket-A`
       completedTowers <
       towerLocations.length
     ) {
-      return `No issue reported (${completedTowers}/${towerLocations.length} inspected)`
+      return `No issue (${completedTowers}/${towerLocations.length} checked)`
     }
 
     return 'All Working'
@@ -2884,8 +2200,7 @@ RWA Pocket-A`
 
   function getGarbageSummaryText() {
     if (
-      societyGarbageDisposed ===
-      null
+      societyGarbageDisposed === null
     ) {
       return 'Pending'
     }
@@ -2903,9 +2218,7 @@ RWA Pocket-A`
       towerLocations.filter(
         (location) =>
           Boolean(
-            getInspection(
-              location
-            )?.saved_at
+            getInspection(location)?.saved_at
           )
       ).length
 
@@ -2913,9 +2226,7 @@ RWA Pocket-A`
       parkLocations.filter(
         (location) =>
           Boolean(
-            getInspection(
-              location
-            )?.saved_at
+            getInspection(location)?.saved_at
           )
       ).length
 
@@ -2926,56 +2237,45 @@ RWA Pocket-A`
         parkLocations.length
 
     const streetLightText =
-      summary.streetLightIssues
-        .length > 0
+      summary.streetLightIssues.length > 0
         ? summary.streetLightIssues
             .map(
               (item, index) =>
                 index === 0
                   ? item
-                  : `${' '.repeat(
-                      18
-                    )}${item}`
+                  : `${' '.repeat(14)}${item}`
             )
             .join('\n')
         : allInspectionsComplete
         ? 'All Working'
-        : `No issue reported (${completedCount}/${allLocations.length} inspected)`
+        : `No issue (${completedCount}/${allLocations.length} checked)`
 
     const overallStatusText =
       allInspectionsComplete
         ? 'Rest everything else is OK.'
         : 'Remaining inspected items are OK.'
 
-    const fence = '```'
-
-    const summaryReport = `RWA POCKET-A
+    return `RWA POCKET-A
 DAILY INSPECTION SUMMARY
 ${formatDate(today)}
 
 ATTENTION REQUIRED
-Item              Status
---------------------------------
-Camera            ${getCameraSummaryText(
-      summary
-    )}
-LED               ${getLedSummaryText(
-      summary
-    )}
-Street Lights     ${streetLightText}
-Garbage Disposal  ${getGarbageSummaryText()}
+Item          Status
+-----------------------
+Camera        ${getCameraSummaryText(summary)}
+LED           ${getLedSummaryText(summary)}
+Street Lights ${streetLightText}
+Garbage       ${getGarbageSummaryText()}
+-----------------------
 
 ${overallStatusText}
 
 INSPECTION PROGRESS
-Location          Completed
---------------------------------
-Towers            ${completedTowers}/${towerLocations.length}
-Parks              ${completedParks}/${parkLocations.length}`
-
-    return `${fence}
-${summaryReport}
-${fence}
+Type          Done
+-----------------------
+Towers        ${completedTowers}/${towerLocations.length}
+Parks         ${completedParks}/${parkLocations.length}
+-----------------------
 
 ${REPORT_FOOTER}
 
@@ -3031,38 +2331,26 @@ RWA Pocket-A`
 
             <div className="summary-card summary-done">
               <span>✅</span>
-
               <strong>
                 {completedCount}
               </strong>
-
-              <small>
-                Done
-              </small>
+              <small>Done</small>
             </div>
 
             <div className="summary-card summary-pending">
               <span>⏳</span>
-
               <strong>
                 {pendingCount}
               </strong>
-
-              <small>
-                Pending
-              </small>
+              <small>Pending</small>
             </div>
 
             <div className="summary-card summary-issues">
               <span>⚠️</span>
-
               <strong>
                 {issueCount}
               </strong>
-
-              <small>
-                Issues
-              </small>
+              <small>Issues</small>
             </div>
 
           </div>
@@ -3092,8 +2380,7 @@ RWA Pocket-A`
               <button
                 type="button"
                 className={`society-garbage-option good ${
-                  societyGarbageDisposed ===
-                  true
+                  societyGarbageDisposed === true
                     ? 'selected'
                     : ''
                 }`}
@@ -3102,9 +2389,7 @@ RWA Pocket-A`
                     true
                   )
 
-                  setSocietySaved(
-                    false
-                  )
+                  setSocietySaved(false)
                 }}
               >
                 ✅ Yes
@@ -3113,8 +2398,7 @@ RWA Pocket-A`
               <button
                 type="button"
                 className={`society-garbage-option bad ${
-                  societyGarbageDisposed ===
-                  false
+                  societyGarbageDisposed === false
                     ? 'selected'
                     : ''
                 }`}
@@ -3123,9 +2407,7 @@ RWA Pocket-A`
                     false
                   )
 
-                  setSocietySaved(
-                    false
-                  )
+                  setSocietySaved(false)
                 }}
               >
                 ❌ No
@@ -3138,8 +2420,7 @@ RWA Pocket-A`
               className="society-garbage-save"
               disabled={
                 societySaving ||
-                societyGarbageDisposed ===
-                  null ||
+                societyGarbageDisposed === null ||
                 societySaved
               }
               onClick={
@@ -3178,12 +2459,8 @@ RWA Pocket-A`
                 {towerLocations.map(
                   (location) => (
                     <InspectionLocationRow
-                      key={
-                        location.id
-                      }
-                      location={
-                        location
-                      }
+                      key={location.id}
+                      location={location}
                       inspection={getInspection(
                         location
                       )}
@@ -3211,12 +2488,8 @@ RWA Pocket-A`
                 {parkLocations.map(
                   (location) => (
                     <InspectionLocationRow
-                      key={
-                        location.id
-                      }
-                      location={
-                        location
-                      }
+                      key={location.id}
+                      location={location}
                       inspection={getInspection(
                         location
                       )}
@@ -3298,9 +2571,7 @@ RWA Pocket-A`
               {selectedLocation?.name}
             </h1>
 
-            <p>
-              Scan QR
-            </p>
+            <p>Scan QR</p>
           </div>
 
         </header>
@@ -3317,8 +2588,7 @@ RWA Pocket-A`
             </strong>
 
             <p>
-              Scan the QR installed
-              at this location.
+              Scan the QR installed at this location.
             </p>
 
           </div>
@@ -3365,8 +2635,7 @@ RWA Pocket-A`
   }
 
   if (
-    screen ===
-    'verification'
+    screen === 'verification'
   ) {
     return (
       <div className="tower-inspection-page">
@@ -3521,9 +2790,7 @@ RWA Pocket-A`
 
           <div className="verification-success-card">
 
-            <span>
-              ✅
-            </span>
+            <span>✅</span>
 
             <div>
               <strong>
@@ -3547,17 +2814,10 @@ RWA Pocket-A`
             label="Sweeping"
             positiveText="Done"
             negativeText="Not Done"
-            value={
-              sweepingDone
-            }
-            onChange={(
-              value
-            ) => {
+            value={sweepingDone}
+            onChange={(value) => {
               markChanged()
-
-              setSweepingDone(
-                value
-              )
+              setSweepingDone(value)
             }}
           />
 
@@ -3568,17 +2828,10 @@ RWA Pocket-A`
                 label="Mopping"
                 positiveText="Done"
                 negativeText="Not Done Today"
-                value={
-                  moppingDone
-                }
-                onChange={(
-                  value
-                ) => {
+                value={moppingDone}
+                onChange={(value) => {
                   markChanged()
-
-                  setMoppingDone(
-                    value
-                  )
+                  setMoppingDone(value)
                 }}
               />
 
@@ -3587,17 +2840,10 @@ RWA Pocket-A`
                 label="Camera"
                 positiveText="Working"
                 negativeText="Not Working"
-                value={
-                  cameraWorking
-                }
-                onChange={(
-                  value
-                ) => {
+                value={cameraWorking}
+                onChange={(value) => {
                   markChanged()
-
-                  setCameraWorking(
-                    value
-                  )
+                  setCameraWorking(value)
                 }}
               />
 
@@ -3606,24 +2852,16 @@ RWA Pocket-A`
                 label="LED Screen"
                 positiveText="Working"
                 negativeText="Not Working"
-                value={
-                  ledScreenWorking
-                }
-                onChange={(
-                  value
-                ) => {
+                value={ledScreenWorking}
+                onChange={(value) => {
                   markChanged()
-
-                  setLedScreenWorking(
-                    value
-                  )
+                  setLedScreenWorking(value)
                 }}
               />
 
               <div className="inspection-item">
 
                 <div className="inspection-item-heading">
-
                   <span className="inspection-item-icon">
                     💡
                   </span>
@@ -3631,7 +2869,6 @@ RWA Pocket-A`
                   <strong>
                     Tower Lights
                   </strong>
-
                 </div>
 
                 <div className="lights-counter">
@@ -3646,10 +2883,8 @@ RWA Pocket-A`
                   </button>
 
                   <div>
-
                     <strong>
-                      {lightsWorkingCount ===
-                      null
+                      {lightsWorkingCount === null
                         ? '—'
                         : lightsWorkingCount}
                     </strong>
@@ -3657,7 +2892,6 @@ RWA Pocket-A`
                     <span>
                       / 9 Working
                     </span>
-
                   </div>
 
                   <button
@@ -3679,26 +2913,19 @@ RWA Pocket-A`
                 positiveText="No Leakage"
                 negativeText="Leakage Found"
                 value={
-                  waterLeakage ===
-                  null
+                  waterLeakage === null
                     ? null
                     : !waterLeakage
                 }
-                onChange={(
-                  noLeakage
-                ) => {
+                onChange={(noLeakage) => {
                   markChanged()
-
-                  setWaterLeakage(
-                    !noLeakage
-                  )
+                  setWaterLeakage(!noLeakage)
                 }}
               />
 
               <StreetLightMap
                 locationName={
-                  selectedLocation
-                    ?.name
+                  selectedLocation?.name
                 }
                 status={
                   streetLightStatus
@@ -3720,14 +2947,9 @@ RWA Pocket-A`
                 value={
                   grassProperlyCut
                 }
-                onChange={(
-                  value
-                ) => {
+                onChange={(value) => {
                   markChanged()
-
-                  setGrassProperlyCut(
-                    value
-                  )
+                  setGrassProperlyCut(value)
                 }}
               />
 
@@ -3739,14 +2961,9 @@ RWA Pocket-A`
                 value={
                   benchesWellPlaced
                 }
-                onChange={(
-                  value
-                ) => {
+                onChange={(value) => {
                   markChanged()
-
-                  setBenchesWellPlaced(
-                    value
-                  )
+                  setBenchesWellPlaced(value)
                 }}
               />
 
@@ -3758,14 +2975,9 @@ RWA Pocket-A`
                 value={
                   swingsNotBroken
                 }
-                onChange={(
-                  value
-                ) => {
+                onChange={(value) => {
                   markChanged()
-
-                  setSwingsNotBroken(
-                    value
-                  )
+                  setSwingsNotBroken(value)
                 }}
               />
 
@@ -3775,19 +2987,13 @@ RWA Pocket-A`
                 positiveText="Not Needed"
                 negativeText="Needed"
                 value={
-                  wateringNeeded ===
-                  null
+                  wateringNeeded === null
                     ? null
                     : !wateringNeeded
                 }
-                onChange={(
-                  notNeeded
-                ) => {
+                onChange={(notNeeded) => {
                   markChanged()
-
-                  setWateringNeeded(
-                    !notNeeded
-                  )
+                  setWateringNeeded(!notNeeded)
                 }}
               />
 
@@ -3799,9 +3005,7 @@ RWA Pocket-A`
                 value={
                   parkStreetLightsAllLit
                 }
-                onChange={(
-                  value
-                ) => {
+                onChange={(value) => {
                   markChanged()
 
                   setParkStreetLightsAllLit(
@@ -3828,7 +3032,6 @@ RWA Pocket-A`
                 <div className="inspection-item">
 
                   <div className="inspection-item-heading">
-
                     <span className="inspection-item-icon">
                       💡
                     </span>
@@ -3836,7 +3039,6 @@ RWA Pocket-A`
                     <strong>
                       Street Lights Not Lit
                     </strong>
-
                   </div>
 
                   <div className="lights-counter">
@@ -3851,7 +3053,6 @@ RWA Pocket-A`
                     </button>
 
                     <div>
-
                       <strong>
                         {
                           parkStreetLightsNotLitCount
@@ -3861,7 +3062,6 @@ RWA Pocket-A`
                       <span>
                         Not Lit
                       </span>
-
                     </div>
 
                     <button
@@ -3883,7 +3083,6 @@ RWA Pocket-A`
           <div className="inspection-item">
 
             <div className="inspection-item-heading">
-
               <span className="inspection-item-icon">
                 ⚠️
               </span>
@@ -3891,7 +3090,6 @@ RWA Pocket-A`
               <strong>
                 Any Other Issue
               </strong>
-
             </div>
 
             <div className="inspection-toggle-row">
@@ -3905,14 +3103,8 @@ RWA Pocket-A`
                 }`}
                 onClick={() => {
                   markChanged()
-
-                  setOtherIssue(
-                    false
-                  )
-
-                  setOtherIssueDetails(
-                    ''
-                  )
+                  setOtherIssue(false)
+                  setOtherIssueDetails('')
                 }}
               >
                 ✅ No
@@ -3927,10 +3119,7 @@ RWA Pocket-A`
                 }`}
                 onClick={() => {
                   markChanged()
-
-                  setOtherIssue(
-                    true
-                  )
+                  setOtherIssue(true)
                 }}
               >
                 ⚠️ Yes
@@ -3945,14 +3134,11 @@ RWA Pocket-A`
                 value={
                   otherIssueDetails
                 }
-                onChange={(
-                  event
-                ) => {
+                onChange={(event) => {
                   markChanged()
 
                   setOtherIssueDetails(
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }}
               />
@@ -3963,7 +3149,6 @@ RWA Pocket-A`
           <div className="inspection-item">
 
             <div className="inspection-item-heading">
-
               <span className="inspection-item-icon">
                 📝
               </span>
@@ -3971,21 +3156,17 @@ RWA Pocket-A`
               <strong>
                 Remarks
               </strong>
-
             </div>
 
             <textarea
               className="inspection-textarea"
               placeholder="Optional remarks..."
               value={remarks}
-              onChange={(
-                event
-              ) => {
+              onChange={(event) => {
                 markChanged()
 
                 setRemarks(
-                  event.target
-                    .value
+                  event.target.value
                 )
               }}
             />
@@ -4039,36 +3220,31 @@ RWA Pocket-A`
           {savedAt && (
             <div className="saved-time">
               Last saved:{' '}
-              {formatTime(
-                savedAt
-              )}
+              {formatTime(savedAt)}
             </div>
           )}
 
-          {saved &&
-            !isPark && (
-              <button
-                type="button"
-                className="share-inspection-button"
-                onClick={() => {
-                  const inspection =
-                    getInspection(
-                      selectedLocation
-                    )
+          {saved && !isPark && (
+            <button
+              type="button"
+              className="share-inspection-button"
+              onClick={() => {
+                const inspection =
+                  getInspection(
+                    selectedLocation
+                  )
 
-                  if (
+                if (inspection) {
+                  shareReport(
+                    selectedLocation,
                     inspection
-                  ) {
-                    shareReport(
-                      selectedLocation,
-                      inspection
-                    )
-                  }
-                }}
-              >
-                📲 Share Tower Report
-              </button>
-            )}
+                  )
+                }
+              }}
+            >
+              📲 Share Tower Report
+            </button>
+          )}
 
           <button
             type="button"
@@ -4092,9 +3268,7 @@ RWA Pocket-A`
 
   if (screen === 'report') {
     const inspection =
-      getInspection(
-        selectedLocation
-      )
+      getInspection(selectedLocation)
 
     const attentionLines =
       inspection
@@ -4105,11 +3279,9 @@ RWA Pocket-A`
         : []
 
     const streetFailures =
-      !isPark &&
-      inspection
+      !isPark && inspection
         ? getStreetLightFailures(
-            inspection
-              .street_light_status
+            inspection.street_light_status
           )
         : []
 
@@ -4156,27 +3328,21 @@ RWA Pocket-A`
 
           <div
             className={`compact-report-status ${
-              attentionLines.length >
-              0
+              attentionLines.length > 0
                 ? 'issue'
                 : 'good'
             }`}
           >
-            {attentionLines.length >
-            0
+            {attentionLines.length > 0
               ? '⚠️ ATTENTION REQUIRED'
               : '✅ SATISFACTORY'}
           </div>
 
-          {attentionLines.length >
-            0 && (
+          {attentionLines.length > 0 && (
             <div className="compact-attention-card">
 
               {attentionLines.map(
-                (
-                  line,
-                  index
-                ) => (
+                (line, index) => (
                   <div key={index}>
                     • {line}
                   </div>
@@ -4189,13 +3355,10 @@ RWA Pocket-A`
           <div className="compact-report-card">
 
             <div className="compact-report-row">
-              <span>
-                Sweeping
-              </span>
+              <span>Sweeping</span>
 
               <strong>
-                {inspection
-                  ?.sweeping_done
+                {inspection?.sweeping_done
                   ? 'Done'
                   : 'Not Done'}
               </strong>
@@ -4204,22 +3367,17 @@ RWA Pocket-A`
             {!isPark && (
               <>
                 <div className="compact-report-row">
-                  <span>
-                    Mopping
-                  </span>
+                  <span>Mopping</span>
 
                   <strong>
-                    {inspection
-                      ?.mopping_done
+                    {inspection?.mopping_done
                       ? 'Done'
                       : 'Not Done'}
                   </strong>
                 </div>
 
                 <div className="compact-report-row">
-                  <span>
-                    Camera
-                  </span>
+                  <span>Camera</span>
 
                   <strong>
                     {reportCamera
@@ -4229,9 +3387,7 @@ RWA Pocket-A`
                 </div>
 
                 <div className="compact-report-row">
-                  <span>
-                    LED
-                  </span>
+                  <span>LED</span>
 
                   <strong>
                     {reportLed
@@ -4247,8 +3403,7 @@ RWA Pocket-A`
 
                   <strong>
                     {
-                      inspection
-                        ?.lights_working_count
+                      inspection?.lights_working_count
                     }
                     /9
                   </strong>
@@ -4260,8 +3415,7 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {inspection
-                      ?.water_leakage
+                    {inspection?.water_leakage
                       ? 'Yes'
                       : 'No'}
                   </strong>
@@ -4273,8 +3427,7 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {streetFailures.length ===
-                    0
+                    {streetFailures.length === 0
                       ? 'All Working'
                       : `${streetFailures.length} Not Working`}
                   </strong>
@@ -4290,8 +3443,7 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {inspection
-                      ?.grass_properly_cut
+                    {inspection?.grass_properly_cut
                       ? 'Properly Cut'
                       : 'Needs Cutting'}
                   </strong>
@@ -4303,8 +3455,7 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {inspection
-                      ?.benches_well_placed
+                    {inspection?.benches_well_placed
                       ? 'Well Placed'
                       : 'Needs Attention'}
                   </strong>
@@ -4316,8 +3467,7 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {inspection
-                      ?.swings_not_broken
+                    {inspection?.swings_not_broken
                       ? 'Good'
                       : 'Broken'}
                   </strong>
@@ -4329,8 +3479,7 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {inspection
-                      ?.watering_needed
+                    {inspection?.watering_needed
                       ? 'Needed'
                       : 'Not Needed'}
                   </strong>
@@ -4342,12 +3491,10 @@ RWA Pocket-A`
                   </span>
 
                   <strong>
-                    {inspection
-                      ?.street_lights_all_lit
+                    {inspection?.street_lights_all_lit
                       ? 'All Lit'
                       : `${
-                          inspection
-                            ?.street_lights_not_lit_count ||
+                          inspection?.street_lights_not_lit_count ||
                           0
                         } Not Lit`}
                   </strong>
@@ -4365,8 +3512,7 @@ RWA Pocket-A`
 
           <div className="compact-verification-line">
             QR + GPS Verified
-            {distanceFromLocation !==
-              null &&
+            {distanceFromLocation !== null &&
               ` • ${Math.round(
                 distanceFromLocation
               )} m`}
@@ -4415,9 +3561,7 @@ RWA Pocket-A`
       towerLocations.filter(
         (location) =>
           Boolean(
-            getInspection(
-              location
-            )?.saved_at
+            getInspection(location)?.saved_at
           )
       ).length
 
@@ -4425,21 +3569,15 @@ RWA Pocket-A`
       parkLocations.filter(
         (location) =>
           Boolean(
-            getInspection(
-              location
-            )?.saved_at
+            getInspection(location)?.saved_at
           )
       ).length
 
     const criticalAttention =
-      summary.cameraIssues.length >
-        0 ||
-      summary.ledIssues.length >
-        0 ||
-      summary.streetLightIssues
-        .length > 0 ||
-      societyGarbageDisposed ===
-        false
+      summary.cameraIssues.length > 0 ||
+      summary.ledIssues.length > 0 ||
+      summary.streetLightIssues.length > 0 ||
+      societyGarbageDisposed === false
 
     return (
       <div className="tower-inspection-page">
@@ -4515,13 +3653,9 @@ RWA Pocket-A`
                 Street Lights
               </strong>
 
-              {summary.streetLightIssues
-                .length > 0 ? (
+              {summary.streetLightIssues.length > 0 ? (
                 summary.streetLightIssues.map(
-                  (
-                    item,
-                    index
-                  ) => (
+                  (item, index) => (
                     <span key={index}>
                       {item}
                     </span>
@@ -4563,9 +3697,7 @@ RWA Pocket-A`
 
                   return (
                     <div
-                      key={
-                        location.id
-                      }
+                      key={location.id}
                       className="summary-location-chip"
                     >
                       <span>
@@ -4619,9 +3751,7 @@ RWA Pocket-A`
 
                   return (
                     <div
-                      key={
-                        location.id
-                      }
+                      key={location.id}
                       className="summary-location-chip"
                     >
                       <span>
