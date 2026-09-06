@@ -101,101 +101,6 @@ function drawRoundedRect(
 }
 
 
-function loadImage(src) {
-
-  return new Promise((resolve) => {
-
-    const image = new Image()
-
-    image.onload = () => {
-      resolve(image)
-    }
-
-    image.onerror = () => {
-      resolve(null)
-    }
-
-    image.src = src
-  })
-}
-
-
-function drawImageContain(
-  ctx,
-  image,
-  x,
-  y,
-  width,
-  height
-) {
-
-  if (!image) {
-    return
-  }
-
-  const scale = Math.min(
-    width / image.width,
-    height / image.height
-  )
-
-  const drawWidth =
-    image.width * scale
-
-  const drawHeight =
-    image.height * scale
-
-  const drawX =
-    x + (width - drawWidth) / 2
-
-  const drawY =
-    y + (height - drawHeight) / 2
-
-  ctx.drawImage(
-    image,
-    drawX,
-    drawY,
-    drawWidth,
-    drawHeight
-  )
-}
-
-
-function drawFallbackLogo(
-  ctx,
-  x,
-  y,
-  width,
-  height
-) {
-
-  drawRoundedRect(
-    ctx,
-    x,
-    y,
-    width,
-    height,
-    20,
-    '#ffffff'
-  )
-
-  ctx.fillStyle = '#1769b4'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-
-  ctx.font =
-    '700 38px Arial, sans-serif'
-
-  ctx.fillText(
-    'RWA',
-    x + width / 2,
-    y + height / 2
-  )
-
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'alphabetic'
-}
-
-
 function wrapCanvasText(
   ctx,
   text,
@@ -204,15 +109,12 @@ function wrapCanvasText(
   maxWidth,
   lineHeight
 ) {
-
-  const words =
-    text.split(' ')
+  const words = text.split(' ')
 
   let line = ''
   let currentY = y
 
   words.forEach((word) => {
-
     const testLine =
       line
         ? `${line} ${word}`
@@ -227,7 +129,6 @@ function wrapCanvasText(
       width > maxWidth &&
       line
     ) {
-
       ctx.fillText(
         line,
         x,
@@ -236,15 +137,12 @@ function wrapCanvasText(
 
       line = word
       currentY += lineHeight
-
     } else {
-
       line = testLine
     }
   })
 
   if (line) {
-
     ctx.fillText(
       line,
       x,
@@ -296,7 +194,6 @@ function Attendance({
   // =========================================================
 
   const getTodayDate = () => {
-
     const now =
       new Date()
 
@@ -326,7 +223,6 @@ function Attendance({
 
 
   const getDisplayDate = () => {
-
     return new Date()
       .toLocaleDateString(
         'en-GB',
@@ -353,10 +249,6 @@ function Attendance({
       getTodayDate()
 
 
-    // ---------------------------------------------------------
-    // Load active RWA staff
-    // ---------------------------------------------------------
-
     const {
       data: staffData,
       error: staffError
@@ -376,7 +268,6 @@ function Attendance({
 
 
     if (staffError) {
-
       console.error(
         staffError
       )
@@ -390,10 +281,6 @@ function Attendance({
       return
     }
 
-
-    // ---------------------------------------------------------
-    // Load today's RWA attendance
-    // ---------------------------------------------------------
 
     const {
       data: attendanceData,
@@ -410,7 +297,6 @@ function Attendance({
 
 
     if (attendanceError) {
-
       console.error(
         attendanceError
       )
@@ -424,10 +310,6 @@ function Attendance({
       return
     }
 
-
-    // ---------------------------------------------------------
-    // Load today's Noida Authority sweepers
-    // ---------------------------------------------------------
 
     const {
       data: externalStaffData,
@@ -449,7 +331,6 @@ function Attendance({
 
 
     if (externalStaffError) {
-
       console.error(
         externalStaffError
       )
@@ -463,10 +344,6 @@ function Attendance({
       return
     }
 
-
-    // ---------------------------------------------------------
-    // Merge staff with saved attendance
-    // ---------------------------------------------------------
 
     const attendanceStaff =
       staffData.map(
@@ -588,10 +465,6 @@ function Attendance({
         getTodayDate()
 
 
-      // -------------------------------------------------------
-      // Save RWA staff attendance
-      // -------------------------------------------------------
-
       const attendanceRecords =
         staff.map(
           (person) => ({
@@ -636,7 +509,6 @@ function Attendance({
       if (
         attendanceSaveError
       ) {
-
         console.error(
           attendanceSaveError
         )
@@ -650,10 +522,6 @@ function Attendance({
         return
       }
 
-
-      // -------------------------------------------------------
-      // Save Noida Authority sweepers
-      // -------------------------------------------------------
 
       const {
         error:
@@ -687,7 +555,6 @@ function Attendance({
       if (
         externalStaffSaveError
       ) {
-
         console.error(
           externalStaffSaveError
         )
@@ -735,14 +602,12 @@ function Attendance({
           />
         )
 
-
       case 'Plumber':
         return (
           <Wrench
             {...props}
           />
         )
-
 
       case 'Sweeper':
         return (
@@ -751,14 +616,12 @@ function Attendance({
           />
         )
 
-
       case 'Housekeeping':
         return (
           <Recycle
             {...props}
           />
         )
-
 
       case 'Gardener':
         return (
@@ -767,14 +630,12 @@ function Attendance({
           />
         )
 
-
       case 'Electrician':
         return (
           <Zap
             {...props}
           />
         )
-
 
       default:
         return (
@@ -806,9 +667,7 @@ function Attendance({
     async () => {
 
       const width = 1080
-
       const rowHeight = 92
-
       const listStartY = 300
 
       const listHeight =
@@ -830,10 +689,14 @@ function Attendance({
         105 +
         20
 
-      const height =
+      const supervisorY =
         footerY +
-        150 +
-        45
+        135 +
+        20
+
+      const height =
+        supervisorY +
+        85
 
 
       const canvas =
@@ -855,7 +718,6 @@ function Attendance({
 
 
       if (!ctx) {
-
         throw new Error(
           'Unable to create attendance image.'
         )
@@ -919,6 +781,12 @@ function Attendance({
       )
 
 
+      // Header centered
+
+      ctx.textAlign =
+        'center'
+
+
       ctx.fillStyle =
         '#ffffff'
 
@@ -928,7 +796,7 @@ function Attendance({
 
       ctx.fillText(
         'RWA POCKET-A',
-        80,
+        width / 2,
         105
       )
 
@@ -938,7 +806,7 @@ function Attendance({
 
       ctx.fillText(
         'STAFF DAILY ATTENDANCE',
-        80,
+        width / 2,
         160
       )
 
@@ -951,62 +819,13 @@ function Attendance({
 
       ctx.fillText(
         getDisplayDate(),
-        80,
+        width / 2,
         211
       )
 
 
-      // -------------------------------------------------------
-      // RWA Logo
-      //
-      // Put actual logo here:
-      // public/rwa-logo.png
-      // -------------------------------------------------------
-
-      const logoX = 820
-      const logoY = 62
-      const logoWidth = 165
-      const logoHeight = 155
-
-
-      drawRoundedRect(
-        ctx,
-        logoX,
-        logoY,
-        logoWidth,
-        logoHeight,
-        20,
-        '#ffffff'
-      )
-
-
-      const logo =
-        await loadImage(
-          '/rwa-logo.png'
-        )
-
-
-      if (logo) {
-
-        drawImageContain(
-          ctx,
-          logo,
-          logoX + 12,
-          logoY + 12,
-          logoWidth - 24,
-          logoHeight - 24
-        )
-
-      } else {
-
-        drawFallbackLogo(
-          ctx,
-          logoX,
-          logoY,
-          logoWidth,
-          logoHeight
-        )
-      }
+      ctx.textAlign =
+        'left'
 
 
       // -------------------------------------------------------
@@ -1048,8 +867,6 @@ function Attendance({
             2
           )
 
-
-          // Number circle
 
           ctx.beginPath()
 
@@ -1095,8 +912,6 @@ function Attendance({
             'alphabetic'
 
 
-          // Name
-
           ctx.fillStyle =
             '#102a4c'
 
@@ -1110,8 +925,6 @@ function Attendance({
           )
 
 
-          // Profession
-
           ctx.fillStyle =
             '#64748b'
 
@@ -1124,8 +937,6 @@ function Attendance({
             y + 65
           )
 
-
-          // Attendance status
 
           const statusX = 785
           const statusY = y + 17
@@ -1251,8 +1062,6 @@ function Attendance({
       )
 
 
-      // Present
-
       ctx.fillStyle =
         '#079455'
 
@@ -1281,8 +1090,6 @@ function Attendance({
       )
 
 
-      // Separator
-
       ctx.fillStyle =
         '#c8dbea'
 
@@ -1293,8 +1100,6 @@ function Attendance({
         47
       )
 
-
-      // Absent
 
       ctx.fillStyle =
         '#dc2626'
@@ -1324,8 +1129,6 @@ function Attendance({
       )
 
 
-      // Separator
-
       ctx.fillStyle =
         '#c8dbea'
 
@@ -1336,8 +1139,6 @@ function Attendance({
         47
       )
 
-
-      // Total Staff
 
       ctx.fillStyle =
         '#1266d3'
@@ -1384,69 +1185,6 @@ function Attendance({
       )
 
 
-      // Simple staff icon
-
-      ctx.fillStyle =
-        '#079455'
-
-      ctx.beginPath()
-
-      ctx.arc(
-        105,
-        authorityY + 42,
-        11,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      ctx.beginPath()
-
-      ctx.arc(
-        82,
-        authorityY + 49,
-        8,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      ctx.beginPath()
-
-      ctx.arc(
-        128,
-        authorityY + 49,
-        8,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      ctx.fillRect(
-        86,
-        authorityY + 59,
-        38,
-        18
-      )
-
-
-      ctx.fillStyle =
-        '#d1eee0'
-
-      ctx.fillRect(
-        160,
-        authorityY + 20,
-        2,
-        65
-      )
-
-
       ctx.fillStyle =
         '#102a4c'
 
@@ -1455,7 +1193,7 @@ function Attendance({
 
       ctx.fillText(
         'Noida Authority Sweepers available today :',
-        185,
+        110,
         authorityY + 63
       )
 
@@ -1492,51 +1230,6 @@ function Attendance({
       )
 
 
-      // Gear-style badge
-
-      ctx.beginPath()
-
-      ctx.fillStyle =
-        '#1f4e7a'
-
-      ctx.arc(
-        105,
-        footerY + 67,
-        25,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      ctx.fillStyle =
-        '#ffffff'
-
-      ctx.beginPath()
-
-      ctx.arc(
-        105,
-        footerY + 67,
-        8,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      ctx.fillStyle =
-        '#d9c48c'
-
-      ctx.fillRect(
-        160,
-        footerY + 26,
-        2,
-        82
-      )
-
-
       ctx.fillStyle =
         '#17375e'
 
@@ -1547,11 +1240,35 @@ function Attendance({
       wrapCanvasText(
         ctx,
         'Powered by the RWA Pocket-A in-house App — a step towards smarter, transparent & technology-driven RWA management.',
-        190,
-        footerY + 55,
-        785,
+        90,
+        footerY + 52,
+        900,
         34
       )
+
+
+      // -------------------------------------------------------
+      // Supervisor line
+      // -------------------------------------------------------
+
+      ctx.textAlign =
+        'center'
+
+      ctx.fillStyle =
+        '#526579'
+
+      ctx.font =
+        '600 24px Arial, sans-serif'
+
+      ctx.fillText(
+        'Supervisor Pocket-A',
+        width / 2,
+        supervisorY + 38
+      )
+
+
+      ctx.textAlign =
+        'left'
 
 
       // -------------------------------------------------------
@@ -1571,13 +1288,11 @@ function Attendance({
                 if (
                   result
                 ) {
-
                   resolve(
                     result
                   )
 
                 } else {
-
                   reject(
                     new Error(
                       'Unable to generate PNG report.'
@@ -1607,7 +1322,6 @@ function Attendance({
         !saved ||
         dirty
       ) {
-
         alert(
           'Please save the latest attendance before sharing.'
         )
@@ -1674,22 +1388,14 @@ function Attendance({
             )
 
         } catch {
-
           canShareFiles =
             false
         }
 
 
-        // -----------------------------------------------------
-        // Mobile / supported PWA:
-        // Open native Share Sheet.
-        // WhatsApp will appear as a share target.
-        // -----------------------------------------------------
-
         if (
           canShareFiles
         ) {
-
           try {
 
             await navigator.share(
@@ -1706,7 +1412,6 @@ function Attendance({
               shareError?.name ===
               'AbortError'
             ) {
-
               return
             }
 
@@ -1716,11 +1421,6 @@ function Attendance({
           }
         }
 
-
-        // -----------------------------------------------------
-        // Desktop fallback:
-        // Download PNG
-        // -----------------------------------------------------
 
         const downloadUrl =
           URL.createObjectURL(
@@ -1911,10 +1611,6 @@ function Attendance({
         </div>
 
 
-        {/* =====================================================
-            RWA Staff Attendance
-        ====================================================== */}
-
         <div
           className="attendance-table"
         >
@@ -2020,10 +1716,6 @@ function Attendance({
         </div>
 
 
-        {/* =====================================================
-            RWA Staff Summary
-        ====================================================== */}
-
         <div
           className="attendance-summary"
         >
@@ -2042,10 +1734,6 @@ function Attendance({
 
         </div>
 
-
-        {/* =====================================================
-            Noida Authority Sweepers
-        ====================================================== */}
 
         <div
           className="external-staff-card"
@@ -2097,10 +1785,6 @@ function Attendance({
         </div>
 
 
-        {/* =====================================================
-            Save Attendance
-        ====================================================== */}
-
         <button
           className="save-attendance-button"
           onClick={
@@ -2132,10 +1816,6 @@ function Attendance({
 
         </button>
 
-
-        {/* =====================================================
-            PNG / WhatsApp Share
-        ====================================================== */}
 
         <button
           className="whatsapp-button"
