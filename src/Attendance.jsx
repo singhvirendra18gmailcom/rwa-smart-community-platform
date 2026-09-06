@@ -14,7 +14,7 @@ import { supabase } from './supabase'
 
 
 // =========================================================
-// Canvas Helpers
+// Canvas Helper
 // =========================================================
 
 function drawRoundedRect(
@@ -28,20 +28,12 @@ function drawRoundedRect(
   strokeColor = null,
   lineWidth = 1
 ) {
-  const r = Math.min(
-    radius,
-    width / 2,
-    height / 2
-  )
+  const r = Math.min(radius, width / 2, height / 2)
 
   ctx.beginPath()
 
   ctx.moveTo(x + r, y)
-
-  ctx.lineTo(
-    x + width - r,
-    y
-  )
+  ctx.lineTo(x + width - r, y)
 
   ctx.quadraticCurveTo(
     x + width,
@@ -121,9 +113,7 @@ function wrapCanvasText(
         : word
 
     const width =
-      ctx.measureText(
-        testLine
-      ).width
+      ctx.measureText(testLine).width
 
     if (
       width > maxWidth &&
@@ -149,6 +139,89 @@ function wrapCanvasText(
       currentY
     )
   }
+}
+
+
+// =========================================================
+// Simple Community / People Icon
+// =========================================================
+
+function drawPeopleIcon(
+  ctx,
+  centerX,
+  centerY
+) {
+  ctx.save()
+
+  ctx.fillStyle = '#d9ecff'
+
+  // Centre head
+  ctx.beginPath()
+  ctx.arc(
+    centerX,
+    centerY - 18,
+    13,
+    0,
+    Math.PI * 2
+  )
+  ctx.fill()
+
+  // Left head
+  ctx.beginPath()
+  ctx.arc(
+    centerX - 31,
+    centerY - 8,
+    10,
+    0,
+    Math.PI * 2
+  )
+  ctx.fill()
+
+  // Right head
+  ctx.beginPath()
+  ctx.arc(
+    centerX + 31,
+    centerY - 8,
+    10,
+    0,
+    Math.PI * 2
+  )
+  ctx.fill()
+
+  // Centre body
+  drawRoundedRect(
+    ctx,
+    centerX - 23,
+    centerY,
+    46,
+    34,
+    15,
+    '#d9ecff'
+  )
+
+  // Left body
+  drawRoundedRect(
+    ctx,
+    centerX - 48,
+    centerY + 3,
+    28,
+    27,
+    12,
+    '#d9ecff'
+  )
+
+  // Right body
+  drawRoundedRect(
+    ctx,
+    centerX + 20,
+    centerY + 3,
+    28,
+    27,
+    12,
+    '#d9ecff'
+  )
+
+  ctx.restore()
 }
 
 
@@ -194,8 +267,7 @@ function Attendance({
   // =========================================================
 
   const getTodayDate = () => {
-    const now =
-      new Date()
+    const now = new Date()
 
     const year =
       now.getFullYear()
@@ -216,9 +288,7 @@ function Attendance({
         '0'
       )
 
-    return (
-      `${year}-${month}-${day}`
-    )
+    return `${year}-${month}-${day}`
   }
 
 
@@ -241,13 +311,16 @@ function Attendance({
   // =========================================================
 
   const loadStaff = async () => {
-
     setLoading(true)
     setError(null)
 
     const today =
       getTodayDate()
 
+
+    // ---------------------------------------------------------
+    // Load active RWA staff
+    // ---------------------------------------------------------
 
     const {
       data: staffData,
@@ -282,6 +355,10 @@ function Attendance({
     }
 
 
+    // ---------------------------------------------------------
+    // Load today's attendance
+    // ---------------------------------------------------------
+
     const {
       data: attendanceData,
       error: attendanceError
@@ -310,6 +387,10 @@ function Attendance({
       return
     }
 
+
+    // ---------------------------------------------------------
+    // Load Noida Authority sweepers
+    // ---------------------------------------------------------
 
     const {
       data: externalStaffData,
@@ -344,6 +425,10 @@ function Attendance({
       return
     }
 
+
+    // ---------------------------------------------------------
+    // Merge staff + attendance
+    // ---------------------------------------------------------
 
     const attendanceStaff =
       staffData.map(
@@ -395,7 +480,7 @@ function Attendance({
 
 
   // =========================================================
-  // Toggle Attendance
+  // Attendance Toggle
   // =========================================================
 
   const toggleAttendance = (
@@ -421,7 +506,7 @@ function Attendance({
 
 
   // =========================================================
-  // Noida Authority Sweepers
+  // Authority Sweeper Counter
   // =========================================================
 
   const decreaseAuthoritySweepers =
@@ -580,7 +665,7 @@ function Attendance({
 
 
   // =========================================================
-  // Profession Icons
+  // Profession Icon
   // =========================================================
 
   const getProfessionIcon = (
@@ -660,43 +745,56 @@ function Attendance({
 
 
   // =========================================================
-  // Generate Attendance PNG
+  // Generate PNG
   // =========================================================
 
   const generateAttendancePng =
     async () => {
 
       const width = 1080
-      const rowHeight = 92
-      const listStartY = 300
 
-      const listHeight =
+      // -------------------------------------------------------
+      // Layout dimensions
+      // -------------------------------------------------------
+
+      const headerY = 25
+      const headerHeight = 205
+
+      const tableHeaderY = 245
+      const tableHeaderHeight = 58
+
+      const rowHeight = 76
+
+      const tableRowsHeight =
         staff.length *
         rowHeight
 
       const summaryY =
-        listStartY +
-        listHeight +
+        tableHeaderY +
+        tableHeaderHeight +
+        tableRowsHeight +
         20
+
+      const summaryHeight = 165
 
       const authorityY =
         summaryY +
-        155 +
-        20
+        summaryHeight +
+        18
+
+      const authorityHeight = 120
 
       const footerY =
         authorityY +
-        105 +
-        20
+        authorityHeight +
+        18
 
-      const supervisorY =
-        footerY +
-        135 +
-        20
+      const footerHeight = 185
 
       const height =
-        supervisorY +
-        85
+        footerY +
+        footerHeight +
+        30
 
 
       const canvas =
@@ -704,11 +802,8 @@ function Attendance({
           'canvas'
         )
 
-      canvas.width =
-        width
-
-      canvas.height =
-        height
+      canvas.width = width
+      canvas.height = height
 
 
       const ctx =
@@ -724,9 +819,9 @@ function Attendance({
       }
 
 
-      // -------------------------------------------------------
+      // =====================================================
       // Background
-      // -------------------------------------------------------
+      // =====================================================
 
       ctx.fillStyle =
         '#ffffff'
@@ -739,17 +834,15 @@ function Attendance({
       )
 
 
-      // -------------------------------------------------------
+      // =====================================================
       // Header
-      // -------------------------------------------------------
+      // =====================================================
 
-      const headerX = 45
-      const headerY = 35
-      const headerWidth = 990
-      const headerHeight = 215
+      const headerX = 15
+      const headerWidth = 1050
 
 
-      const gradient =
+      const headerGradient =
         ctx.createLinearGradient(
           headerX,
           headerY,
@@ -759,14 +852,14 @@ function Attendance({
         )
 
 
-      gradient.addColorStop(
+      headerGradient.addColorStop(
         0,
-        '#17375e'
+        '#174879'
       )
 
-      gradient.addColorStop(
+      headerGradient.addColorStop(
         1,
-        '#174f83'
+        '#1670ad'
       )
 
 
@@ -776,61 +869,183 @@ function Attendance({
         headerY,
         headerWidth,
         headerHeight,
-        28,
-        gradient
+        24,
+        headerGradient
       )
 
 
-      // Header centered
+      // -----------------------------------------------------
+      // Left people/community icon
+      // -----------------------------------------------------
+
+      drawPeopleIcon(
+        ctx,
+        100,
+        112
+      )
+
+
+      // -----------------------------------------------------
+      // Header centred content
+      // -----------------------------------------------------
 
       ctx.textAlign =
         'center'
-
 
       ctx.fillStyle =
         '#ffffff'
 
 
       ctx.font =
-        '700 48px Arial, sans-serif'
+        '700 47px Arial, sans-serif'
 
       ctx.fillText(
         'RWA POCKET-A',
         width / 2,
-        105
+        93
       )
 
 
       ctx.font =
-        '700 33px Arial, sans-serif'
+        '700 31px Arial, sans-serif'
 
       ctx.fillText(
         'STAFF DAILY ATTENDANCE',
         width / 2,
-        160
+        145
       )
 
 
-      ctx.font =
-        '400 31px Arial, sans-serif'
-
       ctx.fillStyle =
-        '#e5eef7'
+        '#d9ebfa'
+
+      ctx.font =
+        '400 28px Arial, sans-serif'
 
       ctx.fillText(
         getDisplayDate(),
         width / 2,
-        211
+        195
       )
+
+
+      // -----------------------------------------------------
+      // Right slogan
+      // -----------------------------------------------------
+
+      ctx.strokeStyle =
+        '#65b9e8'
+
+      ctx.lineWidth = 2
+
+      ctx.beginPath()
+
+      ctx.moveTo(
+        870,
+        60
+      )
+
+      ctx.lineTo(
+        870,
+        190
+      )
+
+      ctx.stroke()
 
 
       ctx.textAlign =
         'left'
 
+      ctx.fillStyle =
+        '#cce8f7'
 
-      // -------------------------------------------------------
+      ctx.font =
+        '700 15px Arial, sans-serif'
+
+
+      ctx.fillText(
+        'CLEANER',
+        905,
+        90
+      )
+
+      ctx.fillText(
+        'SAFER',
+        905,
+        119
+      )
+
+      ctx.fillText(
+        'GREENER',
+        905,
+        148
+      )
+
+      ctx.fillText(
+        'TOGETHER',
+        905,
+        177
+      )
+
+
+      // =====================================================
+      // Table Header
+      // =====================================================
+
+      drawRoundedRect(
+        ctx,
+        15,
+        tableHeaderY,
+        1050,
+        tableHeaderHeight,
+        15,
+        '#eaf5ff',
+        '#71b9f3',
+        1.5
+      )
+
+
+      ctx.fillStyle =
+        '#142f57'
+
+      ctx.font =
+        '700 21px Arial, sans-serif'
+
+      ctx.textAlign =
+        'left'
+
+
+      ctx.fillText(
+        '#',
+        58,
+        tableHeaderY + 37
+      )
+
+
+      ctx.fillText(
+        'Name',
+        150,
+        tableHeaderY + 37
+      )
+
+
+      ctx.fillText(
+        'Role',
+        510,
+        tableHeaderY + 37
+      )
+
+
+      ctx.fillText(
+        'Attendance',
+        835,
+        tableHeaderY + 37
+      )
+
+
+      // =====================================================
       // Staff Rows
-      // -------------------------------------------------------
+      // =====================================================
 
       staff.forEach(
         (
@@ -839,44 +1054,44 @@ function Attendance({
         ) => {
 
           const y =
-            listStartY +
+            tableHeaderY +
+            tableHeaderHeight +
             index *
               rowHeight
-
-
-          const rowX = 55
-          const rowWidth = 970
-          const rowBoxHeight = 80
 
 
           const rowBackground =
             index % 2 === 0
               ? '#ffffff'
-              : '#f7fafc'
+              : '#f7fbfe'
 
 
           drawRoundedRect(
             ctx,
-            rowX,
+            15,
             y,
-            rowWidth,
-            rowBoxHeight,
-            18,
+            1050,
+            rowHeight - 4,
+            14,
             rowBackground,
-            '#d9e2ec',
-            2
+            '#d2e1ee',
+            1.2
           )
 
+
+          // -------------------------------------------------
+          // Number circle
+          // -------------------------------------------------
 
           ctx.beginPath()
 
           ctx.fillStyle =
-            '#e8f3ff'
+            '#dcefff'
 
           ctx.arc(
-            100,
-            y + 40,
-            25,
+            67,
+            y + 35,
+            26,
             0,
             Math.PI * 2
           )
@@ -884,64 +1099,79 @@ function Attendance({
           ctx.fill()
 
 
-          ctx.fillStyle =
-            '#1473d1'
-
-          ctx.font =
-            '500 25px Arial, sans-serif'
-
           ctx.textAlign =
             'center'
 
           ctx.textBaseline =
             'middle'
 
+          ctx.fillStyle =
+            '#1767b3'
+
+          ctx.font =
+            '600 21px Arial, sans-serif'
+
+
           ctx.fillText(
             String(
               index + 1
             ),
-            100,
-            y + 40
+            67,
+            y + 35
           )
 
-
-          ctx.textAlign =
-            'left'
 
           ctx.textBaseline =
             'alphabetic'
 
+          ctx.textAlign =
+            'left'
+
+
+          // -------------------------------------------------
+          // Name
+          // -------------------------------------------------
 
           ctx.fillStyle =
-            '#102a4c'
+            '#112e56'
 
           ctx.font =
-            '700 29px Arial, sans-serif'
+            '700 23px Arial, sans-serif'
+
 
           ctx.fillText(
             person.name,
             150,
-            y + 34
+            y + 43
           )
 
 
+          // -------------------------------------------------
+          // Role
+          // -------------------------------------------------
+
           ctx.fillStyle =
-            '#64748b'
+            '#334f77'
 
           ctx.font =
-            '400 23px Arial, sans-serif'
+            '400 22px Arial, sans-serif'
+
 
           ctx.fillText(
             person.profession,
-            150,
-            y + 65
+            510,
+            y + 43
           )
 
 
-          const statusX = 785
-          const statusY = y + 17
-          const statusWidth = 195
-          const statusHeight = 48
+          // -------------------------------------------------
+          // Attendance badge
+          // -------------------------------------------------
+
+          const badgeX = 815
+          const badgeY = y + 13
+          const badgeWidth = 225
+          const badgeHeight = 47
 
 
           if (
@@ -950,24 +1180,24 @@ function Attendance({
 
             drawRoundedRect(
               ctx,
-              statusX,
-              statusY,
-              statusWidth,
-              statusHeight,
+              badgeX,
+              badgeY,
+              badgeWidth,
+              badgeHeight,
               24,
-              '#dcfce7'
+              '#ddf8e7'
             )
 
 
             ctx.beginPath()
 
             ctx.fillStyle =
-              '#059669'
+              '#08965a'
 
             ctx.arc(
-              statusX + 24,
-              statusY + 24,
-              9,
+              badgeX + 27,
+              badgeY + 23,
+              10,
               0,
               Math.PI * 2
             )
@@ -976,39 +1206,40 @@ function Attendance({
 
 
             ctx.fillStyle =
-              '#078c56'
+              '#087e4b'
 
             ctx.font =
-              '700 24px Arial, sans-serif'
+              '700 19px Arial, sans-serif'
+
 
             ctx.fillText(
               'PRESENT',
-              statusX + 43,
-              statusY + 32
+              badgeX + 56,
+              badgeY + 31
             )
 
           } else {
 
             drawRoundedRect(
               ctx,
-              statusX,
-              statusY,
-              statusWidth,
-              statusHeight,
+              badgeX,
+              badgeY,
+              badgeWidth,
+              badgeHeight,
               24,
-              '#fee2e2'
+              '#fde0e7'
             )
 
 
             ctx.beginPath()
 
             ctx.fillStyle =
-              '#dc2626'
+              '#e31b35'
 
             ctx.arc(
-              statusX + 24,
-              statusY + 24,
-              9,
+              badgeX + 27,
+              badgeY + 23,
+              10,
               0,
               Math.PI * 2
             )
@@ -1017,263 +1248,401 @@ function Attendance({
 
 
             ctx.fillStyle =
-              '#dc2626'
+              '#d81f35'
 
             ctx.font =
-              '700 24px Arial, sans-serif'
+              '700 19px Arial, sans-serif'
+
 
             ctx.fillText(
               'ABSENT',
-              statusX + 47,
-              statusY + 32
+              badgeX + 56,
+              badgeY + 31
             )
           }
         }
       )
 
 
-      // -------------------------------------------------------
+      // =====================================================
       // Today's Summary
-      // -------------------------------------------------------
+      // =====================================================
 
       drawRoundedRect(
         ctx,
-        55,
+        15,
         summaryY,
-        970,
-        155,
-        22,
+        1050,
+        summaryHeight,
+        18,
         '#eef7ff',
-        '#71b9ff',
+        '#54b2f4',
         2
-      )
-
-
-      ctx.fillStyle =
-        '#102a4c'
-
-      ctx.font =
-        '700 31px Arial, sans-serif'
-
-      ctx.fillText(
-        "TODAY'S SUMMARY",
-        85,
-        summaryY + 48
-      )
-
-
-      ctx.fillStyle =
-        '#079455'
-
-      ctx.font =
-        '700 36px Arial, sans-serif'
-
-      ctx.fillText(
-        String(
-          presentCount
-        ),
-        105,
-        summaryY + 112
-      )
-
-
-      ctx.fillStyle =
-        '#425b78'
-
-      ctx.font =
-        '400 25px Arial, sans-serif'
-
-      ctx.fillText(
-        'Present',
-        160,
-        summaryY + 111
-      )
-
-
-      ctx.fillStyle =
-        '#c8dbea'
-
-      ctx.fillRect(
-        340,
-        summaryY + 74,
-        2,
-        47
-      )
-
-
-      ctx.fillStyle =
-        '#dc2626'
-
-      ctx.font =
-        '700 36px Arial, sans-serif'
-
-      ctx.fillText(
-        String(
-          absentCount
-        ),
-        410,
-        summaryY + 112
-      )
-
-
-      ctx.fillStyle =
-        '#425b78'
-
-      ctx.font =
-        '400 25px Arial, sans-serif'
-
-      ctx.fillText(
-        'Absent',
-        465,
-        summaryY + 111
-      )
-
-
-      ctx.fillStyle =
-        '#c8dbea'
-
-      ctx.fillRect(
-        650,
-        summaryY + 74,
-        2,
-        47
-      )
-
-
-      ctx.fillStyle =
-        '#1266d3'
-
-      ctx.font =
-        '700 36px Arial, sans-serif'
-
-      ctx.fillText(
-        String(
-          staff.length
-        ),
-        720,
-        summaryY + 112
-      )
-
-
-      ctx.fillStyle =
-        '#425b78'
-
-      ctx.font =
-        '400 25px Arial, sans-serif'
-
-      ctx.fillText(
-        'Total Staff',
-        775,
-        summaryY + 111
-      )
-
-
-      // -------------------------------------------------------
-      // Noida Authority Sweepers
-      // -------------------------------------------------------
-
-      drawRoundedRect(
-        ctx,
-        55,
-        authorityY,
-        970,
-        105,
-        20,
-        '#effcf5',
-        '#7dd9ac',
-        2
-      )
-
-
-      ctx.fillStyle =
-        '#102a4c'
-
-      ctx.font =
-        '700 27px Arial, sans-serif'
-
-      ctx.fillText(
-        'Noida Authority Sweepers available today :',
-        110,
-        authorityY + 63
-      )
-
-
-      ctx.fillStyle =
-        '#079455'
-
-      ctx.font =
-        '700 32px Arial, sans-serif'
-
-      ctx.fillText(
-        String(
-          authoritySweepers
-        ),
-        835,
-        authorityY + 64
-      )
-
-
-      // -------------------------------------------------------
-      // Common RWA Footer
-      // -------------------------------------------------------
-
-      drawRoundedRect(
-        ctx,
-        55,
-        footerY,
-        970,
-        135,
-        20,
-        '#fffaf0',
-        '#e6b94c',
-        2
-      )
-
-
-      ctx.fillStyle =
-        '#17375e'
-
-      ctx.font =
-        '400 24px Arial, sans-serif'
-
-
-      wrapCanvasText(
-        ctx,
-        'Powered by the RWA Pocket-A in-house App — a step towards smarter, transparent & technology-driven RWA management.',
-        90,
-        footerY + 52,
-        900,
-        34
-      )
-
-
-      // -------------------------------------------------------
-      // Supervisor line
-      // -------------------------------------------------------
-
-      ctx.textAlign =
-        'center'
-
-      ctx.fillStyle =
-        '#526579'
-
-      ctx.font =
-        '600 24px Arial, sans-serif'
-
-      ctx.fillText(
-        'Supervisor Pocket-A',
-        width / 2,
-        supervisorY + 38
       )
 
 
       ctx.textAlign =
         'left'
 
+      ctx.fillStyle =
+        '#102d58'
 
-      // -------------------------------------------------------
-      // Canvas → PNG Blob
-      // -------------------------------------------------------
+      ctx.font =
+        '700 25px Arial, sans-serif'
+
+
+      ctx.fillText(
+        "TODAY'S SUMMARY",
+        50,
+        summaryY + 42
+      )
+
+
+      // -----------------------------------------------------
+      // Present
+      // -----------------------------------------------------
+
+      ctx.textAlign =
+        'center'
+
+
+      ctx.fillStyle =
+        '#079954'
+
+      ctx.font =
+        '700 28px Arial, sans-serif'
+
+
+      ctx.fillText(
+        String(
+          presentCount
+        ),
+        190,
+        summaryY + 100
+      )
+
+
+      ctx.fillStyle =
+        '#3e5473'
+
+      ctx.font =
+        '400 18px Arial, sans-serif'
+
+
+      ctx.fillText(
+        'Present',
+        190,
+        summaryY + 128
+      )
+
+
+      // Divider 1
+
+      ctx.fillStyle =
+        '#aed7f3'
+
+      ctx.fillRect(
+        370,
+        summaryY + 70,
+        2,
+        70
+      )
+
+
+      // -----------------------------------------------------
+      // Absent
+      // -----------------------------------------------------
+
+      ctx.fillStyle =
+        '#dc2935'
+
+      ctx.font =
+        '700 28px Arial, sans-serif'
+
+
+      ctx.fillText(
+        String(
+          absentCount
+        ),
+        540,
+        summaryY + 100
+      )
+
+
+      ctx.fillStyle =
+        '#3e5473'
+
+      ctx.font =
+        '400 18px Arial, sans-serif'
+
+
+      ctx.fillText(
+        'Absent',
+        540,
+        summaryY + 128
+      )
+
+
+      // Divider 2
+
+      ctx.fillStyle =
+        '#aed7f3'
+
+      ctx.fillRect(
+        710,
+        summaryY + 70,
+        2,
+        70
+      )
+
+
+      // -----------------------------------------------------
+      // Total
+      // -----------------------------------------------------
+
+      ctx.fillStyle =
+        '#126bd1'
+
+      ctx.font =
+        '700 28px Arial, sans-serif'
+
+
+      ctx.fillText(
+        String(
+          staff.length
+        ),
+        890,
+        summaryY + 100
+      )
+
+
+      ctx.fillStyle =
+        '#3e5473'
+
+      ctx.font =
+        '400 18px Arial, sans-serif'
+
+
+      ctx.fillText(
+        'Total Staff',
+        890,
+        summaryY + 128
+      )
+
+
+      // =====================================================
+      // Noida Authority Sweepers
+      // =====================================================
+
+      drawRoundedRect(
+        ctx,
+        15,
+        authorityY,
+        1050,
+        authorityHeight,
+        18,
+        '#effcf5',
+        '#59dc9b',
+        2
+      )
+
+
+      // People icon
+
+      drawPeopleIcon(
+        ctx,
+        105,
+        authorityY + 60
+      )
+
+
+      // Vertical separator
+
+      ctx.fillStyle =
+        '#62d7a2'
+
+      ctx.fillRect(
+        185,
+        authorityY + 26,
+        2,
+        68
+      )
+
+
+      ctx.textAlign =
+        'left'
+
+      ctx.fillStyle =
+        '#102d58'
+
+      ctx.font =
+        '700 23px Arial, sans-serif'
+
+
+      ctx.fillText(
+        'Noida Authority Sweepers available today :',
+        225,
+        authorityY + 70
+      )
+
+
+      // Count badge
+
+      drawRoundedRect(
+        ctx,
+        875,
+        authorityY + 18,
+        160,
+        84,
+        17,
+        '#d7f7e4',
+        '#68dfa6',
+        1.5
+      )
+
+
+      ctx.textAlign =
+        'center'
+
+      ctx.fillStyle =
+        '#079954'
+
+      ctx.font =
+        '700 38px Arial, sans-serif'
+
+
+      ctx.fillText(
+        String(
+          authoritySweepers
+        ),
+        955,
+        authorityY + 70
+      )
+
+
+      // =====================================================
+      // Footer
+      // =====================================================
+
+      drawRoundedRect(
+        ctx,
+        15,
+        footerY,
+        1050,
+        footerHeight,
+        18,
+        '#fffaf0',
+        '#e5b42d',
+        2
+      )
+
+
+      // -----------------------------------------------------
+      // Small gear style icon
+      // -----------------------------------------------------
+
+      ctx.beginPath()
+
+      ctx.fillStyle =
+        '#f3aa11'
+
+      ctx.arc(
+        105,
+        footerY + 68,
+        26,
+        0,
+        Math.PI * 2
+      )
+
+      ctx.fill()
+
+
+      ctx.beginPath()
+
+      ctx.fillStyle =
+        '#ffffff'
+
+      ctx.arc(
+        105,
+        footerY + 68,
+        9,
+        0,
+        Math.PI * 2
+      )
+
+      ctx.fill()
+
+
+      // Vertical separator
+
+      ctx.fillStyle =
+        '#94aac0'
+
+      ctx.fillRect(
+        185,
+        footerY + 30,
+        2,
+        75
+      )
+
+
+      // Footer message
+
+      ctx.textAlign =
+        'left'
+
+      ctx.fillStyle =
+        '#17365e'
+
+      ctx.font =
+        '400 19px Arial, sans-serif'
+
+
+      wrapCanvasText(
+        ctx,
+        'Powered by the RWA Pocket-A in-house App — a step towards smarter, transparent & technology-driven RWA management.',
+        225,
+        footerY + 55,
+        785,
+        30
+      )
+
+
+      // Horizontal divider
+
+      ctx.fillStyle =
+        '#9baebe'
+
+      ctx.fillRect(
+        55,
+        footerY + 128,
+        970,
+        1.5
+      )
+
+
+      // Supervisor
+
+      ctx.textAlign =
+        'center'
+
+      ctx.fillStyle =
+        '#2c486c'
+
+      ctx.font =
+        '700 21px Arial, sans-serif'
+
+
+      ctx.fillText(
+        'Supervisor Pocket-A',
+        width / 2,
+        footerY + 166
+      )
+
+
+      // =====================================================
+      // Canvas → PNG
+      // =====================================================
 
       const blob =
         await new Promise(
@@ -1291,7 +1660,6 @@ function Attendance({
                   resolve(
                     result
                   )
-
                 } else {
                   reject(
                     new Error(
@@ -1299,6 +1667,7 @@ function Attendance({
                     )
                   )
                 }
+
               },
               'image/png',
               1
@@ -1332,6 +1701,7 @@ function Attendance({
 
       setSharing(true)
 
+
       try {
 
         const blob =
@@ -1351,13 +1721,13 @@ function Attendance({
             [blob],
             fileName,
             {
-              type: 'image/png'
+              type:
+                'image/png'
             }
           )
 
 
         const shareData = {
-
           title:
             'RWA Pocket-A Staff Daily Attendance',
 
@@ -1388,14 +1758,20 @@ function Attendance({
             )
 
         } catch {
+
           canShareFiles =
             false
         }
 
 
+        // -----------------------------------------------------
+        // Mobile share sheet
+        // -----------------------------------------------------
+
         if (
           canShareFiles
         ) {
+
           try {
 
             await navigator.share(
@@ -1421,6 +1797,10 @@ function Attendance({
           }
         }
 
+
+        // -----------------------------------------------------
+        // Desktop fallback
+        // -----------------------------------------------------
 
         const downloadUrl =
           URL.createObjectURL(
@@ -1461,7 +1841,9 @@ function Attendance({
         )
 
 
-      } catch (shareError) {
+      } catch (
+        shareError
+      ) {
 
         console.error(
           shareError
@@ -1579,7 +1961,6 @@ function Attendance({
 
       <main className="dashboard">
 
-
         <div
           className="attendance-title"
         >
@@ -1611,6 +1992,10 @@ function Attendance({
         </div>
 
 
+        {/* =====================================================
+            RWA Staff Attendance
+        ====================================================== */}
+
         <div
           className="attendance-table"
         >
@@ -1629,7 +2014,7 @@ function Attendance({
             </div>
 
             <div>
-              Profession
+              Role
             </div>
 
             <div>
@@ -1716,6 +2101,10 @@ function Attendance({
         </div>
 
 
+        {/* =====================================================
+            Summary
+        ====================================================== */}
+
         <div
           className="attendance-summary"
         >
@@ -1734,6 +2123,10 @@ function Attendance({
 
         </div>
 
+
+        {/* =====================================================
+            Noida Authority Sweepers
+        ====================================================== */}
 
         <div
           className="external-staff-card"
@@ -1785,6 +2178,10 @@ function Attendance({
         </div>
 
 
+        {/* =====================================================
+            Save
+        ====================================================== */}
+
         <button
           className="save-attendance-button"
           onClick={
@@ -1816,6 +2213,10 @@ function Attendance({
 
         </button>
 
+
+        {/* =====================================================
+            Share PNG
+        ====================================================== */}
 
         <button
           className="whatsapp-button"
