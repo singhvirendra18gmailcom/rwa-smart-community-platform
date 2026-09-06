@@ -1,6 +1,6 @@
 /* =========================================================
    RWA POCKET-A - TOWER / PARK INSPECTION
-   SIMPLE MOBILE-FIRST LIST VIEW
+   MOBILE-FIRST LIST + COMPACT REPORT + DAILY SUMMARY
    ========================================================= */
 
 .tower-inspection-page {
@@ -32,6 +32,19 @@
 }
 
 /* =========================================================
+   BRAND
+   ========================================================= */
+
+.inspection-brand {
+  color: #1569e8;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 0.5px;
+}
+
+/* =========================================================
    LIST PAGE HEADER
    ========================================================= */
 
@@ -54,20 +67,12 @@
   border-radius: 19px;
 
   box-shadow:
-    0 7px 20px rgba(40, 70, 100, 0.07);
+    0 7px 20px
+    rgba(40, 70, 100, 0.07);
 }
 
 .list-header-title {
   min-width: 0;
-}
-
-.inspection-brand {
-  color: #1569e8;
-
-  font-size: 12px;
-  font-weight: 900;
-
-  letter-spacing: 0.5px;
 }
 
 .list-header-title h1 {
@@ -91,8 +96,32 @@
 }
 
 /* =========================================================
-   GENERAL BACK BUTTON
+   GENERIC HEADER
+   SCANNER / GPS / FORM / REPORT / SUMMARY
    ========================================================= */
+
+.inspection-header {
+  width: calc(100% - 24px);
+  max-width: 760px;
+
+  margin: 14px auto 0;
+
+  padding: 15px 18px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  background: #ffffff;
+
+  border: 1px solid #d4e2f0;
+  border-radius: 19px;
+
+  box-shadow:
+    0 7px 20px
+    rgba(40, 70, 100, 0.07);
+}
 
 .inspection-header-back {
   width: 44px;
@@ -116,6 +145,24 @@
   cursor: pointer;
 }
 
+.inspection-header h1 {
+  margin: 2px 0 0;
+
+  color: #101d3d;
+
+  font-size: 23px;
+  line-height: 1.1;
+}
+
+.inspection-header p {
+  margin: 4px 0 0;
+
+  color: #75849a;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
 /* =========================================================
    LIST CONTENT
    ========================================================= */
@@ -130,7 +177,7 @@
 }
 
 /* =========================================================
-   SUMMARY
+   SUMMARY COUNTERS
    ========================================================= */
 
 .inspection-summary {
@@ -141,13 +188,13 @@
 
   gap: 8px;
 
-  margin-bottom: 15px;
+  margin-bottom: 14px;
 }
 
 .summary-card {
-  min-height: 74px;
+  min-height: 72px;
 
-  padding: 10px;
+  padding: 9px;
 
   display: flex;
   flex-direction: column;
@@ -184,17 +231,145 @@
 
 .summary-done {
   background: #eaf8ef;
+
   border-color: #c5e8d0;
 }
 
 .summary-pending {
   background: #fff5dc;
+
   border-color: #f1dfad;
 }
 
 .summary-issues {
   background: #ffeded;
+
   border-color: #f0caca;
+}
+
+/* =========================================================
+   SOCIETY GARBAGE CARD
+   ========================================================= */
+
+.society-garbage-card {
+  margin-bottom: 18px;
+
+  padding: 15px;
+
+  background: #ffffff;
+
+  border: 1px solid #d9e3ec;
+  border-radius: 16px;
+
+  box-shadow:
+    0 4px 12px
+    rgba(40, 60, 80, 0.06);
+}
+
+.society-garbage-heading {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: flex-start;
+
+  gap: 12px;
+}
+
+.society-garbage-heading > div {
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+}
+
+.society-garbage-heading strong {
+  color: #13213e;
+
+  font-size: 15px;
+}
+
+.society-garbage-heading small {
+  color: #718095;
+
+  font-size: 11px;
+}
+
+.society-garbage-heading > span {
+  padding: 4px 7px;
+
+  border-radius: 999px;
+
+  background: #e3f6e9;
+
+  color: #16733a;
+
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.society-garbage-options {
+  margin-top: 12px;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 8px;
+}
+
+.society-garbage-option {
+  min-height: 44px;
+
+  border: 1px solid #d9e2eb;
+  border-radius: 11px;
+
+  background: #f8fafc;
+
+  font-weight: 900;
+
+  cursor: pointer;
+}
+
+.society-garbage-option.good.selected {
+  background: #e5f8e9;
+
+  border-color: #55b875;
+
+  color: #177238;
+}
+
+.society-garbage-option.bad.selected {
+  background: #ffe8e8;
+
+  border-color: #df6d6d;
+
+  color: #a32323;
+}
+
+.society-garbage-save {
+  width: 100%;
+
+  margin-top: 10px;
+
+  padding: 11px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #176cf0;
+
+  color: #ffffff;
+
+  font-weight: 900;
+
+  cursor: pointer;
+}
+
+.society-garbage-save:disabled {
+  background: #aab7c8;
+
+  cursor: not-allowed;
 }
 
 /* =========================================================
@@ -239,8 +414,8 @@
   padding: 13px;
 
   display: flex;
-
   align-items: center;
+
   justify-content: space-between;
 
   gap: 12px;
@@ -251,7 +426,8 @@
   border-radius: 16px;
 
   box-shadow:
-    0 4px 12px rgba(40, 60, 80, 0.06);
+    0 4px 12px
+    rgba(40, 60, 80, 0.06);
 }
 
 .inspection-location-row.location-complete {
@@ -402,48 +578,44 @@
 }
 
 /* =========================================================
-   NORMAL HEADER
-   SCANNER / GPS / FORM / REPORT
+   DAILY SUMMARY BUTTONS
    ========================================================= */
 
-.inspection-header {
-  width: calc(100% - 24px);
-  max-width: 760px;
+.daily-summary-actions {
+  margin-top: 22px;
 
-  margin: 14px auto 0;
+  display: grid;
 
-  padding: 15px 18px;
+  grid-template-columns:
+    1fr 1fr;
 
-  display: flex;
-  align-items: center;
-
-  gap: 14px;
-
-  background: #ffffff;
-
-  border: 1px solid #d4e2f0;
-  border-radius: 19px;
-
-  box-shadow:
-    0 7px 20px rgba(40, 70, 100, 0.07);
+  gap: 9px;
 }
 
-.inspection-header h1 {
-  margin: 2px 0 0;
+.view-summary-button,
+.share-summary-button {
+  min-height: 46px;
 
-  color: #101d3d;
+  padding: 11px;
 
-  font-size: 23px;
-  line-height: 1.1;
+  border: none;
+  border-radius: 12px;
+
+  font-weight: 900;
+
+  cursor: pointer;
 }
 
-.inspection-header p {
-  margin: 4px 0 0;
+.view-summary-button {
+  background: #eaf2ff;
 
-  color: #75849a;
+  color: #175cb8;
+}
 
-  font-size: 13px;
-  font-weight: 600;
+.share-summary-button {
+  background: #1fa955;
+
+  color: #ffffff;
 }
 
 /* =========================================================
@@ -475,7 +647,8 @@
   border-radius: 17px;
 
   box-shadow:
-    0 5px 14px rgba(40, 60, 80, 0.06);
+    0 5px 14px
+    rgba(40, 60, 80, 0.06);
 }
 
 /* =========================================================
@@ -661,7 +834,7 @@
 }
 
 /* =========================================================
-   INSPECTION ITEMS
+   FORM ITEMS
    ========================================================= */
 
 .inspection-item {
@@ -688,7 +861,7 @@
 }
 
 /* =========================================================
-   TOGGLES
+   TOGGLE BUTTONS
    ========================================================= */
 
 .inspection-toggle-row {
@@ -732,7 +905,7 @@
 }
 
 /* =========================================================
-   TOWER LIGHT COUNTER
+   LIGHT COUNTERS
    ========================================================= */
 
 .lights-counter {
@@ -818,7 +991,8 @@
   border-color: #6fa9f6;
 
   box-shadow:
-    0 0 0 3px rgba(40, 110, 220, 0.09);
+    0 0 0 3px
+    rgba(40, 110, 220, 0.09);
 }
 
 /* =========================================================
@@ -841,12 +1015,8 @@
 }
 
 .attention-preview p {
-  margin-bottom: 5px;
+  margin-bottom: 0;
 
-  color: #80551e;
-}
-
-.attention-preview small {
   color: #80551e;
 }
 
@@ -899,7 +1069,7 @@
 }
 
 /* =========================================================
-   STREET LIGHT SECTION
+   STREET LIGHT MAP FOR TOWERS
    ========================================================= */
 
 .street-light-section {
@@ -988,7 +1158,6 @@
     translate(-50%, -50%);
 
   display: flex;
-
   flex-direction: column;
 
   align-items: center;
@@ -1000,7 +1169,8 @@
   border-radius: 15px;
 
   box-shadow:
-    0 5px 13px rgba(40, 70, 100, 0.08);
+    0 5px 13px
+    rgba(40, 70, 100, 0.08);
 }
 
 .street-light-tower span {
@@ -1026,15 +1196,13 @@
   cursor: default;
 }
 
-.street-light-dot.working,
-.legend-dot.working {
+.street-light-dot.working {
   background: #ffffff;
 
   border: 4px solid #21963c;
 }
 
-.street-light-dot.not-working,
-.legend-dot.not-working {
+.street-light-dot.not-working {
   background: #d92626;
 
   border: 4px solid #9f1919;
@@ -1080,168 +1248,329 @@
   top: 28%;
 }
 
-.street-light-legend {
+/* =========================================================
+   COMPACT INDIVIDUAL REPORT
+   ========================================================= */
+
+.compact-report-status {
+  padding: 10px 13px;
+
+  text-align: center;
+
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.compact-report-status.good {
+  background: #e8f8ed;
+
+  border: 1px solid #a8deb8;
+
+  color: #167239;
+}
+
+.compact-report-status.issue {
+  background: #fff0f0;
+
+  border: 1px solid #e6a8a8;
+
+  color: #a42424;
+}
+
+.compact-attention-card {
+  margin-top: 9px;
+
+  padding: 10px 12px;
+
+  background: #fff7e8;
+
+  border: 1px solid #efc57e;
+  border-radius: 12px;
+
+  color: #87530c;
+
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compact-attention-card > div + div {
+  margin-top: 4px;
+}
+
+.compact-report-card {
+  margin-top: 9px;
+
+  padding: 4px 13px;
+
+  background: #ffffff;
+
+  border: 1px solid #dce5ee;
+  border-radius: 13px;
+
+  box-shadow:
+    0 4px 11px
+    rgba(40, 60, 80, 0.05);
+}
+
+.compact-report-row {
+  min-height: 38px;
+
   display: flex;
+  align-items: center;
 
-  justify-content: center;
+  justify-content: space-between;
 
-  gap: 20px;
+  gap: 12px;
 
-  color: #68768a;
+  border-bottom:
+    1px solid #edf1f5;
+
+  font-size: 13px;
+}
+
+.compact-report-row:last-child {
+  border-bottom: none;
+}
+
+.compact-report-row span {
+  color: #56677f;
+}
+
+.compact-report-row strong {
+  color: #1b2c46;
+
+  text-align: right;
+}
+
+.compact-report-note {
+  margin-top: 9px;
+
+  padding: 9px 11px;
+
+  background: #ffffff;
+
+  border: 1px solid #dce5ee;
+  border-radius: 11px;
+
+  color: #56677f;
 
   font-size: 12px;
 }
 
-.street-light-legend span {
-  display: flex;
+.compact-verification-line {
+  margin-top: 9px;
 
-  align-items: center;
+  padding: 9px 11px;
 
-  gap: 6px;
-}
+  text-align: center;
 
-.legend-dot {
-  width: 14px;
-  height: 14px;
+  background: #f1f7ff;
 
-  display: inline-block;
+  border: 1px solid #d5e4f6;
+  border-radius: 11px;
 
-  border-radius: 50%;
+  color: #315a8a;
+
+  font-size: 11px;
+  font-weight: 800;
 }
 
 /* =========================================================
-   REPORT
+   DAILY SUMMARY REPORT
    ========================================================= */
 
-.report-status-card {
-  padding: 17px;
+.summary-attention-header {
+  padding: 11px 13px;
 
-  display: flex;
-  align-items: center;
+  text-align: center;
 
-  gap: 13px;
+  border-radius: 12px;
 
-  border: 1px solid;
-  border-radius: 17px;
+  font-size: 14px;
+  font-weight: 900;
 }
 
-.report-status-card > span {
-  font-size: 31px;
+.summary-attention-header.good {
+  background: #e8f8ed;
+
+  border: 1px solid #a8deb8;
+
+  color: #167239;
 }
 
-.report-status-card > div {
-  display: flex;
-  flex-direction: column;
+.summary-attention-header.issue {
+  background: #fff0f0;
+
+  border: 1px solid #e6a8a8;
+
+  color: #a42424;
 }
 
-.report-status-card small {
-  color: #788597;
-}
+.summary-attention-card {
+  margin-top: 10px;
 
-.report-status-card strong {
-  font-size: 19px;
-}
-
-.report-status-good {
-  background: #f3fff6;
-
-  border-color: #9edeb1;
-}
-
-.report-status-issue {
-  background: #fff3f3;
-
-  border-color: #e5a1a1;
-}
-
-.report-attention-card {
-  margin-top: 13px;
-
-  padding: 17px;
+  padding: 12px;
 
   background: #fff7e8;
 
-  border: 1px solid #f0c477;
-  border-radius: 17px;
+  border: 1px solid #efc57e;
+  border-radius: 13px;
 }
 
-.report-attention-card h2 {
-  margin: 0 0 11px;
+.summary-attention-section {
+  display: flex;
+  flex-direction: column;
 
-  color: #9d5600;
+  gap: 4px;
 
-  font-size: 17px;
+  padding: 8px 0;
+
+  border-bottom:
+    1px solid
+    rgba(150, 95, 15, 0.13);
 }
 
-.attention-line {
-  padding: 7px 0;
-
-  border-top:
-    1px solid rgba(160, 100, 0, 0.12);
+.summary-attention-section:last-child {
+  border-bottom: none;
 }
 
-.attention-line:first-of-type {
-  border-top: none;
+.summary-attention-section strong {
+  color: #874f00;
+
+  font-size: 13px;
 }
 
-.report-card {
-  margin-top: 13px;
+.summary-attention-section span {
+  color: #684b24;
 
-  padding: 7px 17px;
+  font-size: 12px;
 }
 
-.report-line {
-  min-height: 47px;
+.summary-garbage-row {
+  margin-top: 10px;
+
+  padding: 11px 13px;
+
+  display: flex;
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  background: #ffffff;
+
+  border: 1px solid #dce5ee;
+  border-radius: 12px;
+
+  font-size: 13px;
+}
+
+.summary-garbage-row span {
+  color: #56677f;
+}
+
+.summary-garbage-row strong {
+  color: #182942;
+
+  text-align: right;
+}
+
+.summary-status-card {
+  margin-top: 10px;
+
+  padding: 13px;
+
+  background: #ffffff;
+
+  border: 1px solid #dce5ee;
+  border-radius: 13px;
+
+  box-shadow:
+    0 4px 11px
+    rgba(40, 60, 80, 0.05);
+}
+
+.summary-status-card h2 {
+  margin: 0 0 10px;
+
+  color: #1a2b45;
+
+  font-size: 15px;
+}
+
+.summary-location-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 7px;
+}
+
+.summary-location-chip {
+  min-height: 38px;
+
+  padding: 6px;
 
   display: flex;
 
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
 
-  gap: 13px;
+  gap: 4px;
 
-  border-bottom: 1px solid #edf1f5;
+  background: #f8fafc;
+
+  border: 1px solid #e1e8ef;
+  border-radius: 9px;
+
+  font-size: 12px;
+  font-weight: 900;
 }
 
-.report-line:last-child {
-  border-bottom: none;
+.summary-location-chip span {
+  color: #32445e;
 }
 
-.report-line span {
-  color: #56677f;
+.summary-location-chip strong {
+  font-size: 14px;
 }
 
-.report-line strong {
-  text-align: right;
+.park-summary-grid {
+  grid-template-columns:
+    repeat(2, 1fr);
 }
 
-.report-remarks {
-  margin-top: 13px;
+.summary-progress-line {
+  margin-top: 10px;
 
-  padding: 17px;
+  padding-top: 9px;
+
+  border-top:
+    1px solid #edf1f5;
+
+  color: #607088;
+
+  font-size: 12px;
 }
 
-.report-remarks p {
-  margin-bottom: 0;
-
-  color: #596a80;
+.summary-progress-line strong {
+  color: #1a2b45;
 }
 
-.visit-proof-card {
-  margin-top: 13px;
+.summary-legend {
+  margin-top: 10px;
 
-  padding: 17px;
+  padding: 8px;
 
-  display: flex;
-  flex-direction: column;
+  text-align: center;
 
-  gap: 5px;
+  color: #66768a;
 
-  background: #f6faff;
-}
-
-.visit-proof-card strong {
-  margin-bottom: 3px;
+  font-size: 11px;
 }
 
 /* =========================================================
@@ -1260,12 +1589,11 @@
       0 0 17px 17px;
   }
 
-  .list-page-header {
-    padding: 11px 10px;
-  }
-
+  .list-page-header,
   .inspection-header {
-    padding: 11px 10px;
+    padding:
+      11px
+      10px;
   }
 
   .inspection-header-back {
@@ -1288,7 +1616,9 @@
   }
 
   .inspection-list-content {
-    padding: 0 9px;
+    padding:
+      0
+      9px;
   }
 
   .inspection-summary {
@@ -1298,13 +1628,13 @@
   }
 
   .summary-card {
-    min-height: 62px;
+    min-height: 60px;
 
-    padding: 7px;
+    padding: 6px;
   }
 
   .summary-card span {
-    font-size: 17px;
+    font-size: 16px;
   }
 
   .summary-card strong {
@@ -1313,6 +1643,14 @@
 
   .summary-card small {
     font-size: 9px;
+  }
+
+  .society-garbage-card {
+    padding: 12px;
+  }
+
+  .society-garbage-options {
+    gap: 6px;
   }
 
   .inspection-location-row {
@@ -1350,8 +1688,16 @@
     font-size: 9px;
   }
 
+  .daily-summary-actions {
+    grid-template-columns: 1fr;
+
+    gap: 7px;
+  }
+
   .inspection-content {
-    padding: 0 9px;
+    padding:
+      0
+      9px;
   }
 
   .inspection-toggle-row {
@@ -1366,16 +1712,20 @@
     width: 100%;
   }
 
-  .street-light-legend {
-    justify-content: flex-start;
+  .compact-report-row {
+    min-height: 35px;
 
-    flex-wrap: wrap;
+    font-size: 12px;
   }
 
-  .report-line {
-    align-items: flex-start;
+  .summary-location-grid {
+    grid-template-columns:
+      repeat(3, 1fr);
+  }
 
-    padding: 9px 0;
+  .park-summary-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 }
 
@@ -1411,5 +1761,15 @@
   .location-report-button,
   .location-share-button {
     width: 100%;
+  }
+
+  .summary-location-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .park-summary-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 }

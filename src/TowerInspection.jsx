@@ -188,7 +188,7 @@ function extractQrToken(decodedText) {
       return parkToken.trim()
     }
   } catch {
-    // QR is not a URL.
+    // QR is plain text.
   }
 
   return value
@@ -244,20 +244,20 @@ function inspectionHasIssue(
     return false
   }
 
-  const streetFailureCount =
-    getStreetLightFailures(
-      inspection.street_light_status
-    ).length
-
   if (type === 'park') {
     return (
       inspection.sweeping_done ===
         false ||
-      inspection.water_leakage ===
-        true ||
-      inspection.garbage_disposed ===
+      inspection.grass_properly_cut ===
         false ||
-      streetFailureCount > 0 ||
+      inspection.benches_well_placed ===
+        false ||
+      inspection.swings_not_broken ===
+        false ||
+      inspection.watering_needed ===
+        true ||
+      inspection.street_lights_all_lit ===
+        false ||
       inspection.other_issue ===
         true
     )
@@ -271,6 +271,11 @@ function inspectionHasIssue(
     inspection.led_screen_working ??
     inspection.camera_led_working
 
+  const streetFailureCount =
+    getStreetLightFailures(
+      inspection.street_light_status
+    ).length
+
   return (
     inspection.sweeping_done ===
       false ||
@@ -278,8 +283,6 @@ function inspectionHasIssue(
     led === false ||
     inspection.water_leakage ===
       true ||
-    inspection.garbage_disposed ===
-      false ||
     streetFailureCount > 0 ||
     inspection.other_issue ===
       true ||
@@ -306,7 +309,6 @@ function InspectionToggle({
     <div className="inspection-item">
 
       <div className="inspection-item-heading">
-
         <span className="inspection-item-icon">
           {icon}
         </span>
@@ -314,7 +316,6 @@ function InspectionToggle({
         <strong>
           {label}
         </strong>
-
       </div>
 
       <div className="inspection-toggle-row">
@@ -355,7 +356,6 @@ function InspectionToggle({
 
 function StreetLightMap({
   locationName,
-  locationType,
   status,
   readOnly = false,
   onToggle,
@@ -382,7 +382,7 @@ function StreetLightMap({
           </strong>
 
           <p>
-            Approximate locations
+            Approximate positions
           </p>
         </div>
 
@@ -394,7 +394,7 @@ function StreetLightMap({
           }`}
         >
           {failedCount === 0
-            ? '✅ No issue'
+            ? '✅ All OK'
             : `⚠ ${failedCount} not working`}
         </span>
 
@@ -403,8 +403,7 @@ function StreetLightMap({
       {!readOnly && (
         <div className="street-light-help">
           Tap the approximate position
-          where a street light is not
-          working.
+          where a light is not working.
         </div>
       )}
 
@@ -419,11 +418,6 @@ function StreetLightMap({
               key={index}
               type="button"
               disabled={readOnly}
-              aria-label={
-                STREET_LIGHT_POSITIONS[
-                  index
-                ]
-              }
               className={`street-light-dot street-light-dot-${
                 index + 1
               } ${
@@ -441,33 +435,14 @@ function StreetLightMap({
         )}
 
         <div className="street-light-tower">
-
           <span>
-            {locationType ===
-            'park'
-              ? '🌳'
-              : '🏢'}
+            🏢
           </span>
 
           <strong>
             {locationName}
           </strong>
-
         </div>
-
-      </div>
-
-      <div className="street-light-legend">
-
-        <span>
-          <i className="legend-dot working" />
-          Working
-        </span>
-
-        <span>
-          <i className="legend-dot not-working" />
-          Not working
-        </span>
 
       </div>
 
@@ -602,8 +577,7 @@ function TowerInspection({
 }) {
   const today =
     useMemo(
-      () =>
-        getIndiaDate(),
+      () => getIndiaDate(),
       []
     )
 
@@ -642,6 +616,30 @@ function TowerInspection({
     setParkInspections,
   ] =
     useState([])
+
+  const [
+    societyInspection,
+    setSocietyInspection,
+  ] =
+    useState(null)
+
+  const [
+    societyGarbageDisposed,
+    setSocietyGarbageDisposed,
+  ] =
+    useState(null)
+
+  const [
+    societySaving,
+    setSocietySaving,
+  ] =
+    useState(false)
+
+  const [
+    societySaved,
+    setSocietySaved,
+  ] =
+    useState(false)
 
   const [
     loading,
@@ -758,10 +756,52 @@ function TowerInspection({
     useState(null)
 
   const [
-    garbageDisposed,
-    setGarbageDisposed,
+    streetLightStatus,
+    setStreetLightStatus,
+  ] =
+    useState([
+      ...DEFAULT_STREET_LIGHTS,
+    ])
+
+  /*
+    Park-specific fields
+  */
+
+  const [
+    grassProperlyCut,
+    setGrassProperlyCut,
   ] =
     useState(null)
+
+  const [
+    benchesWellPlaced,
+    setBenchesWellPlaced,
+  ] =
+    useState(null)
+
+  const [
+    swingsNotBroken,
+    setSwingsNotBroken,
+  ] =
+    useState(null)
+
+  const [
+    wateringNeeded,
+    setWateringNeeded,
+  ] =
+    useState(null)
+
+  const [
+    parkStreetLightsAllLit,
+    setParkStreetLightsAllLit,
+  ] =
+    useState(null)
+
+  const [
+    parkStreetLightsNotLitCount,
+    setParkStreetLightsNotLitCount,
+  ] =
+    useState(0)
 
   const [
     otherIssue,
@@ -774,14 +814,6 @@ function TowerInspection({
     setOtherIssueDetails,
   ] =
     useState('')
-
-  const [
-    streetLightStatus,
-    setStreetLightStatus,
-  ] =
-    useState([
-      ...DEFAULT_STREET_LIGHTS,
-    ])
 
   const [
     remarks,
@@ -907,14 +939,10 @@ function TowerInspection({
     return {
       id: tower.id,
       type: 'tower',
-      name:
-        tower.tower_name,
-      qr_token:
-        tower.qr_token,
-      latitude:
-        tower.latitude,
-      longitude:
-        tower.longitude,
+      name: tower.tower_name,
+      qr_token: tower.qr_token,
+      latitude: tower.latitude,
+      longitude: tower.longitude,
       allowed_radius_m:
         tower.allowed_radius_m,
       display_order:
@@ -928,14 +956,10 @@ function TowerInspection({
     return {
       id: park.id,
       type: 'park',
-      name:
-        park.park_name,
-      qr_token:
-        park.qr_token,
-      latitude:
-        park.latitude,
-      longitude:
-        park.longitude,
+      name: park.park_name,
+      qr_token: park.qr_token,
+      latitude: park.latitude,
+      longitude: park.longitude,
       allowed_radius_m:
         park.allowed_radius_m,
       display_order:
@@ -945,44 +969,47 @@ function TowerInspection({
 
   async function loadDashboard() {
     setLoading(true)
-
     setError('')
 
     try {
       const [
         towerResponse,
         parkResponse,
+        societyResponse,
       ] =
         await Promise.all([
           supabase
             .from('towers')
             .select('*')
-            .eq(
-              'active',
-              true
-            )
+            .eq('active', true)
             .order(
               'display_order',
               {
-                ascending:
-                  true,
+                ascending: true,
               }
             ),
 
           supabase
             .from('parks')
             .select('*')
-            .eq(
-              'active',
-              true
-            )
+            .eq('active', true)
             .order(
               'display_order',
               {
-                ascending:
-                  true,
+                ascending: true,
               }
             ),
+
+          supabase
+            .from(
+              'society_daily_inspections'
+            )
+            .select('*')
+            .eq(
+              'inspection_date',
+              today
+            )
+            .maybeSingle(),
         ])
 
       if (
@@ -997,6 +1024,12 @@ function TowerInspection({
         throw parkResponse.error
       }
 
+      if (
+        societyResponse.error
+      ) {
+        throw societyResponse.error
+      }
+
       const towerData =
         towerResponse.data || []
 
@@ -1009,6 +1042,24 @@ function TowerInspection({
 
       setParks(
         parkData
+      )
+
+      setSocietyInspection(
+        societyResponse.data ||
+          null
+      )
+
+      setSocietyGarbageDisposed(
+        societyResponse.data
+          ?.garbage_disposed ??
+          null
+      )
+
+      setSocietySaved(
+        Boolean(
+          societyResponse.data
+            ?.saved_at
+        )
       )
 
       const towerIds =
@@ -1101,7 +1152,7 @@ function TowerInspection({
 
       setError(
         err?.message ||
-          'Unable to load inspection locations.'
+          'Unable to load inspection data.'
       )
     } finally {
       setLoading(false)
@@ -1152,16 +1203,14 @@ function TowerInspection({
     ) {
       return parkInspections.find(
         (inspection) =>
-          inspection
-            .park_id ===
+          inspection.park_id ===
           location.id
       )
     }
 
     return towerInspections.find(
       (inspection) =>
-        inspection
-          .tower_id ===
+        inspection.tower_id ===
         location.id
     )
   }
@@ -1178,17 +1227,29 @@ function TowerInspection({
     )
 
     setWaterLeakage(null)
-    setGarbageDisposed(null)
+
+    setStreetLightStatus([
+      ...DEFAULT_STREET_LIGHTS,
+    ])
+
+    setGrassProperlyCut(null)
+    setBenchesWellPlaced(null)
+    setSwingsNotBroken(null)
+    setWateringNeeded(null)
+
+    setParkStreetLightsAllLit(
+      null
+    )
+
+    setParkStreetLightsNotLitCount(
+      0
+    )
 
     setOtherIssue(false)
 
     setOtherIssueDetails(
       ''
     )
-
-    setStreetLightStatus([
-      ...DEFAULT_STREET_LIGHTS,
-    ])
 
     setRemarks('')
 
@@ -1213,14 +1274,14 @@ function TowerInspection({
       inspection.sweeping_done
     )
 
-    setMoppingDone(
-      inspection.mopping_done
-    )
-
     if (
       location.type ===
       'tower'
     ) {
+      setMoppingDone(
+        inspection.mopping_done
+      )
+
       setCameraWorking(
         inspection.camera_working ??
           inspection.camera_led_working ??
@@ -1237,17 +1298,50 @@ function TowerInspection({
         inspection
           .lights_working_count
       )
+
+      setWaterLeakage(
+        inspection.water_leakage ??
+          false
+      )
+
+      setStreetLightStatus(
+        normaliseStreetLights(
+          inspection
+            .street_light_status
+        )
+      )
+    } else {
+      setGrassProperlyCut(
+        inspection
+          .grass_properly_cut
+      )
+
+      setBenchesWellPlaced(
+        inspection
+          .benches_well_placed
+      )
+
+      setSwingsNotBroken(
+        inspection
+          .swings_not_broken
+      )
+
+      setWateringNeeded(
+        inspection
+          .watering_needed
+      )
+
+      setParkStreetLightsAllLit(
+        inspection
+          .street_lights_all_lit
+      )
+
+      setParkStreetLightsNotLitCount(
+        inspection
+          .street_lights_not_lit_count ||
+          0
+      )
     }
-
-    setWaterLeakage(
-      inspection.water_leakage ??
-        false
-    )
-
-    setGarbageDisposed(
-      inspection.garbage_disposed ??
-        true
-    )
 
     setOtherIssue(
       inspection.other_issue ??
@@ -1258,13 +1352,6 @@ function TowerInspection({
       inspection
         .other_issue_details ||
         ''
-    )
-
-    setStreetLightStatus(
-      normaliseStreetLights(
-        inspection
-          .street_light_status
-      )
     )
 
     setRemarks(
@@ -1307,7 +1394,6 @@ function TowerInspection({
       ''
     )
 
-    setInfoMessage('')
     setError('')
 
     setScreen('scanner')
@@ -1633,56 +1719,81 @@ function TowerInspection({
     selectedLocation?.type ===
     'park'
 
-  const checklistComplete =
+  const towerChecklistComplete =
     sweepingDone !== null &&
     moppingDone !== null &&
-    waterLeakage !== null &&
-    garbageDisposed !==
+    cameraWorking !== null &&
+    ledScreenWorking !==
+      null &&
+    lightsWorkingCount !==
+      null &&
+    waterLeakage !== null
+
+  const parkChecklistComplete =
+    sweepingDone !== null &&
+    grassProperlyCut !==
+      null &&
+    benchesWellPlaced !==
+      null &&
+    swingsNotBroken !==
+      null &&
+    wateringNeeded !== null &&
+    parkStreetLightsAllLit !==
       null &&
     (
-      isPark ||
-      (
-        cameraWorking !==
-          null &&
-        ledScreenWorking !==
-          null &&
-        lightsWorkingCount !==
-          null
-      )
+      parkStreetLightsAllLit ===
+        true ||
+      parkStreetLightsNotLitCount >
+        0
     )
 
-  const streetFailures =
+  const checklistComplete =
+    isPark
+      ? parkChecklistComplete
+      : towerChecklistComplete
+
+  const towerStreetFailures =
     getStreetLightFailures(
       streetLightStatus
     )
 
-  /*
-    Mopping deliberately does not
-    trigger Attention Required.
-  */
   const hasIssue =
-    sweepingDone === false ||
-    waterLeakage === true ||
-    garbageDisposed ===
-      false ||
-    streetFailures.length >
-      0 ||
-    otherIssue === true ||
-    (
-      !isPark &&
-      (
-        cameraWorking ===
-          false ||
-        ledScreenWorking ===
-          false ||
-        (
-          lightsWorkingCount !==
-            null &&
-          lightsWorkingCount <
-            9
+    isPark
+      ? (
+          sweepingDone ===
+            false ||
+          grassProperlyCut ===
+            false ||
+          benchesWellPlaced ===
+            false ||
+          swingsNotBroken ===
+            false ||
+          wateringNeeded ===
+            true ||
+          parkStreetLightsAllLit ===
+            false ||
+          otherIssue === true
         )
-      )
-    )
+      : (
+          sweepingDone ===
+            false ||
+          cameraWorking ===
+            false ||
+          ledScreenWorking ===
+            false ||
+          waterLeakage ===
+            true ||
+          towerStreetFailures.length >
+            0 ||
+          otherIssue ===
+            true ||
+          (
+            lightsWorkingCount !==
+              null &&
+            lightsWorkingCount <
+              9
+          )
+        )
 
   function markChanged() {
     setSaved(false)
@@ -1748,16 +1859,127 @@ function TowerInspection({
     )
   }
 
+  function decreaseParkStreetLights() {
+    markChanged()
+
+    setParkStreetLightsNotLitCount(
+      (current) =>
+        Math.max(
+          1,
+          current - 1
+        )
+    )
+  }
+
+  function increaseParkStreetLights() {
+    markChanged()
+
+    setParkStreetLightsNotLitCount(
+      (current) =>
+        current + 1
+    )
+  }
+
+  async function saveSocietyGarbage() {
+    if (
+      societyGarbageDisposed ===
+      null
+    ) {
+      setError(
+        'Please select Yes or No for Garbage Disposal.'
+      )
+
+      return
+    }
+
+    setSocietySaving(true)
+
+    setError('')
+    setInfoMessage('')
+
+    try {
+      const {
+        data: { user },
+      } =
+        await supabase.auth
+          .getUser()
+
+      if (!user) {
+        throw new Error(
+          'Login session expired.'
+        )
+      }
+
+      const now =
+        new Date()
+          .toISOString()
+
+      const {
+        data,
+        error:
+          saveError,
+      } =
+        await supabase
+          .from(
+            'society_daily_inspections'
+          )
+          .upsert(
+            {
+              inspection_date:
+                today,
+
+              garbage_disposed:
+                societyGarbageDisposed,
+
+              inspected_by:
+                user.id,
+
+              saved_at: now,
+
+              updated_at: now,
+            },
+            {
+              onConflict:
+                'inspection_date',
+            }
+          )
+          .select()
+          .single()
+
+      if (saveError) {
+        throw saveError
+      }
+
+      setSocietyInspection(
+        data
+      )
+
+      setSocietySaved(true)
+
+      setInfoMessage(
+        'Society garbage disposal status saved.'
+      )
+    } catch (err) {
+      console.error(err)
+
+      setError(
+        err?.message ||
+          'Unable to save garbage disposal status.'
+      )
+    } finally {
+      setSocietySaving(false)
+    }
+  }
+
   async function saveInspection() {
     setError('')
-
     setInfoMessage('')
 
     if (
       !isScanStillValid()
     ) {
       setError(
-        'The QR/GPS verification has expired. Please scan the QR again.'
+        'QR/GPS verification has expired. Please scan the QR again.'
       )
 
       return
@@ -1810,25 +2032,12 @@ function TowerInspection({
         sweeping_done:
           sweepingDone,
 
-        mopping_done:
-          moppingDone,
-
-        water_leakage:
-          waterLeakage,
-
-        garbage_disposed:
-          garbageDisposed,
-
-        street_light_status:
-          streetLightStatus,
-
         other_issue:
           otherIssue,
 
         other_issue_details:
           otherIssue
-            ? otherIssueDetails
-                .trim()
+            ? otherIssueDetails.trim()
             : null,
 
         remarks:
@@ -1874,6 +2083,26 @@ function TowerInspection({
                 park_id:
                   selectedLocation.id,
 
+                grass_properly_cut:
+                  grassProperlyCut,
+
+                benches_well_placed:
+                  benchesWellPlaced,
+
+                swings_not_broken:
+                  swingsNotBroken,
+
+                watering_needed:
+                  wateringNeeded,
+
+                street_lights_all_lit:
+                  parkStreetLightsAllLit,
+
+                street_lights_not_lit_count:
+                  parkStreetLightsAllLit
+                    ? 0
+                    : parkStreetLightsNotLitCount,
+
                 distance_from_park_m:
                   distanceFromLocation,
               },
@@ -1917,6 +2146,9 @@ function TowerInspection({
                 tower_id:
                   selectedLocation.id,
 
+                mopping_done:
+                  moppingDone,
+
                 camera_working:
                   cameraWorking,
 
@@ -1925,6 +2157,12 @@ function TowerInspection({
 
                 lights_working_count:
                   lightsWorkingCount,
+
+                water_leakage:
+                  waterLeakage,
+
+                street_light_status:
+                  streetLightStatus,
 
                 distance_from_tower_m:
                   distanceFromLocation,
@@ -1981,8 +2219,72 @@ function TowerInspection({
 
     if (
       location.type ===
-      'tower'
+      'park'
     ) {
+      if (
+        inspection
+          .sweeping_done ===
+        false
+      ) {
+        lines.push(
+          '🧹 Sweeping not done'
+        )
+      }
+
+      if (
+        inspection
+          .grass_properly_cut ===
+        false
+      ) {
+        lines.push(
+          '🌱 Grass needs cutting'
+        )
+      }
+
+      if (
+        inspection
+          .benches_well_placed ===
+        false
+      ) {
+        lines.push(
+          '🪑 Benches need attention'
+        )
+      }
+
+      if (
+        inspection
+          .swings_not_broken ===
+        false
+      ) {
+        lines.push(
+          '🛝 Swing broken'
+        )
+      }
+
+      if (
+        inspection
+          .watering_needed ===
+        true
+      ) {
+        lines.push(
+          '💧 Watering required'
+        )
+      }
+
+      if (
+        inspection
+          .street_lights_all_lit ===
+        false
+      ) {
+        lines.push(
+          `💡 ${
+            inspection
+              .street_lights_not_lit_count ||
+            0
+          } street light(s) not lit`
+        )
+      }
+    } else {
       const camera =
         inspection.camera_working ??
         inspection.camera_led_working
@@ -2006,78 +2308,141 @@ function TowerInspection({
           '📺 LED Screen not working'
         )
       }
-    }
 
-    if (
-      inspection
-        .water_leakage ===
-      true
-    ) {
-      lines.push(
-        '💧 Water leakage observed'
-      )
-    }
-
-    if (
-      inspection
-        .garbage_disposed ===
-      false
-    ) {
-      lines.push(
-        '🗑️ Garbage collection/disposal requires attention'
-      )
-    }
-
-    const streetIssues =
-      getStreetLightFailures(
+      if (
         inspection
-          .street_light_status
-      )
+          .water_leakage ===
+        true
+      ) {
+        lines.push(
+          '💧 Water leakage observed'
+        )
+      }
 
-    if (
-      streetIssues.length >
-      0
-    ) {
-      lines.push(
-        `💡 Street lights: ${streetIssues.length} not working`
-      )
+      const streetIssues =
+        getStreetLightFailures(
+          inspection
+            .street_light_status
+        )
+
+      if (
+        streetIssues.length >
+        0
+      ) {
+        lines.push(
+          `💡 ${streetIssues.length} street light(s) not working`
+        )
+      }
+
+      if (
+        inspection
+          .lights_working_count !==
+          null &&
+        inspection
+          .lights_working_count <
+          9
+      ) {
+        lines.push(
+          `💡 ${
+            9 -
+            inspection
+              .lights_working_count
+          } tower light(s) not working`
+        )
+      }
+
+      if (
+        inspection
+          .sweeping_done ===
+        false
+      ) {
+        lines.push(
+          '🧹 Sweeping not done'
+        )
+      }
     }
 
     if (
-      inspection
-        .other_issue === true
+      inspection.other_issue ===
+      true
     ) {
       lines.push(
         `⚠️ ${
           inspection
             .other_issue_details ||
-          'Other issue reported'
+          'Other issue'
         }`
-      )
-    }
-
-    if (
-      inspection
-        .sweeping_done ===
-      false
-    ) {
-      lines.push(
-        '🧹 Sweeping not done'
       )
     }
 
     return lines
   }
 
-  function buildShareMessage(
+  function buildIndividualShareMessage(
     location,
     inspection
   ) {
-    const attentionLines =
+    const lines =
       buildAttentionLines(
         location,
         inspection
       )
+
+    const attention =
+      lines.length > 0
+        ? `
+🚨 *ATTENTION REQUIRED*
+${lines
+  .map(
+    (line) =>
+      `• ${line}`
+  )
+  .join('\n')}
+`
+        : ''
+
+    if (
+      location.type ===
+      'park'
+    ) {
+      return `🌳 *${location.name} Inspection*
+📅 ${formatDate(today)}
+
+${attention}
+🧹 Sweeping: ${
+        inspection.sweeping_done
+          ? '✅'
+          : '❌'
+      }
+🌱 Grass: ${
+        inspection.grass_properly_cut
+          ? '✅ Properly Cut'
+          : '❌ Needs Cutting'
+      }
+🪑 Benches: ${
+        inspection.benches_well_placed
+          ? '✅'
+          : '❌'
+      }
+🛝 Swings: ${
+        inspection.swings_not_broken
+          ? '✅'
+          : '❌ Broken'
+      }
+💧 Watering: ${
+        inspection.watering_needed
+          ? '⚠️ Needed'
+          : '✅ Not Needed'
+      }
+💡 Street Lights: ${
+        inspection.street_lights_all_lit
+          ? '✅ All Lit'
+          : `❌ ${inspection.street_lights_not_lit_count || 0} not lit`
+      }
+
+📍 QR + GPS Verified
+🏘️ RWA Pocket-A`
+    }
 
     const streetFailures =
       getStreetLightFailures(
@@ -2085,125 +2450,53 @@ function TowerInspection({
           .street_light_status
       )
 
-    const attentionBlock =
-      attentionLines.length >
-      0
-        ? `
-🚨 *ATTENTION REQUIRED*
-
-${attentionLines
-  .map(
-    (line) =>
-      `• ${line}`
-  )
-  .join('\n')}
-
-`
-        : ''
-
-    const towerBlock =
-      location.type ===
-      'tower'
-        ? `
-📷 Camera: ${
-  inspection.camera_working
-    ? '✅ Working'
-    : '❌ Not Working'
-}
-
-📺 LED Screen: ${
-  inspection
-    .led_screen_working
-    ? '✅ Working'
-    : '❌ Not Working'
-}
-
-💡 Tower Lights: ${
-  inspection
-    .lights_working_count
-}/9 Working
-`
-        : ''
-
-    return `${
-      location.type ===
-      'park'
-        ? '🌳'
-        : '🏢'
-    } *${location.name} - DAILY INSPECTION*
-
+    return `🏢 *${location.name} Inspection*
 📅 ${formatDate(today)}
 
-${attentionBlock}*Inspection Summary*
-
+${attention}
 🧹 Sweeping: ${
-      inspection
-        .sweeping_done
-        ? '✅ Done'
-        : '❌ Not Done'
+      inspection.sweeping_done
+        ? '✅'
+        : '❌'
     }
-
 🧽 Mopping: ${
-      inspection
-        .mopping_done
-        ? '✅ Done'
-        : '➖ Not Done Today'
+      inspection.mopping_done
+        ? '✅'
+        : '➖'
     }
-${towerBlock}
-💧 Water Leakage: ${
-      inspection
-        .water_leakage
-        ? '❌ Leakage observed'
-        : '✅ No leakage'
+📷 Camera: ${
+      inspection.camera_working
+        ? '✅'
+        : '❌'
     }
-
-🗑️ Garbage: ${
-      inspection
-        .garbage_disposed
-        ? '✅ Disposed / Area Clean'
-        : '❌ Requires Attention'
+📺 LED: ${
+      inspection.led_screen_working
+        ? '✅'
+        : '❌'
     }
-
-💡 Nearby Street Lights: ${
+💡 Tower Lights: ${
+      inspection
+        .lights_working_count
+    }/9
+💧 Leakage: ${
+      inspection.water_leakage
+        ? '❌ Found'
+        : '✅ None'
+    }
+💡 Street Lights: ${
       streetFailures.length ===
       0
-        ? '✅ No issue observed'
-        : `⚠️ ${streetFailures.length} not working`
+        ? '✅ All OK'
+        : `❌ ${streetFailures.length} not working`
     }
 
-📍 Visit: QR + GPS Verified
-
-*Overall Status: ${
-      attentionLines.length >
-      0
-        ? '⚠️ ATTENTION REQUIRED'
-        : '✅ SATISFACTORY'
-    }*
-
-👤 Inspected by: Supervisor
-🏘️ RWA Pocket-A
-
-_Digitally generated through the RWA-AI App._`
+📍 QR + GPS Verified
+🏘️ RWA Pocket-A`
   }
 
-  async function shareReport(
-    location,
-    inspection
+  async function shareText(
+    message
   ) {
-    if (!inspection) {
-      setError(
-        'Inspection has not been saved yet.'
-      )
-
-      return
-    }
-
-    const message =
-      buildShareMessage(
-        location,
-        inspection
-      )
-
     if (
       navigator.share
     ) {
@@ -2240,6 +2533,22 @@ _Digitally generated through the RWA-AI App._`
     }
   }
 
+  function shareReport(
+    location,
+    inspection
+  ) {
+    if (!inspection) {
+      return
+    }
+
+    shareText(
+      buildIndividualShareMessage(
+        location,
+        inspection
+      )
+    )
+  }
+
   function openReport(
     location
   ) {
@@ -2263,14 +2572,6 @@ _Digitally generated through the RWA-AI App._`
 
     setQrScannedAt(
       inspection.qr_scanned_at
-    )
-
-    setScanLatitude(
-      inspection.scan_latitude
-    )
-
-    setScanLongitude(
-      inspection.scan_longitude
     )
 
     setGpsAccuracy(
@@ -2299,18 +2600,6 @@ _Digitally generated through the RWA-AI App._`
     setSelectedLocation(
       null
     )
-
-    setQrScannedAt(null)
-
-    setGpsFailureReason(
-      ''
-    )
-
-    setDistanceFromLocation(
-      null
-    )
-
-    setGpsAccuracy(null)
 
     resetForm()
 
@@ -2372,6 +2661,286 @@ _Digitally generated through the RWA-AI App._`
         completedCount
     )
 
+  function buildSummaryData() {
+    const cameraIssues = []
+    const ledIssues = []
+    const streetLightIssues = []
+
+    towerLocations.forEach(
+      (location) => {
+        const inspection =
+          getInspection(
+            location
+          )
+
+        if (
+          !inspection?.saved_at
+        ) {
+          return
+        }
+
+        const camera =
+          inspection.camera_working ??
+          inspection.camera_led_working
+
+        const led =
+          inspection.led_screen_working ??
+          inspection.camera_led_working
+
+        if (
+          camera === false
+        ) {
+          cameraIssues.push(
+            location.name
+          )
+        }
+
+        if (
+          led === false
+        ) {
+          ledIssues.push(
+            location.name
+          )
+        }
+
+        const failures =
+          getStreetLightFailures(
+            inspection
+              .street_light_status
+          )
+
+        if (
+          failures.length > 0
+        ) {
+          streetLightIssues.push(
+            `${location.name} - ${failures.length} not working`
+          )
+        }
+      }
+    )
+
+    parkLocations.forEach(
+      (location) => {
+        const inspection =
+          getInspection(
+            location
+          )
+
+        if (
+          !inspection?.saved_at
+        ) {
+          return
+        }
+
+        if (
+          inspection
+            .street_lights_all_lit ===
+          false
+        ) {
+          streetLightIssues.push(
+            `${location.name} - ${
+              inspection
+                .street_lights_not_lit_count ||
+              0
+            } not lit`
+          )
+        }
+      }
+    )
+
+    return {
+      cameraIssues,
+      ledIssues,
+      streetLightIssues,
+    }
+  }
+
+  function buildSummaryMessage() {
+    const summary =
+      buildSummaryData()
+
+    const attentionLines = []
+
+    if (
+      summary.cameraIssues.length >
+      0
+    ) {
+      attentionLines.push(
+        `📷 Camera: ${summary.cameraIssues.join(
+          ', '
+        )}`
+      )
+    }
+
+    if (
+      summary.ledIssues.length >
+      0
+    ) {
+      attentionLines.push(
+        `📺 LED: ${summary.ledIssues.join(
+          ', '
+        )}`
+      )
+    }
+
+    if (
+      summary.streetLightIssues
+        .length > 0
+    ) {
+      attentionLines.push(
+        `💡 Street Lights:\n${summary.streetLightIssues
+          .map(
+            (item) =>
+              `   • ${item}`
+          )
+          .join('\n')}`
+      )
+    }
+
+    if (
+      societyGarbageDisposed ===
+      false
+    ) {
+      attentionLines.push(
+        '🗑️ Garbage Disposal: Not Done'
+      )
+    }
+
+    const attentionBlock =
+      attentionLines.length > 0
+        ? `🚨 *ATTENTION REQUIRED*
+
+${attentionLines.join(
+  '\n'
+)}`
+        : '✅ *NO CRITICAL ATTENTION REQUIRED*'
+
+    const towerStatus =
+      towerLocations
+        .map(
+          (location) => {
+            const inspection =
+              getInspection(
+                location
+              )
+
+            if (
+              !inspection?.saved_at
+            ) {
+              return `${location.name.replace(
+                'Tower ',
+                'T'
+              )} ⏳`
+            }
+
+            return `${location.name.replace(
+              'Tower ',
+              'T'
+            )} ${
+              inspectionHasIssue(
+                'tower',
+                inspection
+              )
+                ? '⚠️'
+                : '✅'
+            }`
+          }
+        )
+        .join('   ')
+
+    const parkStatus =
+      parkLocations
+        .map(
+          (location) => {
+            const inspection =
+              getInspection(
+                location
+              )
+
+            if (
+              !inspection?.saved_at
+            ) {
+              return `${location.name} ⏳`
+            }
+
+            return `${location.name} ${
+              inspectionHasIssue(
+                'park',
+                inspection
+              )
+                ? '⚠️'
+                : '✅'
+            }`
+          }
+        )
+        .join('   ')
+
+    const completedTowers =
+      towerLocations.filter(
+        (location) =>
+          Boolean(
+            getInspection(
+              location
+            )?.saved_at
+          )
+      ).length
+
+    const completedParks =
+      parkLocations.filter(
+        (location) =>
+          Boolean(
+            getInspection(
+              location
+            )?.saved_at
+          )
+      ).length
+
+    const garbageText =
+      societyGarbageDisposed ===
+      null
+        ? '⏳ Pending'
+        : societyGarbageDisposed
+        ? '✅ Done'
+        : '❌ Not Done'
+
+    return `🏘️ *RWA POCKET-A*
+*DAILY INSPECTION SUMMARY*
+📅 ${formatDate(today)}
+
+${attentionBlock}
+
+*Garbage Disposal from Society*
+${garbageText}
+
+*Towers*
+${towerStatus}
+
+*Parks*
+${parkStatus}
+
+*Inspection Progress*
+Towers: ${completedTowers}/${towerLocations.length}
+Parks: ${completedParks}/${parkLocations.length}
+
+_Digitally generated through the RWA-AI App._`
+  }
+
+  function openSummary() {
+    setScreen('summary')
+  }
+
+  function shareSummary() {
+    shareText(
+      buildSummaryMessage()
+    )
+  }
+
+  /*
+    ========================================================
+    LIST SCREEN
+    ========================================================
+  */
+
   if (screen === 'list') {
     return (
       <div className="tower-inspection-page">
@@ -2409,52 +2978,112 @@ _Digitally generated through the RWA-AI App._`
           <div className="inspection-summary">
 
             <div className="summary-card summary-done">
-
-              <span>
-                ✅
-              </span>
-
+              <span>✅</span>
               <strong>
                 {completedCount}
               </strong>
-
-              <small>
-                Done
-              </small>
-
+              <small>Done</small>
             </div>
 
             <div className="summary-card summary-pending">
-
-              <span>
-                ⏳
-              </span>
-
+              <span>⏳</span>
               <strong>
                 {pendingCount}
               </strong>
-
-              <small>
-                Pending
-              </small>
-
+              <small>Pending</small>
             </div>
 
             <div className="summary-card summary-issues">
-
-              <span>
-                ⚠️
-              </span>
-
+              <span>⚠️</span>
               <strong>
                 {issueCount}
               </strong>
+              <small>Issues</small>
+            </div>
 
-              <small>
-                Issues
-              </small>
+          </div>
+
+          <div className="society-garbage-card">
+
+            <div className="society-garbage-heading">
+              <div>
+                <strong>
+                  🗑️ Garbage Disposal from Society
+                </strong>
+
+                <small>
+                  Daily society-wide status
+                </small>
+              </div>
+
+              {societySaved && (
+                <span>
+                  ✅ Saved
+                </span>
+              )}
+            </div>
+
+            <div className="society-garbage-options">
+
+              <button
+                type="button"
+                className={`society-garbage-option good ${
+                  societyGarbageDisposed ===
+                  true
+                    ? 'selected'
+                    : ''
+                }`}
+                onClick={() => {
+                  setSocietyGarbageDisposed(
+                    true
+                  )
+
+                  setSocietySaved(false)
+                }}
+              >
+                ✅ Yes
+              </button>
+
+              <button
+                type="button"
+                className={`society-garbage-option bad ${
+                  societyGarbageDisposed ===
+                  false
+                    ? 'selected'
+                    : ''
+                }`}
+                onClick={() => {
+                  setSocietyGarbageDisposed(
+                    false
+                  )
+
+                  setSocietySaved(false)
+                }}
+              >
+                ❌ No
+              </button>
 
             </div>
+
+            <button
+              type="button"
+              className="society-garbage-save"
+              disabled={
+                societySaving ||
+                societyGarbageDisposed ===
+                  null ||
+                societySaved
+              }
+              onClick={
+                saveSocietyGarbage
+              }
+            >
+              {societySaving
+                ? 'Saving...'
+                : societySaved
+                ? '✅ Saved'
+                : 'Save Garbage Status'}
+            </button>
 
           </div>
 
@@ -2481,7 +3110,9 @@ _Digitally generated through the RWA-AI App._`
                 {towerLocations.map(
                   (location) => (
                     <InspectionLocationRow
-                      key={`tower-${location.id}`}
+                      key={
+                        location.id
+                      }
                       location={
                         location
                       }
@@ -2512,7 +3143,9 @@ _Digitally generated through the RWA-AI App._`
                 {parkLocations.map(
                   (location) => (
                     <InspectionLocationRow
-                      key={`park-${location.id}`}
+                      key={
+                        location.id
+                      }
                       location={
                         location
                       }
@@ -2533,6 +3166,30 @@ _Digitally generated through the RWA-AI App._`
                 )}
 
               </div>
+
+              <div className="daily-summary-actions">
+
+                <button
+                  type="button"
+                  className="view-summary-button"
+                  onClick={
+                    openSummary
+                  }
+                >
+                  📋 View Daily Summary
+                </button>
+
+                <button
+                  type="button"
+                  className="share-summary-button"
+                  onClick={
+                    shareSummary
+                  }
+                >
+                  📲 Share Summary
+                </button>
+
+              </div>
             </>
           )}
 
@@ -2547,6 +3204,12 @@ _Digitally generated through the RWA-AI App._`
       </div>
     )
   }
+
+  /*
+    ========================================================
+    QR SCANNER
+    ========================================================
+  */
 
   if (screen === 'scanner') {
     return (
@@ -2565,22 +3228,17 @@ _Digitally generated through the RWA-AI App._`
           </button>
 
           <div>
-
             <div className="inspection-brand">
               RWA POCKET-A
             </div>
 
             <h1>
-              {
-                selectedLocation
-                  ?.name
-              }
+              {selectedLocation?.name}
             </h1>
 
             <p>
               Scan QR
             </p>
-
           </div>
 
         </header>
@@ -2590,15 +3248,10 @@ _Digitally generated through the RWA-AI App._`
           <div className="selected-tower-card">
 
             <strong>
-              {selectedLocation
-                ?.type ===
-              'park'
+              {isPark
                 ? '🌳'
                 : '🏢'}{' '}
-              {
-                selectedLocation
-                  ?.name
-              }
+              {selectedLocation?.name}
             </strong>
 
             <p>
@@ -2635,6 +3288,12 @@ _Digitally generated through the RWA-AI App._`
     )
   }
 
+  /*
+    ========================================================
+    GPS
+    ========================================================
+  */
+
   if (
     screen ===
     'verification'
@@ -2655,22 +3314,17 @@ _Digitally generated through the RWA-AI App._`
           </button>
 
           <div>
-
             <div className="inspection-brand">
               RWA POCKET-A
             </div>
 
             <h1>
-              {
-                selectedLocation
-                  ?.name
-              }
+              {selectedLocation?.name}
             </h1>
 
             <p>
               Location Verification
             </p>
-
           </div>
 
         </header>
@@ -2679,7 +3333,6 @@ _Digitally generated through the RWA-AI App._`
 
           {gpsLoading ? (
             <div className="location-card">
-
               <div className="inspection-big-icon">
                 📍
               </div>
@@ -2691,7 +3344,6 @@ _Digitally generated through the RWA-AI App._`
               <p>
                 Checking your current GPS position.
               </p>
-
             </div>
           ) : (
             <div className="location-card">
@@ -2711,7 +3363,6 @@ _Digitally generated through the RWA-AI App._`
               {distanceFromLocation !==
                 null && (
                 <div className="failed-distance">
-
                   <span>
                     Current Distance
                   </span>
@@ -2722,7 +3373,6 @@ _Digitally generated through the RWA-AI App._`
                     )}{' '}
                     m
                   </strong>
-
                 </div>
               )}
 
@@ -2747,6 +3397,12 @@ _Digitally generated through the RWA-AI App._`
     )
   }
 
+  /*
+    ========================================================
+    FORM
+    ========================================================
+  */
+
   if (screen === 'form') {
     return (
       <div className="tower-inspection-page">
@@ -2764,22 +3420,17 @@ _Digitally generated through the RWA-AI App._`
           </button>
 
           <div>
-
             <div className="inspection-brand">
               RWA POCKET-A
             </div>
 
             <h1>
-              {
-                selectedLocation
-                  ?.name
-              }
+              {selectedLocation?.name}
             </h1>
 
             <p>
               Daily Inspection
             </p>
-
           </div>
 
         </header>
@@ -2793,7 +3444,6 @@ _Digitally generated through the RWA-AI App._`
             </span>
 
             <div>
-
               <strong>
                 Visit Verified
               </strong>
@@ -2806,7 +3456,6 @@ _Digitally generated through the RWA-AI App._`
                     distanceFromLocation
                   )} m`}
               </small>
-
             </div>
 
           </div>
@@ -2830,27 +3479,27 @@ _Digitally generated through the RWA-AI App._`
             }}
           />
 
-          <InspectionToggle
-            icon="🧽"
-            label="Mopping"
-            positiveText="Done"
-            negativeText="Not Done Today"
-            value={
-              moppingDone
-            }
-            onChange={(
-              value
-            ) => {
-              markChanged()
-
-              setMoppingDone(
-                value
-              )
-            }}
-          />
-
           {!isPark && (
             <>
+              <InspectionToggle
+                icon="🧽"
+                label="Mopping"
+                positiveText="Done"
+                negativeText="Not Done Today"
+                value={
+                  moppingDone
+                }
+                onChange={(
+                  value
+                ) => {
+                  markChanged()
+
+                  setMoppingDone(
+                    value
+                  )
+                }}
+              />
+
               <InspectionToggle
                 icon="📷"
                 label="Camera"
@@ -2892,7 +3541,6 @@ _Digitally generated through the RWA-AI App._`
               <div className="inspection-item">
 
                 <div className="inspection-item-heading">
-
                   <span className="inspection-item-icon">
                     💡
                   </span>
@@ -2900,7 +3548,6 @@ _Digitally generated through the RWA-AI App._`
                   <strong>
                     Tower Lights
                   </strong>
-
                 </div>
 
                 <div className="lights-counter">
@@ -2915,7 +3562,6 @@ _Digitally generated through the RWA-AI App._`
                   </button>
 
                   <div>
-
                     <strong>
                       {lightsWorkingCount ===
                       null
@@ -2926,7 +3572,6 @@ _Digitally generated through the RWA-AI App._`
                     <span>
                       / 9 Working
                     </span>
-
                   </div>
 
                   <button
@@ -2958,71 +3603,213 @@ _Digitally generated through the RWA-AI App._`
                 )}
 
               </div>
+
+              <InspectionToggle
+                icon="💧"
+                label="Water Leakage"
+                positiveText="No Leakage"
+                negativeText="Leakage Found"
+                value={
+                  waterLeakage ===
+                  null
+                    ? null
+                    : !waterLeakage
+                }
+                onChange={(
+                  noLeakage
+                ) => {
+                  markChanged()
+
+                  setWaterLeakage(
+                    !noLeakage
+                  )
+                }}
+              />
+
+              <StreetLightMap
+                locationName={
+                  selectedLocation
+                    ?.name
+                }
+                status={
+                  streetLightStatus
+                }
+                onToggle={
+                  toggleStreetLight
+                }
+              />
             </>
           )}
 
-          <InspectionToggle
-            icon="💧"
-            label="Water Leakage"
-            positiveText="No Leakage"
-            negativeText="Leakage Found"
-            value={
-              waterLeakage ===
-              null
-                ? null
-                : !waterLeakage
-            }
-            onChange={(
-              noLeakage
-            ) => {
-              markChanged()
+          {isPark && (
+            <>
+              <InspectionToggle
+                icon="🌱"
+                label="Grass Cutting"
+                positiveText="Properly Cut"
+                negativeText="Needs Cutting"
+                value={
+                  grassProperlyCut
+                }
+                onChange={(
+                  value
+                ) => {
+                  markChanged()
 
-              setWaterLeakage(
-                !noLeakage
-              )
-            }}
-          />
+                  setGrassProperlyCut(
+                    value
+                  )
+                }}
+              />
 
-          <InspectionToggle
-            icon="🗑️"
-            label="Garbage Collection / Disposal"
-            positiveText="Disposed / Area Clean"
-            negativeText="Requires Attention"
-            value={
-              garbageDisposed
-            }
-            onChange={(
-              value
-            ) => {
-              markChanged()
+              <InspectionToggle
+                icon="🪑"
+                label="Benches"
+                positiveText="Well Placed"
+                negativeText="Needs Attention"
+                value={
+                  benchesWellPlaced
+                }
+                onChange={(
+                  value
+                ) => {
+                  markChanged()
 
-              setGarbageDisposed(
-                value
-              )
-            }}
-          />
+                  setBenchesWellPlaced(
+                    value
+                  )
+                }}
+              />
 
-          <StreetLightMap
-            locationName={
-              selectedLocation
-                ?.name
-            }
-            locationType={
-              selectedLocation
-                ?.type
-            }
-            status={
-              streetLightStatus
-            }
-            onToggle={
-              toggleStreetLight
-            }
-          />
+              <InspectionToggle
+                icon="🛝"
+                label="Swings"
+                positiveText="Good"
+                negativeText="Broken"
+                value={
+                  swingsNotBroken
+                }
+                onChange={(
+                  value
+                ) => {
+                  markChanged()
+
+                  setSwingsNotBroken(
+                    value
+                  )
+                }}
+              />
+
+              <InspectionToggle
+                icon="💧"
+                label="Watering"
+                positiveText="Not Needed"
+                negativeText="Needed"
+                value={
+                  wateringNeeded ===
+                  null
+                    ? null
+                    : !wateringNeeded
+                }
+                onChange={(
+                  notNeeded
+                ) => {
+                  markChanged()
+
+                  setWateringNeeded(
+                    !notNeeded
+                  )
+                }}
+              />
+
+              <InspectionToggle
+                icon="💡"
+                label="Street Lights"
+                positiveText="All Lit"
+                negativeText="Some Not Lit"
+                value={
+                  parkStreetLightsAllLit
+                }
+                onChange={(
+                  value
+                ) => {
+                  markChanged()
+
+                  setParkStreetLightsAllLit(
+                    value
+                  )
+
+                  if (value) {
+                    setParkStreetLightsNotLitCount(
+                      0
+                    )
+                  } else {
+                    setParkStreetLightsNotLitCount(
+                      (current) =>
+                        current > 0
+                          ? current
+                          : 1
+                    )
+                  }
+                }}
+              />
+
+              {parkStreetLightsAllLit ===
+                false && (
+                <div className="inspection-item">
+
+                  <div className="inspection-item-heading">
+                    <span className="inspection-item-icon">
+                      💡
+                    </span>
+
+                    <strong>
+                      Street Lights Not Lit
+                    </strong>
+                  </div>
+
+                  <div className="lights-counter">
+
+                    <button
+                      type="button"
+                      onClick={
+                        decreaseParkStreetLights
+                      }
+                    >
+                      −
+                    </button>
+
+                    <div>
+                      <strong>
+                        {
+                          parkStreetLightsNotLitCount
+                        }
+                      </strong>
+
+                      <span>
+                        Not Lit
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        increaseParkStreetLights
+                      }
+                    >
+                      +
+                    </button>
+
+                  </div>
+
+                </div>
+              )}
+            </>
+          )}
 
           <div className="inspection-item">
 
             <div className="inspection-item-heading">
-
               <span className="inspection-item-icon">
                 ⚠️
               </span>
@@ -3030,7 +3817,6 @@ _Digitally generated through the RWA-AI App._`
               <strong>
                 Any Other Issue
               </strong>
-
             </div>
 
             <div className="inspection-toggle-row">
@@ -3102,7 +3888,6 @@ _Digitally generated through the RWA-AI App._`
           <div className="inspection-item">
 
             <div className="inspection-item-heading">
-
               <span className="inspection-item-icon">
                 📝
               </span>
@@ -3110,7 +3895,6 @@ _Digitally generated through the RWA-AI App._`
               <strong>
                 Remarks
               </strong>
-
             </div>
 
             <textarea
@@ -3133,7 +3917,6 @@ _Digitally generated through the RWA-AI App._`
 
           {hasIssue && (
             <div className="attention-preview">
-
               <strong>
                 ⚠️ Attention Required
               </strong>
@@ -3141,11 +3924,6 @@ _Digitally generated through the RWA-AI App._`
               <p>
                 One or more issues have been marked.
               </p>
-
-              <small>
-                Mopping is excluded from Attention Required.
-              </small>
-
             </div>
           )}
 
@@ -3179,23 +3957,6 @@ _Digitally generated through the RWA-AI App._`
               : '💾 Save Inspection'}
           </button>
 
-          {saved && (
-            <button
-              type="button"
-              className="share-inspection-button"
-              onClick={() =>
-                shareReport(
-                  selectedLocation,
-                  getInspection(
-                    selectedLocation
-                  )
-                )
-              }
-            >
-              📲 Share on WhatsApp
-            </button>
-          )}
-
           {savedAt && (
             <div className="saved-time">
               Last saved:{' '}
@@ -3211,6 +3972,12 @@ _Digitally generated through the RWA-AI App._`
     )
   }
 
+  /*
+    ========================================================
+    COMPACT INDIVIDUAL REPORT
+    ========================================================
+  */
+
   if (screen === 'report') {
     const inspection =
       getInspection(
@@ -3222,6 +3989,15 @@ _Digitally generated through the RWA-AI App._`
         ? buildAttentionLines(
             selectedLocation,
             inspection
+          )
+        : []
+
+    const streetFailures =
+      !isPark &&
+      inspection
+        ? getStreetLightFailures(
+            inspection
+              .street_light_status
           )
         : []
 
@@ -3241,23 +4017,17 @@ _Digitally generated through the RWA-AI App._`
           </button>
 
           <div>
-
             <div className="inspection-brand">
               RWA POCKET-A
             </div>
 
             <h1>
-              {
-                selectedLocation
-                  ?.name
-              }
+              {selectedLocation?.name}
             </h1>
 
             <p>
-              Inspection Report •{' '}
               {formatDate(today)}
             </p>
-
           </div>
 
         </header>
@@ -3265,53 +4035,30 @@ _Digitally generated through the RWA-AI App._`
         <main className="inspection-content">
 
           <div
-            className={`report-status-card ${
-              hasIssue
-                ? 'report-status-issue'
-                : 'report-status-good'
+            className={`compact-report-status ${
+              attentionLines.length >
+              0
+                ? 'issue'
+                : 'good'
             }`}
           >
-
-            <span>
-              {hasIssue
-                ? '⚠️'
-                : '✅'}
-            </span>
-
-            <div>
-
-              <small>
-                Overall Status
-              </small>
-
-              <strong>
-                {hasIssue
-                  ? 'Attention Required'
-                  : 'Satisfactory'}
-              </strong>
-
-            </div>
-
+            {attentionLines.length >
+            0
+              ? '⚠️ ATTENTION REQUIRED'
+              : '✅ SATISFACTORY'}
           </div>
 
           {attentionLines.length >
             0 && (
-            <div className="report-attention-card">
-
-              <h2>
-                🚨 Attention Required
-              </h2>
+            <div className="compact-attention-card">
 
               {attentionLines.map(
                 (
                   line,
                   index
                 ) => (
-                  <div
-                    key={index}
-                    className="attention-line"
-                  >
-                    {line}
+                  <div key={index}>
+                    • {line}
                   </div>
                 )
               )}
@@ -3319,199 +4066,192 @@ _Digitally generated through the RWA-AI App._`
             </div>
           )}
 
-          <div className="report-card">
+          <div className="compact-report-card">
 
-            <div className="report-line">
-
+            <div className="compact-report-row">
               <span>
                 🧹 Sweeping
               </span>
 
               <strong>
-                {sweepingDone
+                {inspection
+                  ?.sweeping_done
                   ? '✅ Done'
                   : '❌ Not Done'}
               </strong>
-
-            </div>
-
-            <div className="report-line">
-
-              <span>
-                🧽 Mopping
-              </span>
-
-              <strong>
-                {moppingDone
-                  ? '✅ Done'
-                  : '➖ Not Done Today'}
-              </strong>
-
             </div>
 
             {!isPark && (
               <>
-                <div className="report-line">
+                <div className="compact-report-row">
+                  <span>
+                    🧽 Mopping
+                  </span>
 
+                  <strong>
+                    {inspection
+                      ?.mopping_done
+                      ? '✅ Done'
+                      : '➖ Not Done'}
+                  </strong>
+                </div>
+
+                <div className="compact-report-row">
                   <span>
                     📷 Camera
                   </span>
 
                   <strong>
-                    {cameraWorking
+                    {inspection
+                      ?.camera_working
                       ? '✅ Working'
                       : '❌ Not Working'}
                   </strong>
-
                 </div>
 
-                <div className="report-line">
-
+                <div className="compact-report-row">
                   <span>
-                    📺 LED Screen
+                    📺 LED
                   </span>
 
                   <strong>
-                    {ledScreenWorking
+                    {inspection
+                      ?.led_screen_working
                       ? '✅ Working'
                       : '❌ Not Working'}
                   </strong>
-
                 </div>
 
-                <div className="report-line">
-
+                <div className="compact-report-row">
                   <span>
                     💡 Tower Lights
                   </span>
 
                   <strong>
                     {
-                      lightsWorkingCount
+                      inspection
+                        ?.lights_working_count
                     }
-                    /9 Working
+                    /9
                   </strong>
+                </div>
 
+                <div className="compact-report-row">
+                  <span>
+                    💧 Leakage
+                  </span>
+
+                  <strong>
+                    {inspection
+                      ?.water_leakage
+                      ? '❌ Found'
+                      : '✅ None'}
+                  </strong>
+                </div>
+
+                <div className="compact-report-row">
+                  <span>
+                    💡 Street Lights
+                  </span>
+
+                  <strong>
+                    {streetFailures.length ===
+                    0
+                      ? '✅ All OK'
+                      : `❌ ${streetFailures.length} not working`}
+                  </strong>
                 </div>
               </>
             )}
 
-            <div className="report-line">
+            {isPark && (
+              <>
+                <div className="compact-report-row">
+                  <span>
+                    🌱 Grass
+                  </span>
 
-              <span>
-                💧 Water Leakage
-              </span>
+                  <strong>
+                    {inspection
+                      ?.grass_properly_cut
+                      ? '✅ Properly Cut'
+                      : '❌ Needs Cutting'}
+                  </strong>
+                </div>
 
-              <strong>
-                {waterLeakage
-                  ? '❌ Found'
-                  : '✅ None'}
-              </strong>
+                <div className="compact-report-row">
+                  <span>
+                    🪑 Benches
+                  </span>
 
-            </div>
+                  <strong>
+                    {inspection
+                      ?.benches_well_placed
+                      ? '✅ Well Placed'
+                      : '❌ Attention'}
+                  </strong>
+                </div>
 
-            <div className="report-line">
+                <div className="compact-report-row">
+                  <span>
+                    🛝 Swings
+                  </span>
 
-              <span>
-                🗑️ Garbage
-              </span>
+                  <strong>
+                    {inspection
+                      ?.swings_not_broken
+                      ? '✅ Good'
+                      : '❌ Broken'}
+                  </strong>
+                </div>
 
-              <strong>
-                {garbageDisposed
-                  ? '✅ Disposed'
-                  : '❌ Attention'}
-              </strong>
+                <div className="compact-report-row">
+                  <span>
+                    💧 Watering
+                  </span>
 
-            </div>
+                  <strong>
+                    {inspection
+                      ?.watering_needed
+                      ? '⚠️ Needed'
+                      : '✅ Not Needed'}
+                  </strong>
+                </div>
+
+                <div className="compact-report-row">
+                  <span>
+                    💡 Street Lights
+                  </span>
+
+                  <strong>
+                    {inspection
+                      ?.street_lights_all_lit
+                      ? '✅ All Lit'
+                      : `❌ ${
+                          inspection
+                            ?.street_lights_not_lit_count ||
+                          0
+                        } not lit`}
+                  </strong>
+                </div>
+              </>
+            )}
 
           </div>
 
-          <StreetLightMap
-            locationName={
-              selectedLocation
-                ?.name
-            }
-            locationType={
-              selectedLocation
-                ?.type
-            }
-            status={
-              streetLightStatus
-            }
-            readOnly
-          />
-
-          {otherIssue && (
-            <div className="report-remarks">
-
-              <strong>
-                ⚠️ Other Issue
-              </strong>
-
-              <p>
-                {otherIssueDetails}
-              </p>
-
-            </div>
-          )}
-
           {remarks.trim() && (
-            <div className="report-remarks">
-
-              <strong>
-                📝 Remarks
-              </strong>
-
-              <p>
-                {remarks}
-              </p>
-
+            <div className="compact-report-note">
+              📝 {remarks}
             </div>
           )}
 
-          <div className="visit-proof-card">
-
-            <strong>
-              🔐 Visit Verification
-            </strong>
-
-            <span>
-              QR: ✅ Verified
-            </span>
-
-            <span>
-              GPS: ✅ Verified
-            </span>
-
+          <div className="compact-verification-line">
+            📍 QR + GPS Verified
             {distanceFromLocation !==
-              null && (
-              <span>
-                Distance:{' '}
-                {Math.round(
-                  distanceFromLocation
-                )}{' '}
-                m
-              </span>
-            )}
-
-            {gpsAccuracy !==
-              null && (
-              <span>
-                GPS Accuracy: ±
-                {Math.round(
-                  gpsAccuracy
-                )}{' '}
-                m
-              </span>
-            )}
-
-            <span>
-              Scan Time:{' '}
-              {formatTime(
-                qrScannedAt
-              )}
-            </span>
-
+              null &&
+              ` • ${Math.round(
+                distanceFromLocation
+              )} m`}
           </div>
 
           <button
@@ -3525,6 +4265,310 @@ _Digitally generated through the RWA-AI App._`
             }
           >
             📲 Share Report
+          </button>
+
+        </main>
+
+      </div>
+    )
+  }
+
+  /*
+    ========================================================
+    RWA DAILY SUMMARY REPORT
+    ========================================================
+  */
+
+  if (screen === 'summary') {
+    const summary =
+      buildSummaryData()
+
+    const completedTowers =
+      towerLocations.filter(
+        (location) =>
+          Boolean(
+            getInspection(
+              location
+            )?.saved_at
+          )
+      ).length
+
+    const completedParks =
+      parkLocations.filter(
+        (location) =>
+          Boolean(
+            getInspection(
+              location
+            )?.saved_at
+          )
+      ).length
+
+    const criticalAttention =
+      summary.cameraIssues.length >
+        0 ||
+      summary.ledIssues.length >
+        0 ||
+      summary.streetLightIssues
+        .length > 0 ||
+      societyGarbageDisposed ===
+        false
+
+    return (
+      <div className="tower-inspection-page">
+
+        <header className="inspection-header">
+
+          <button
+            type="button"
+            className="inspection-header-back"
+            onClick={
+              returnToList
+            }
+          >
+            ←
+          </button>
+
+          <div>
+            <div className="inspection-brand">
+              RWA POCKET-A
+            </div>
+
+            <h1>
+              Daily Summary
+            </h1>
+
+            <p>
+              {formatDate(today)}
+            </p>
+          </div>
+
+        </header>
+
+        <main className="inspection-content">
+
+          <div
+            className={`summary-attention-header ${
+              criticalAttention
+                ? 'issue'
+                : 'good'
+            }`}
+          >
+            {criticalAttention
+              ? '🚨 ATTENTION REQUIRED'
+              : '✅ NO CRITICAL ATTENTION REQUIRED'}
+          </div>
+
+          {criticalAttention && (
+            <div className="summary-attention-card">
+
+              {summary.cameraIssues
+                .length > 0 && (
+                <div className="summary-attention-section">
+                  <strong>
+                    📷 Camera
+                  </strong>
+
+                  <span>
+                    {summary.cameraIssues.join(
+                      ', '
+                    )}{' '}
+                    - Not Working
+                  </span>
+                </div>
+              )}
+
+              {summary.ledIssues
+                .length > 0 && (
+                <div className="summary-attention-section">
+                  <strong>
+                    📺 LED
+                  </strong>
+
+                  <span>
+                    {summary.ledIssues.join(
+                      ', '
+                    )}{' '}
+                    - Not Working
+                  </span>
+                </div>
+              )}
+
+              {summary.streetLightIssues
+                .length > 0 && (
+                <div className="summary-attention-section">
+                  <strong>
+                    💡 Street Lights
+                  </strong>
+
+                  {summary.streetLightIssues.map(
+                    (
+                      item,
+                      index
+                    ) => (
+                      <span key={index}>
+                        {item}
+                      </span>
+                    )
+                  )}
+                </div>
+              )}
+
+              {societyGarbageDisposed ===
+                false && (
+                <div className="summary-attention-section">
+                  <strong>
+                    🗑️ Garbage Disposal
+                  </strong>
+
+                  <span>
+                    Not Done
+                  </span>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          <div className="summary-garbage-row">
+
+            <span>
+              🗑️ Garbage Disposal from Society
+            </span>
+
+            <strong>
+              {societyGarbageDisposed ===
+              null
+                ? '⏳ Pending'
+                : societyGarbageDisposed
+                ? '✅ Done'
+                : '❌ Not Done'}
+            </strong>
+
+          </div>
+
+          <div className="summary-status-card">
+
+            <h2>
+              Towers
+            </h2>
+
+            <div className="summary-location-grid">
+
+              {towerLocations.map(
+                (location) => {
+                  const inspection =
+                    getInspection(
+                      location
+                    )
+
+                  return (
+                    <div
+                      key={
+                        location.id
+                      }
+                      className="summary-location-chip"
+                    >
+                      <span>
+                        {location.name.replace(
+                          'Tower ',
+                          'T'
+                        )}
+                      </span>
+
+                      <strong>
+                        {!inspection?.saved_at
+                          ? '⏳'
+                          : inspectionHasIssue(
+                              'tower',
+                              inspection
+                            )
+                          ? '⚠️'
+                          : '✅'}
+                      </strong>
+                    </div>
+                  )
+                }
+              )}
+
+            </div>
+
+            <div className="summary-progress-line">
+              Towers inspected:{' '}
+              <strong>
+                {completedTowers}/
+                {towerLocations.length}
+              </strong>
+            </div>
+
+          </div>
+
+          <div className="summary-status-card">
+
+            <h2>
+              Parks
+            </h2>
+
+            <div className="summary-location-grid park-summary-grid">
+
+              {parkLocations.map(
+                (location) => {
+                  const inspection =
+                    getInspection(
+                      location
+                    )
+
+                  return (
+                    <div
+                      key={
+                        location.id
+                      }
+                      className="summary-location-chip"
+                    >
+                      <span>
+                        {location.name}
+                      </span>
+
+                      <strong>
+                        {!inspection?.saved_at
+                          ? '⏳'
+                          : inspectionHasIssue(
+                              'park',
+                              inspection
+                            )
+                          ? '⚠️'
+                          : '✅'}
+                      </strong>
+                    </div>
+                  )
+                }
+              )}
+
+            </div>
+
+            <div className="summary-progress-line">
+              Parks inspected:{' '}
+              <strong>
+                {completedParks}/
+                {parkLocations.length}
+              </strong>
+            </div>
+
+          </div>
+
+          <div className="summary-legend">
+            ✅ Satisfactory &nbsp;
+            ⚠️ Attention &nbsp;
+            ⏳ Pending
+          </div>
+
+          <button
+            type="button"
+            className="share-summary-button"
+            onClick={
+              shareSummary
+            }
+          >
+            📲 Share Summary with RWA Members
           </button>
 
         </main>
