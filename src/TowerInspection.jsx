@@ -289,10 +289,12 @@ async function shareImageBlob(blob, filename, title) {
 
 function createSummaryReportCanvas({
   date,
-  cameraText,
-  ledText,
+  cameraIssues,
+  ledIssues,
   streetLightIssues,
   garbageText,
+  sweepingIssues,
+  moppingIssues,
   completedTowers,
   totalTowers,
   completedParks,
@@ -302,9 +304,34 @@ function createSummaryReportCanvas({
   const width = 1080
   const margin = 58
   const cardWidth = width - margin * 2
-  const streetRows = Math.max(1, streetLightIssues.length)
-  const attentionHeight = 360 + (streetRows - 1) * 62
-  const height = 1050 + attentionHeight
+
+  const issueTableHeight = (count) =>
+    count > 0 ? 64 + count * 56 : 58
+
+  const streetTableHeight =
+    streetLightIssues.length > 0
+      ? 64 + streetLightIssues.length * 56
+      : 58
+
+  const sweepingHeight = sweepingIssues.length > 0 ? 104 : 58
+  const moppingHeight = moppingIssues.length > 0 ? 104 : 58
+
+  const attentionHeight =
+    105 +
+    issueTableHeight(cameraIssues.length) +
+    18 +
+    issueTableHeight(ledIssues.length) +
+    18 +
+    streetTableHeight +
+    18 +
+    58 +
+    18 +
+    sweepingHeight +
+    18 +
+    moppingHeight +
+    34
+
+  const height = 820 + attentionHeight
 
   const canvas = document.createElement('canvas')
   canvas.width = width
@@ -347,45 +374,274 @@ function createSummaryReportCanvas({
   ctx.fillText('ATTENTION REQUIRED', margin + 34, y + 54)
 
   const labelX = margin + 36
-  const valueX = margin + 340
-  let rowY = y + 120
+  const contentX = margin + 350
+  const contentWidth = cardWidth - 390
+  let rowY = y + 112
 
-  function drawKeyRow(label, value, isProblem) {
-    ctx.fillStyle = '#344054'
-    ctx.font = '600 29px Arial'
-    ctx.fillText(label, labelX, rowY)
-
-    ctx.fillStyle = isProblem ? '#b42318' : '#027a48'
-    ctx.font = '700 29px Arial'
-    ctx.fillText(value, valueX, rowY)
-
-    rowY += 64
+  function drawDivider(dividerY) {
+    ctx.strokeStyle = '#e5eaf0'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(margin + 28, dividerY)
+    ctx.lineTo(width - margin - 28, dividerY)
+    ctx.stroke()
   }
 
-  drawKeyRow('Camera', cameraText, cameraText !== 'All Working')
-  drawKeyRow('LED', ledText, ledText !== 'All Working')
-
-  ctx.fillStyle = '#344054'
-  ctx.font = '600 29px Arial'
-  ctx.fillText('Street Lights', labelX, rowY)
-
-  if (streetLightIssues.length === 0) {
-    ctx.fillStyle = '#027a48'
+  function drawSimpleStatus(label, value, isProblem = false) {
+    ctx.fillStyle = '#173f67'
     ctx.font = '700 29px Arial'
-    ctx.fillText('All Working', valueX, rowY)
-    rowY += 64
-  } else {
-    ctx.fillStyle = '#b42318'
-    ctx.font = '700 28px Arial'
+    ctx.fillText(label, labelX, rowY + 36)
 
-    streetLightIssues.forEach((issue, index) => {
-      ctx.fillText(issue, valueX, rowY + index * 62)
+    ctx.fillStyle = isProblem ? '#d92d20' : '#027a48'
+    ctx.font = '700 29px Arial'
+    ctx.fillText(value, contentX, rowY + 36)
+
+    rowY += 58
+  }
+
+  function drawIssueTable(label, issues, problemText) {
+    ctx.fillStyle = '#173f67'
+    ctx.font = '700 29px Arial'
+    ctx.fillText(label, labelX, rowY + 36)
+
+    if (issues.length === 0) {
+      ctx.fillStyle = '#027a48'
+      ctx.font = '700 29px Arial'
+      ctx.fillText('All Working', contentX, rowY + 36)
+      rowY += 58
+      return
+    }
+
+    const tableX = contentX
+    const tableY = rowY
+    const tableWidth = contentWidth
+    const leftColumn = 190
+    const headerHeight = 56
+    const tableHeight = headerHeight + issues.length * 56
+
+    roundedRect(
+      ctx,
+      tableX,
+      tableY,
+      tableWidth,
+      tableHeight,
+      14,
+      '#ffffff',
+      '#d6dee8'
+    )
+
+    ctx.fillStyle = '#eef3f8'
+    ctx.fillRect(tableX + 1, tableY + 1, tableWidth - 2, headerHeight - 1)
+
+    ctx.strokeStyle = '#d6dee8'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(tableX + leftColumn, tableY)
+    ctx.lineTo(tableX + leftColumn, tableY + tableHeight)
+    ctx.stroke()
+
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#173f67'
+    ctx.font = '700 23px Arial'
+    ctx.fillText('Tower', tableX + leftColumn / 2, tableY + 36)
+    ctx.fillText(
+      'Status',
+      tableX + leftColumn + (tableWidth - leftColumn) / 2,
+      tableY + 36
+    )
+
+    issues.forEach((tower, index) => {
+      const currentY = tableY + headerHeight + index * 56
+
+      if (index > 0) {
+        ctx.strokeStyle = '#d6dee8'
+        ctx.beginPath()
+        ctx.moveTo(tableX, currentY)
+        ctx.lineTo(tableX + tableWidth, currentY)
+        ctx.stroke()
+      }
+
+      ctx.fillStyle = '#173f67'
+      ctx.font = '600 24px Arial'
+      ctx.fillText(
+        tower.replace('Tower ', ''),
+        tableX + leftColumn / 2,
+        currentY + 36
+      )
+
+      ctx.fillStyle = '#fff0f0'
+      ctx.fillRect(
+        tableX + leftColumn + 1,
+        currentY + 1,
+        tableWidth - leftColumn - 2,
+        54
+      )
+
+      ctx.fillStyle = '#d92d20'
+      ctx.font = '700 24px Arial'
+      ctx.fillText(
+        problemText,
+        tableX + leftColumn + (tableWidth - leftColumn) / 2,
+        currentY + 36
+      )
     })
 
-    rowY += streetLightIssues.length * 62
+    ctx.textAlign = 'left'
+    rowY += tableHeight
   }
 
-  drawKeyRow('Garbage Disposal', garbageText, garbageText !== 'Yes')
+  function drawStreetLightTable() {
+    ctx.fillStyle = '#173f67'
+    ctx.font = '700 29px Arial'
+    ctx.fillText('Street Lights', labelX, rowY + 36)
+
+    if (streetLightIssues.length === 0) {
+      ctx.fillStyle = '#027a48'
+      ctx.font = '700 29px Arial'
+      ctx.fillText('All Working', contentX, rowY + 36)
+      rowY += 58
+      return
+    }
+
+    const tableX = contentX
+    const tableY = rowY
+    const tableWidth = contentWidth
+    const leftColumn = 190
+    const headerHeight = 64
+    const tableHeight = headerHeight + streetLightIssues.length * 56
+
+    roundedRect(
+      ctx,
+      tableX,
+      tableY,
+      tableWidth,
+      tableHeight,
+      14,
+      '#ffffff',
+      '#d6dee8'
+    )
+
+    ctx.fillStyle = '#eef3f8'
+    ctx.fillRect(tableX + 1, tableY + 1, tableWidth - 2, headerHeight - 1)
+
+    ctx.strokeStyle = '#d6dee8'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(tableX + leftColumn, tableY)
+    ctx.lineTo(tableX + leftColumn, tableY + tableHeight)
+    ctx.stroke()
+
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#173f67'
+    ctx.font = '700 22px Arial'
+    ctx.fillText('Tower', tableX + leftColumn / 2, tableY + 39)
+    ctx.fillText(
+      'No. of Street Lights Not Working',
+      tableX + leftColumn + (tableWidth - leftColumn) / 2,
+      tableY + 39
+    )
+
+    streetLightIssues.forEach((issue, index) => {
+      const currentY = tableY + headerHeight + index * 56
+
+      if (index > 0) {
+        ctx.strokeStyle = '#d6dee8'
+        ctx.beginPath()
+        ctx.moveTo(tableX, currentY)
+        ctx.lineTo(tableX + tableWidth, currentY)
+        ctx.stroke()
+      }
+
+      ctx.fillStyle = '#173f67'
+      ctx.font = '600 24px Arial'
+      ctx.fillText(
+        issue.location.replace('Tower ', ''),
+        tableX + leftColumn / 2,
+        currentY + 36
+      )
+
+      ctx.fillStyle = '#fff0f0'
+      ctx.fillRect(
+        tableX + leftColumn + 1,
+        currentY + 1,
+        tableWidth - leftColumn - 2,
+        54
+      )
+
+      ctx.fillStyle = '#d92d20'
+      ctx.font = '700 23px Arial'
+      ctx.fillText(
+        `${issue.count} Street Light${issue.count === 1 ? '' : 's'}`,
+        tableX + leftColumn + (tableWidth - leftColumn) / 2,
+        currentY + 36
+      )
+    })
+
+    ctx.textAlign = 'left'
+    rowY += tableHeight
+  }
+
+  function drawCleaningStatus(label, issues) {
+    ctx.fillStyle = '#173f67'
+    ctx.font = '700 29px Arial'
+    ctx.fillText(label, labelX, rowY + 36)
+
+    if (issues.length === 0) {
+      ctx.fillStyle = '#027a48'
+      ctx.font = '700 29px Arial'
+      ctx.fillText('All Done', contentX, rowY + 36)
+      rowY += 58
+      return
+    }
+
+    ctx.fillStyle = '#fff0f0'
+    roundedRect(
+      ctx,
+      contentX,
+      rowY,
+      contentWidth,
+      94,
+      14,
+      '#fff0f0',
+      '#f5c2c0'
+    )
+
+    const towerNumbers = issues
+      .map((name) => name.replace('Tower ', ''))
+      .join(', ')
+
+    ctx.fillStyle = '#d92d20'
+    ctx.font = '700 25px Arial'
+    ctx.fillText(`Not done in Tower ${towerNumbers}`, contentX + 18, rowY + 36)
+
+    ctx.fillStyle = '#344054'
+    ctx.font = '600 23px Arial'
+    ctx.fillText('Rest Done', contentX + 18, rowY + 72)
+
+    rowY += 104
+  }
+
+  drawIssueTable('Camera', cameraIssues, 'Not Working')
+  rowY += 18
+  drawDivider(rowY - 8)
+
+  drawIssueTable('LED', ledIssues, 'Not Working')
+  rowY += 18
+  drawDivider(rowY - 8)
+
+  drawStreetLightTable()
+  rowY += 18
+  drawDivider(rowY - 8)
+
+  drawSimpleStatus('Garbage Disposal', garbageText, garbageText !== 'Yes')
+  rowY += 18
+  drawDivider(rowY - 8)
+
+  drawCleaningStatus('Sweeping', sweepingIssues)
+  rowY += 18
+  drawDivider(rowY - 8)
+
+  drawCleaningStatus('Mopping', moppingIssues)
 
   y += attentionHeight + 28
 
@@ -2441,6 +2697,8 @@ function TowerInspection({ onBack }) {
     const cameraIssues = []
     const ledIssues = []
     const streetLightIssues = []
+    const sweepingIssues = []
+    const moppingIssues = []
 
     towerLocations.forEach(
       (location) => {
@@ -2460,15 +2718,19 @@ function TowerInspection({ onBack }) {
           inspection.camera_led_working
 
         if (camera === false) {
-          cameraIssues.push(
-            location.name
-          )
+          cameraIssues.push(location.name)
         }
 
         if (led === false) {
-          ledIssues.push(
-            location.name
-          )
+          ledIssues.push(location.name)
+        }
+
+        if (inspection.sweeping_done === false) {
+          sweepingIssues.push(location.name)
+        }
+
+        if (inspection.mopping_done === false) {
+          moppingIssues.push(location.name)
         }
 
         const failures =
@@ -2477,12 +2739,10 @@ function TowerInspection({ onBack }) {
           )
 
         if (failures.length > 0) {
-          streetLightIssues.push(
-            `${location.name.replace(
-              'Tower ',
-              'T'
-            )} - ${failures.length} Not Working`
-          )
+          streetLightIssues.push({
+            location: location.name,
+            count: failures.length,
+          })
         }
       }
     )
@@ -2500,15 +2760,12 @@ function TowerInspection({ onBack }) {
           inspection.street_lights_all_lit ===
           false
         ) {
-          streetLightIssues.push(
-            `${location.name.replace(
-              'Park ',
-              'P'
-            )} - ${
+          streetLightIssues.push({
+            location: location.name,
+            count:
               inspection.street_lights_not_lit_count ||
-              0
-            } Not Lit`
-          )
+              0,
+          })
         }
       }
     )
@@ -2517,6 +2774,8 @@ function TowerInspection({ onBack }) {
       cameraIssues,
       ledIssues,
       streetLightIssues,
+      sweepingIssues,
+      moppingIssues,
     }
   }
 
@@ -2608,6 +2867,18 @@ function TowerInspection({ onBack }) {
       : 'No'
   }
 
+  function getCleaningSummaryText(issues) {
+    if (issues.length === 0) {
+      return 'All Done'
+    }
+
+    const towerNumbers = issues
+      .map((name) => name.replace('Tower ', ''))
+      .join(', ')
+
+    return `Not done in Tower ${towerNumbers} • Rest Done`
+  }
+
   async function shareSummaryImage() {
     setError('')
     setInfoMessage('')
@@ -2641,14 +2912,18 @@ function TowerInspection({ onBack }) {
       const canvas =
         createSummaryReportCanvas({
           date: formatDate(today),
-          cameraText:
-            getCameraSummaryText(summary),
-          ledText:
-            getLedSummaryText(summary),
+          cameraIssues:
+            summary.cameraIssues,
+          ledIssues:
+            summary.ledIssues,
           streetLightIssues:
             summary.streetLightIssues,
           garbageText:
             getGarbageSummaryText(),
+          sweepingIssues:
+            summary.sweepingIssues,
+          moppingIssues:
+            summary.moppingIssues,
           completedTowers,
           totalTowers:
             towerLocations.length,
@@ -4054,7 +4329,8 @@ function TowerInspection({ onBack }) {
                 summary.streetLightIssues.map(
                   (item, index) => (
                     <span key={index}>
-                      {item}
+                      {item.location} - {item.count}{' '}
+                      Street Light{item.count === 1 ? '' : 's'}
                     </span>
                   )
                 )
@@ -4072,6 +4348,26 @@ function TowerInspection({ onBack }) {
 
               <span>
                 {getGarbageSummaryText()}
+              </span>
+            </div>
+
+            <div className="summary-attention-section">
+              <strong>
+                Sweeping
+              </strong>
+
+              <span>
+                {getCleaningSummaryText(summary.sweepingIssues)}
+              </span>
+            </div>
+
+            <div className="summary-attention-section">
+              <strong>
+                Mopping
+              </strong>
+
+              <span>
+                {getCleaningSummaryText(summary.moppingIssues)}
               </span>
             </div>
 
