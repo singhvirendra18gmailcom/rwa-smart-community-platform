@@ -97,9 +97,7 @@ function formatTime(dateString) {
       minute: '2-digit',
       hour12: true,
     }
-  ).format(
-    new Date(dateString)
-  )
+  ).format(new Date(dateString))
 }
 
 function calculateDistance(
@@ -1442,7 +1440,7 @@ function TowerInspection({
         decodedText
       )
 
-    const allLocations = [
+    const allLocationsForScan = [
       ...towers.map(
         mapTower
       ),
@@ -1452,7 +1450,7 @@ function TowerInspection({
     ]
 
     const scannedLocation =
-      allLocations.find(
+      allLocationsForScan.find(
         (location) =>
           location.qr_token ===
           token
@@ -2757,7 +2755,10 @@ RWA Pocket-A`
           failures.length > 0
         ) {
           streetLightIssues.push(
-            `${location.name} — ${failures.length} Not Working`
+            `${location.name.replace(
+              'Tower ',
+              'T'
+            )} - ${failures.length} Not Working`
           )
         }
       }
@@ -2782,7 +2783,7 @@ RWA Pocket-A`
           false
         ) {
           streetLightIssues.push(
-            `${location.name} — ${
+            `${location.name} - ${
               inspection
                 .street_lights_not_lit_count ||
               0
@@ -2806,16 +2807,18 @@ RWA Pocket-A`
       summary.cameraIssues.length >
       0
     ) {
-      return summary.cameraIssues
-        .map(
-          (name) =>
-            name.replace(
-              'Tower ',
-              'T'
-            )
-        )
-        .join(', ') +
+      return (
+        summary.cameraIssues
+          .map(
+            (name) =>
+              name.replace(
+                'Tower ',
+                'T'
+              )
+          )
+          .join(', ') +
         ' Not Working'
+      )
     }
 
     const completedTowers =
@@ -2845,16 +2848,18 @@ RWA Pocket-A`
       summary.ledIssues.length >
       0
     ) {
-      return summary.ledIssues
-        .map(
-          (name) =>
-            name.replace(
-              'Tower ',
-              'T'
-            )
-        )
-        .join(', ') +
+      return (
+        summary.ledIssues
+          .map(
+            (name) =>
+              name.replace(
+                'Tower ',
+                'T'
+              )
+          )
+          .join(', ') +
         ' Not Working'
+      )
     }
 
     const completedTowers =
@@ -2914,178 +2919,63 @@ RWA Pocket-A`
           )
       ).length
 
-    const towerAttention =
-      towerLocations.filter(
-        (location) => {
-          const inspection =
-            getInspection(
-              location
-            )
-
-          return (
-            inspection?.saved_at &&
-            inspectionHasIssue(
-              'tower',
-              inspection
-            )
-          )
-        }
-      )
-
-    const pendingTowers =
-      towerLocations.filter(
-        (location) =>
-          !getInspection(
-            location
-          )?.saved_at
-      )
-
-    let towerStatusText = ''
-
-    if (
-      towerAttention.length ===
-        0 &&
-      pendingTowers.length ===
-        0
-    ) {
-      towerStatusText =
-        '✓ All towers are OK'
-    } else {
-      const lines = []
-
-      towerAttention.forEach(
-        (location) => {
-          lines.push(
-            `⚠ ${location.name.replace(
-              'Tower ',
-              'T'
-            )} — Attention`
-          )
-        }
-      )
-
-      pendingTowers.forEach(
-        (location) => {
-          lines.push(
-            `• ${location.name.replace(
-              'Tower ',
-              'T'
-            )} — Pending`
-          )
-        }
-      )
-
-      if (
-        completedTowers ===
-          towerLocations.length &&
-        towerAttention.length >
-          0 &&
-        towerAttention.length <
-          towerLocations.length
-      ) {
-        lines.push(
-          '',
-          '✓ Rest all towers are OK'
-        )
-      }
-
-      if (
-        completedTowers <
-          towerLocations.length &&
-        completedTowers >
-          towerAttention.length
-      ) {
-        lines.push(
-          '',
-          '✓ Remaining inspected towers are OK'
-        )
-      }
-
-      towerStatusText =
-        lines.join('\n')
-    }
-
-    const parkStatusText =
-      parkLocations
-        .map(
-          (location) => {
-            const inspection =
-              getInspection(
-                location
-              )
-
-            if (
-              !inspection?.saved_at
-            ) {
-              return `• ${location.name} — Pending`
-            }
-
-            if (
-              inspectionHasIssue(
-                'park',
-                inspection
-              )
-            ) {
-              return `⚠ ${location.name} — Attention`
-            }
-
-            return `✓ ${location.name} — OK`
-          }
-        )
-        .join('\n')
+    const allInspectionsComplete =
+      completedTowers ===
+        towerLocations.length &&
+      completedParks ===
+        parkLocations.length
 
     const streetLightText =
       summary.streetLightIssues
         .length > 0
         ? summary.streetLightIssues
             .map(
-              (item) =>
-                `• ${item.replace(
-                  'Tower ',
-                  'T'
-                )}`
+              (item, index) =>
+                index === 0
+                  ? item
+                  : `${' '.repeat(
+                      18
+                    )}${item}`
             )
             .join('\n')
-        : completedCount ===
-          allLocations.length
+        : allInspectionsComplete
         ? 'All Working'
-        : `No issue reported (${completedCount}/${allLocations.length} locations inspected)`
+        : `No issue reported (${completedCount}/${allLocations.length} inspected)`
 
-    return `RWA POCKET-A
+    const overallStatusText =
+      allInspectionsComplete
+        ? 'Rest everything else is OK.'
+        : 'Remaining inspected items are OK.'
+
+    const fence = '```'
+
+    const summaryReport = `RWA POCKET-A
 DAILY INSPECTION SUMMARY
 ${formatDate(today)}
 
-⚠️ ATTENTION REQUIRED
-
-Camera: ${getCameraSummaryText(
+ATTENTION REQUIRED
+Item              Status
+--------------------------------
+Camera            ${getCameraSummaryText(
       summary
     )}
-
-LED: ${getLedSummaryText(
+LED               ${getLedSummaryText(
       summary
     )}
+Street Lights     ${streetLightText}
+Garbage Disposal  ${getGarbageSummaryText()}
 
-Street Lights:
-${streetLightText}
-
-Garbage Disposal: ${getGarbageSummaryText()}
-
-
-TOWER STATUS
-
-${towerStatusText}
-
-
-PARK STATUS
-
-${parkStatusText}
-
+${overallStatusText}
 
 INSPECTION PROGRESS
+Location          Completed
+--------------------------------
+Towers            ${completedTowers}/${towerLocations.length}
+Parks              ${completedParks}/${parkLocations.length}`
 
-Towers: ${completedTowers}/${towerLocations.length}
-Parks: ${completedParks}/${parkLocations.length}
-
+    return `${fence}
+${summaryReport}
+${fence}
 
 ${REPORT_FOOTER}
 
@@ -3141,26 +3031,38 @@ RWA Pocket-A`
 
             <div className="summary-card summary-done">
               <span>✅</span>
+
               <strong>
                 {completedCount}
               </strong>
-              <small>Done</small>
+
+              <small>
+                Done
+              </small>
             </div>
 
             <div className="summary-card summary-pending">
               <span>⏳</span>
+
               <strong>
                 {pendingCount}
               </strong>
-              <small>Pending</small>
+
+              <small>
+                Pending
+              </small>
             </div>
 
             <div className="summary-card summary-issues">
               <span>⚠️</span>
+
               <strong>
                 {issueCount}
               </strong>
-              <small>Issues</small>
+
+              <small>
+                Issues
+              </small>
             </div>
 
           </div>
@@ -3200,7 +3102,9 @@ RWA Pocket-A`
                     true
                   )
 
-                  setSocietySaved(false)
+                  setSocietySaved(
+                    false
+                  )
                 }}
               >
                 ✅ Yes
@@ -3219,7 +3123,9 @@ RWA Pocket-A`
                     false
                   )
 
-                  setSocietySaved(false)
+                  setSocietySaved(
+                    false
+                  )
                 }}
               >
                 ❌ No
@@ -3497,6 +3403,7 @@ RWA Pocket-A`
 
           {gpsLoading ? (
             <div className="location-card">
+
               <div className="inspection-big-icon">
                 📍
               </div>
@@ -3508,6 +3415,7 @@ RWA Pocket-A`
               <p>
                 Checking your current GPS position.
               </p>
+
             </div>
           ) : (
             <div className="location-card">
@@ -3527,6 +3435,7 @@ RWA Pocket-A`
               {distanceFromLocation !==
                 null && (
                 <div className="failed-distance">
+
                   <span>
                     Current Distance
                   </span>
@@ -3537,6 +3446,7 @@ RWA Pocket-A`
                     )}{' '}
                     m
                   </strong>
+
                 </div>
               )}
 
@@ -3713,6 +3623,7 @@ RWA Pocket-A`
               <div className="inspection-item">
 
                 <div className="inspection-item-heading">
+
                   <span className="inspection-item-icon">
                     💡
                   </span>
@@ -3720,6 +3631,7 @@ RWA Pocket-A`
                   <strong>
                     Tower Lights
                   </strong>
+
                 </div>
 
                 <div className="lights-counter">
@@ -3734,6 +3646,7 @@ RWA Pocket-A`
                   </button>
 
                   <div>
+
                     <strong>
                       {lightsWorkingCount ===
                       null
@@ -3744,6 +3657,7 @@ RWA Pocket-A`
                     <span>
                       / 9 Working
                     </span>
+
                   </div>
 
                   <button
@@ -3914,6 +3828,7 @@ RWA Pocket-A`
                 <div className="inspection-item">
 
                   <div className="inspection-item-heading">
+
                     <span className="inspection-item-icon">
                       💡
                     </span>
@@ -3921,6 +3836,7 @@ RWA Pocket-A`
                     <strong>
                       Street Lights Not Lit
                     </strong>
+
                   </div>
 
                   <div className="lights-counter">
@@ -3935,6 +3851,7 @@ RWA Pocket-A`
                     </button>
 
                     <div>
+
                       <strong>
                         {
                           parkStreetLightsNotLitCount
@@ -3944,6 +3861,7 @@ RWA Pocket-A`
                       <span>
                         Not Lit
                       </span>
+
                     </div>
 
                     <button
@@ -3965,6 +3883,7 @@ RWA Pocket-A`
           <div className="inspection-item">
 
             <div className="inspection-item-heading">
+
               <span className="inspection-item-icon">
                 ⚠️
               </span>
@@ -3972,6 +3891,7 @@ RWA Pocket-A`
               <strong>
                 Any Other Issue
               </strong>
+
             </div>
 
             <div className="inspection-toggle-row">
@@ -4043,6 +3963,7 @@ RWA Pocket-A`
           <div className="inspection-item">
 
             <div className="inspection-item-heading">
+
               <span className="inspection-item-icon">
                 📝
               </span>
@@ -4050,6 +3971,7 @@ RWA Pocket-A`
               <strong>
                 Remarks
               </strong>
+
             </div>
 
             <textarea
@@ -4072,6 +3994,7 @@ RWA Pocket-A`
 
           {hasIssue && (
             <div className="attention-preview">
+
               <strong>
                 ⚠️ Attention Required
               </strong>
@@ -4079,6 +4002,7 @@ RWA Pocket-A`
               <p>
                 One or more issues have been marked.
               </p>
+
             </div>
           )}
 
