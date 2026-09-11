@@ -14,6 +14,44 @@ import { supabase } from './supabase'
 
 
 // =========================================================
+// WhatsApp Icon
+// =========================================================
+
+function WhatsAppIcon({ size = 22 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        fill="#25D366"
+      />
+
+      <path
+        d="M8.2 7.4c.2-.5.4-.5.8-.5h.6c.2 0 .4.1.5.4l.9 2.1c.1.3.1.5-.1.7l-.7.9c-.2.2-.2.4 0 .7.5.9 1.2 1.6 2 2.1.3.2.5.2.7 0l.9-1.1c.2-.2.4-.3.7-.2l2.2 1c.3.1.4.3.4.6 0 .4-.2 1.4-1 2-.8.7-1.8 1-2.8.8-1.1-.2-2.3-.7-3.4-1.5-1-.7-1.9-1.6-2.6-2.6-.8-1.1-1.3-2.3-1.5-3.4-.2-.8.1-1.6.5-2Z"
+        fill="#ffffff"
+      />
+
+      <path
+        d="M5.7 18.1 6.4 15.8"
+        stroke="#ffffff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+
+// =========================================================
 // Canvas Helper
 // =========================================================
 
@@ -751,684 +789,645 @@ function Attendance({
   const generateAttendancePng =
     async () => {
 
+      // =======================================================
+      // Mobile-first WhatsApp attendance report
+      // =======================================================
+      // This changes ONLY the generated PNG.
+      // Attendance screen UI remains unchanged.
+      // =======================================================
+
       const width = 1080
+      const pagePadding = 20
+      const contentWidth = width - pagePadding * 2
+
+      const reportDate = new Date()
+      const weekday = reportDate
+        .toLocaleDateString('en-GB', { weekday: 'short' })
+        .toUpperCase()
+      const reportDisplayDate = `${getDisplayDate()} (${weekday})`
 
       // -------------------------------------------------------
-      // Layout dimensions
+      // Layout
       // -------------------------------------------------------
 
-      const headerY = 25
-      const headerHeight = 205
+      const headerY = 20
+      const headerHeight = 198
 
-      const tableHeaderY = 245
-      const tableHeaderHeight = 58
+      const summaryY = headerY + headerHeight + 14
+      const summaryHeight = 136
+      const summaryGap = 16
+      const summaryCardWidth =
+        (contentWidth - summaryGap * 2) / 3
 
-      const rowHeight = 76
+      const tableHeaderY = summaryY + summaryHeight + 16
+      const tableHeaderHeight = 66
 
-      const tableRowsHeight =
-        staff.length *
-        rowHeight
-
-      const summaryY =
-        tableHeaderY +
-        tableHeaderHeight +
-        tableRowsHeight +
-        20
-
-      const summaryHeight = 165
+      const rowHeight = 82
+      const rowsHeight = staff.length * rowHeight
 
       const authorityY =
-        summaryY +
-        summaryHeight +
-        18
+        tableHeaderY +
+        tableHeaderHeight +
+        rowsHeight +
+        16
+      const authorityHeight = 122
 
-      const authorityHeight = 120
+      const poweredY = authorityY + authorityHeight + 16
+      const poweredHeight = 122
 
-      const footerY =
-        authorityY +
-        authorityHeight +
-        18
+      const footerY = poweredY + poweredHeight + 14
+      const footerHeight = 112
 
-      const footerHeight = 185
+      const height = footerY + footerHeight + 20
 
-      const height =
-        footerY +
-        footerHeight +
-        30
-
-
-      const canvas =
-        document.createElement(
-          'canvas'
-        )
-
+      const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
 
-
-      const ctx =
-        canvas.getContext(
-          '2d'
-        )
-
+      const ctx = canvas.getContext('2d')
 
       if (!ctx) {
-        throw new Error(
-          'Unable to create attendance image.'
-        )
+        throw new Error('Unable to create attendance image.')
       }
 
+      // -------------------------------------------------------
+      // Local drawing helpers used only by the PNG
+      // -------------------------------------------------------
+
+      const drawCheck = (cx, cy, radius) => {
+        ctx.save()
+        ctx.beginPath()
+        ctx.fillStyle = '#10a565'
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = 7
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        ctx.beginPath()
+        ctx.moveTo(cx - radius * 0.45, cy)
+        ctx.lineTo(cx - radius * 0.10, cy + radius * 0.34)
+        ctx.lineTo(cx + radius * 0.50, cy - radius * 0.40)
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      const drawCross = (cx, cy, radius) => {
+        ctx.save()
+        ctx.beginPath()
+        ctx.fillStyle = '#ef3340'
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = 7
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(cx - radius * 0.38, cy - radius * 0.38)
+        ctx.lineTo(cx + radius * 0.38, cy + radius * 0.38)
+        ctx.moveTo(cx + radius * 0.38, cy - radius * 0.38)
+        ctx.lineTo(cx - radius * 0.38, cy + radius * 0.38)
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      const drawPeopleBadge = (cx, cy, scale = 1, fill = '#d9ecff') => {
+        ctx.save()
+        ctx.fillStyle = fill
+
+        ctx.beginPath()
+        ctx.arc(cx, cy - 12 * scale, 12 * scale, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(cx - 26 * scale, cy - 4 * scale, 9 * scale, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(cx + 26 * scale, cy - 4 * scale, 9 * scale, 0, Math.PI * 2)
+        ctx.fill()
+
+        drawRoundedRect(
+          ctx,
+          cx - 23 * scale,
+          cy + 2 * scale,
+          46 * scale,
+          30 * scale,
+          14 * scale,
+          fill
+        )
+        drawRoundedRect(
+          ctx,
+          cx - 44 * scale,
+          cy + 5 * scale,
+          25 * scale,
+          23 * scale,
+          11 * scale,
+          fill
+        )
+        drawRoundedRect(
+          ctx,
+          cx + 19 * scale,
+          cy + 5 * scale,
+          25 * scale,
+          23 * scale,
+          11 * scale,
+          fill
+        )
+        ctx.restore()
+      }
+
+      const drawRoleIcon = (profession, cx, cy) => {
+        ctx.save()
+
+        // soft icon background
+        let bg = '#edf5ff'
+        let fg = '#2469aa'
+
+        if (profession === 'Electrician') {
+          bg = '#fff7df'
+          fg = '#e7a100'
+        } else if (profession === 'Gardener') {
+          bg = '#eff9e8'
+          fg = '#5eaf38'
+        } else if (profession === 'Sweeper') {
+          bg = '#fff5e6'
+          fg = '#e48a17'
+        } else if (profession === 'Housekeeping') {
+          bg = '#f4ecff'
+          fg = '#8544b1'
+        } else if (profession === 'Plumber') {
+          bg = '#eaf6ff'
+          fg = '#3a86c8'
+        }
+
+        drawRoundedRect(
+          ctx,
+          cx - 24,
+          cy - 24,
+          48,
+          48,
+          18,
+          bg
+        )
+
+        ctx.strokeStyle = fg
+        ctx.fillStyle = fg
+        ctx.lineWidth = 5
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+
+        switch (profession) {
+          case 'Supervisor': {
+            ctx.beginPath()
+            ctx.arc(cx, cy - 7, 8, 0, Math.PI * 2)
+            ctx.fill()
+            drawRoundedRect(ctx, cx - 11, cy + 3, 22, 15, 7, fg)
+            ctx.beginPath()
+            ctx.moveTo(cx - 13, cy + 15)
+            ctx.lineTo(cx + 13, cy + 15)
+            ctx.stroke()
+            break
+          }
+
+          case 'Electrician': {
+            ctx.beginPath()
+            ctx.moveTo(cx + 3, cy - 20)
+            ctx.lineTo(cx - 11, cy + 2)
+            ctx.lineTo(cx - 1, cy + 2)
+            ctx.lineTo(cx - 7, cy + 21)
+            ctx.lineTo(cx + 13, cy - 5)
+            ctx.lineTo(cx + 3, cy - 5)
+            ctx.closePath()
+            ctx.fill()
+            break
+          }
+
+          case 'Plumber': {
+            ctx.beginPath()
+            ctx.arc(cx - 6, cy - 5, 8, 0.45, Math.PI * 1.55)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(cx - 1, cy + 1)
+            ctx.lineTo(cx + 13, cy + 15)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.arc(cx + 13, cy + 15, 4, 0, Math.PI * 2)
+            ctx.fill()
+            break
+          }
+
+          case 'Gardener': {
+            ctx.beginPath()
+            ctx.ellipse(cx + 2, cy - 3, 12, 7, -0.6, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.beginPath()
+            ctx.moveTo(cx - 10, cy + 16)
+            ctx.lineTo(cx + 7, cy - 7)
+            ctx.stroke()
+            break
+          }
+
+          case 'Sweeper': {
+            ctx.beginPath()
+            ctx.moveTo(cx + 8, cy - 18)
+            ctx.lineTo(cx - 2, cy + 6)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(cx - 11, cy + 4)
+            ctx.lineTo(cx + 2, cy + 9)
+            ctx.lineTo(cx - 3, cy + 20)
+            ctx.lineTo(cx - 16, cy + 15)
+            ctx.closePath()
+            ctx.fill()
+            break
+          }
+
+          case 'Housekeeping': {
+            ctx.beginPath()
+            ctx.moveTo(cx - 14, cy - 1)
+            ctx.lineTo(cx, cy - 14)
+            ctx.lineTo(cx + 14, cy - 1)
+            ctx.stroke()
+            drawRoundedRect(ctx, cx - 10, cy - 1, 20, 18, 2, fg)
+            break
+          }
+
+          default: {
+            ctx.beginPath()
+            ctx.arc(cx, cy - 6, 8, 0, Math.PI * 2)
+            ctx.fill()
+            drawRoundedRect(ctx, cx - 11, cy + 4, 22, 14, 7, fg)
+          }
+        }
+
+        ctx.restore()
+      }
+
+      const drawSummaryCard = ({
+        x,
+        icon,
+        value,
+        label,
+        background,
+        border,
+        valueColor
+      }) => {
+        drawRoundedRect(
+          ctx,
+          x,
+          summaryY,
+          summaryCardWidth,
+          summaryHeight,
+          22,
+          background,
+          border,
+          1.5
+        )
+
+        if (icon === 'check') {
+          drawCheck(x + 67, summaryY + 58, 32)
+        } else if (icon === 'cross') {
+          drawCross(x + 67, summaryY + 58, 32)
+        } else {
+          drawRoundedRect(
+            ctx,
+            x + 34,
+            summaryY + 26,
+            66,
+            66,
+            28,
+            '#d8ecff'
+          )
+          drawPeopleBadge(
+            x + 67,
+            summaryY + 59,
+            0.6,
+            '#1670c7'
+          )
+        }
+
+        ctx.textAlign = 'left'
+        ctx.fillStyle = valueColor
+        ctx.font = '700 52px Arial, sans-serif'
+        ctx.fillText(
+          String(value),
+          x + 122,
+          summaryY + 69
+        )
+
+        ctx.font = '700 27px Arial, sans-serif'
+        ctx.fillText(
+          label,
+          x + 122,
+          summaryY + 107
+        )
+      }
 
       // =====================================================
       // Background
       // =====================================================
 
-      ctx.fillStyle =
-        '#ffffff'
-
-      ctx.fillRect(
-        0,
-        0,
-        width,
-        height
-      )
-
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, width, height)
 
       // =====================================================
       // Header
       // =====================================================
 
-      const headerX = 15
-      const headerWidth = 1050
-
-
-      const headerGradient =
-        ctx.createLinearGradient(
-          headerX,
-          headerY,
-          headerX +
-            headerWidth,
-          headerY
-        )
-
-
-      headerGradient.addColorStop(
-        0,
-        '#174879'
+      const headerGradient = ctx.createLinearGradient(
+        pagePadding,
+        headerY,
+        pagePadding + contentWidth,
+        headerY
       )
-
-      headerGradient.addColorStop(
-        1,
-        '#1670ad'
-      )
-
+      headerGradient.addColorStop(0, '#0f4c84')
+      headerGradient.addColorStop(1, '#0884c4')
 
       drawRoundedRect(
         ctx,
-        headerX,
+        pagePadding,
         headerY,
-        headerWidth,
+        contentWidth,
         headerHeight,
-        24,
+        26,
         headerGradient
       )
 
-
-      // -----------------------------------------------------
-      // Left people/community icon
-      // -----------------------------------------------------
-
-      drawPeopleIcon(
-        ctx,
-        100,
-        112
+      drawPeopleBadge(
+        105,
+        headerY + 96,
+        1.1,
+        '#d9ecff'
       )
 
+      ctx.fillStyle = '#70b8df'
+      ctx.fillRect(205, headerY + 30, 2, 138)
+      ctx.fillRect(820, headerY + 30, 2, 138)
 
-      // -----------------------------------------------------
-      // Header centred content
-      // -----------------------------------------------------
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '700 48px Arial, sans-serif'
+      ctx.fillText('RWA POCKET-A', 510, headerY + 60)
 
-      ctx.textAlign =
-        'center'
-
-      ctx.fillStyle =
-        '#ffffff'
-
-
-      ctx.font =
-        '700 47px Arial, sans-serif'
-
-      ctx.fillText(
-        'RWA POCKET-A',
-        width / 2,
-        93
-      )
-
-
-      ctx.font =
-        '700 31px Arial, sans-serif'
-
+      ctx.font = '700 31px Arial, sans-serif'
       ctx.fillText(
         'STAFF DAILY ATTENDANCE',
-        width / 2,
-        145
+        510,
+        headerY + 106
       )
-
-
-      ctx.fillStyle =
-        '#d9ebfa'
-
-      ctx.font =
-        '400 28px Arial, sans-serif'
-
-      ctx.fillText(
-        getDisplayDate(),
-        width / 2,
-        195
-      )
-
-
-      // -----------------------------------------------------
-      // Right slogan
-      // -----------------------------------------------------
-
-      ctx.strokeStyle =
-        '#65b9e8'
-
-      ctx.lineWidth = 2
-
-      ctx.beginPath()
-
-      ctx.moveTo(
-        870,
-        60
-      )
-
-      ctx.lineTo(
-        870,
-        190
-      )
-
-      ctx.stroke()
-
-
-      ctx.textAlign =
-        'left'
-
-      ctx.fillStyle =
-        '#cce8f7'
-
-      ctx.font =
-        '700 15px Arial, sans-serif'
-
-
-      ctx.fillText(
-        'CLEANER',
-        905,
-        90
-      )
-
-      ctx.fillText(
-        'SAFER',
-        905,
-        119
-      )
-
-      ctx.fillText(
-        'GREENER',
-        905,
-        148
-      )
-
-      ctx.fillText(
-        'TOGETHER',
-        905,
-        177
-      )
-
-
-      // =====================================================
-      // Table Header
-      // =====================================================
 
       drawRoundedRect(
         ctx,
-        15,
-        tableHeaderY,
-        1050,
-        tableHeaderHeight,
-        15,
-        '#eaf5ff',
-        '#71b9f3',
-        1.5
+        355,
+        headerY + 127,
+        310,
+        46,
+        16,
+        'rgba(255,255,255,0.10)',
+        '#66b8e8',
+        1.4
       )
 
-
-      ctx.fillStyle =
-        '#142f57'
-
-      ctx.font =
-        '700 21px Arial, sans-serif'
-
-      ctx.textAlign =
-        'left'
-
-
+      // Date text must be reset to solid white because
+      // drawRoundedRect above changes ctx.fillStyle.
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '700 23px Arial, sans-serif'
       ctx.fillText(
-        '#',
-        58,
-        tableHeaderY + 37
-      )
-
-
-      ctx.fillText(
-        'Name',
-        150,
-        tableHeaderY + 37
-      )
-
-
-      ctx.fillText(
-        'Role',
+        reportDisplayDate,
         510,
-        tableHeaderY + 37
+        headerY + 158
       )
 
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#dff2ff'
+      ctx.font = '700 18px Arial, sans-serif'
+      ctx.fillText('CLEANER', 866, headerY + 60)
+      ctx.fillText('SAFER', 866, headerY + 88)
+      ctx.fillText('GREENER', 866, headerY + 116)
+      ctx.fillText('TOGETHER', 866, headerY + 144)
 
+      // =====================================================
+      // Summary cards
+      // =====================================================
+
+      drawSummaryCard({
+        x: pagePadding,
+        icon: 'check',
+        value: presentCount,
+        label: 'Present',
+        background: '#f0fbf5',
+        border: '#b2e8ca',
+        valueColor: '#0e8f57'
+      })
+
+      drawSummaryCard({
+        x: pagePadding + summaryCardWidth + summaryGap,
+        icon: 'cross',
+        value: absentCount,
+        label: 'Absent',
+        background: '#fff3f4',
+        border: '#f2c2c8',
+        valueColor: '#d71929'
+      })
+
+      drawSummaryCard({
+        x: pagePadding + (summaryCardWidth + summaryGap) * 2,
+        icon: 'people',
+        value: staff.length,
+        label: 'Total Staff',
+        background: '#f1f7ff',
+        border: '#bcdcff',
+        valueColor: '#0f63b3'
+      })
+
+      // =====================================================
+      // Table header
+      // =====================================================
+
+      const tableGradient = ctx.createLinearGradient(
+        pagePadding,
+        tableHeaderY,
+        pagePadding + contentWidth,
+        tableHeaderY
+      )
+      tableGradient.addColorStop(0, '#0c4f87')
+      tableGradient.addColorStop(1, '#087fbd')
+
+      drawRoundedRect(
+        ctx,
+        pagePadding,
+        tableHeaderY,
+        contentWidth,
+        tableHeaderHeight,
+        18,
+        tableGradient
+      )
+
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '700 24px Arial, sans-serif'
+      ctx.fillText('#', 59, tableHeaderY + tableHeaderHeight / 2)
       ctx.fillText(
-        'Attendance',
-        835,
-        tableHeaderY + 37
+        'STAFF  (Name & Role)',
+        155,
+        tableHeaderY + tableHeaderHeight / 2
       )
-
+      ctx.fillText(
+        'ATTENDANCE',
+        803,
+        tableHeaderY + tableHeaderHeight / 2
+      )
+      ctx.textBaseline = 'alphabetic'
 
       // =====================================================
-      // Staff Rows
+      // Staff rows
       // =====================================================
 
-      staff.forEach(
-        (
-          person,
-          index
-        ) => {
+      staff.forEach((person, index) => {
+        const y =
+          tableHeaderY +
+          tableHeaderHeight +
+          index * rowHeight
 
-          const y =
-            tableHeaderY +
-            tableHeaderHeight +
-            index *
-              rowHeight
+        const fill = index % 2 === 0
+          ? '#ffffff'
+          : '#f8fbfd'
 
+        drawRoundedRect(
+          ctx,
+          pagePadding,
+          y,
+          contentWidth,
+          rowHeight - 2,
+          15,
+          fill,
+          '#cfe0ec',
+          1.2
+        )
 
-          const rowBackground =
-            index % 2 === 0
-              ? '#ffffff'
-              : '#f7fbfe'
+        drawRoundedRect(
+          ctx,
+          38,
+          y + 16,
+          50,
+          50,
+          20,
+          '#e7f4ff'
+        )
 
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#0f68b2'
+        ctx.font = '700 23px Arial, sans-serif'
+        ctx.fillText(String(index + 1), 63, y + 41)
 
+        drawRoleIcon(
+          person.profession,
+          130,
+          y + 41
+        )
+
+        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'left'
+
+        const staffTextY = y + rowHeight / 2
+        const staffNameX = 185
+
+        ctx.fillStyle = '#11355f'
+        ctx.font = '700 34px Arial, sans-serif'
+        ctx.fillText(
+          person.name,
+          staffNameX,
+          staffTextY
+        )
+
+        const staffNameWidth =
+          ctx.measureText(
+            person.name
+          ).width
+
+        ctx.fillStyle = '#536b86'
+        ctx.font = '500 21px Arial, sans-serif'
+        ctx.fillText(
+          `— ${person.profession}`,
+          staffNameX +
+            staffNameWidth +
+            18,
+          staffTextY
+        )
+
+        const badgeX = 785
+        const badgeY = y + 18
+        const badgeWidth = 245
+        const badgeHeight = 48
+
+        if (person.present) {
           drawRoundedRect(
             ctx,
-            15,
-            y,
-            1050,
-            rowHeight - 4,
-            14,
-            rowBackground,
-            '#d2e1ee',
-            1.2
+            badgeX,
+            badgeY,
+            badgeWidth,
+            badgeHeight,
+            24,
+            '#dcf7e7'
           )
 
-
-          // -------------------------------------------------
-          // Number circle
-          // -------------------------------------------------
-
           ctx.beginPath()
-
-          ctx.fillStyle =
-            '#dcefff'
-
+          ctx.fillStyle = '#0fa15f'
           ctx.arc(
-            67,
-            y + 35,
-            26,
+            badgeX + 25,
+            badgeY + 24,
+            9,
             0,
             Math.PI * 2
           )
-
           ctx.fill()
 
-
-          ctx.textAlign =
-            'center'
-
-          ctx.textBaseline =
-            'middle'
-
-          ctx.fillStyle =
-            '#1767b3'
-
-          ctx.font =
-            '600 21px Arial, sans-serif'
-
-
+          ctx.textAlign = 'left'
+          ctx.textBaseline = 'middle'
+          ctx.fillStyle = '#087d4a'
+          ctx.font = '700 23px Arial, sans-serif'
           ctx.fillText(
-            String(
-              index + 1
-            ),
-            67,
-            y + 35
+            'PRESENT',
+            badgeX + 50,
+            badgeY + 25
+          )
+        } else {
+          drawRoundedRect(
+            ctx,
+            badgeX,
+            badgeY,
+            badgeWidth,
+            badgeHeight,
+            24,
+            '#fde4e8'
           )
 
-
-          ctx.textBaseline =
-            'alphabetic'
-
-          ctx.textAlign =
-            'left'
-
-
-          // -------------------------------------------------
-          // Name
-          // -------------------------------------------------
-
-          ctx.fillStyle =
-            '#112e56'
-
-          ctx.font =
-            '700 23px Arial, sans-serif'
-
-
-          ctx.fillText(
-            person.name,
-            150,
-            y + 43
+          ctx.beginPath()
+          ctx.fillStyle = '#df2f42'
+          ctx.arc(
+            badgeX + 25,
+            badgeY + 24,
+            9,
+            0,
+            Math.PI * 2
           )
+          ctx.fill()
 
-
-          // -------------------------------------------------
-          // Role
-          // -------------------------------------------------
-
-          ctx.fillStyle =
-            '#334f77'
-
-          ctx.font =
-            '400 22px Arial, sans-serif'
-
-
+          ctx.textAlign = 'left'
+          ctx.textBaseline = 'middle'
+          ctx.fillStyle = '#ca2335'
+          ctx.font = '700 23px Arial, sans-serif'
           ctx.fillText(
-            person.profession,
-            510,
-            y + 43
+            'ABSENT',
+            badgeX + 50,
+            badgeY + 25
           )
-
-
-          // -------------------------------------------------
-          // Attendance badge
-          // -------------------------------------------------
-
-          const badgeX = 815
-          const badgeY = y + 13
-          const badgeWidth = 225
-          const badgeHeight = 47
-
-
-          if (
-            person.present
-          ) {
-
-            drawRoundedRect(
-              ctx,
-              badgeX,
-              badgeY,
-              badgeWidth,
-              badgeHeight,
-              24,
-              '#ddf8e7'
-            )
-
-
-            ctx.beginPath()
-
-            ctx.fillStyle =
-              '#08965a'
-
-            ctx.arc(
-              badgeX + 27,
-              badgeY + 23,
-              10,
-              0,
-              Math.PI * 2
-            )
-
-            ctx.fill()
-
-
-            ctx.fillStyle =
-              '#087e4b'
-
-            ctx.font =
-              '700 19px Arial, sans-serif'
-
-
-            ctx.fillText(
-              'PRESENT',
-              badgeX + 56,
-              badgeY + 31
-            )
-
-          } else {
-
-            drawRoundedRect(
-              ctx,
-              badgeX,
-              badgeY,
-              badgeWidth,
-              badgeHeight,
-              24,
-              '#fde0e7'
-            )
-
-
-            ctx.beginPath()
-
-            ctx.fillStyle =
-              '#e31b35'
-
-            ctx.arc(
-              badgeX + 27,
-              badgeY + 23,
-              10,
-              0,
-              Math.PI * 2
-            )
-
-            ctx.fill()
-
-
-            ctx.fillStyle =
-              '#d81f35'
-
-            ctx.font =
-              '700 19px Arial, sans-serif'
-
-
-            ctx.fillText(
-              'ABSENT',
-              badgeX + 56,
-              badgeY + 31
-            )
-          }
         }
-      )
 
-
-      // =====================================================
-      // Today's Summary
-      // =====================================================
-
-      drawRoundedRect(
-        ctx,
-        15,
-        summaryY,
-        1050,
-        summaryHeight,
-        18,
-        '#eef7ff',
-        '#54b2f4',
-        2
-      )
-
-
-      ctx.textAlign =
-        'left'
-
-      ctx.fillStyle =
-        '#102d58'
-
-      ctx.font =
-        '700 25px Arial, sans-serif'
-
-
-      ctx.fillText(
-        "TODAY'S SUMMARY",
-        50,
-        summaryY + 42
-      )
-
-
-      // -----------------------------------------------------
-      // Present
-      // -----------------------------------------------------
-
-      ctx.textAlign =
-        'center'
-
-
-      ctx.fillStyle =
-        '#079954'
-
-      ctx.font =
-        '700 28px Arial, sans-serif'
-
-
-      ctx.fillText(
-        String(
-          presentCount
-        ),
-        190,
-        summaryY + 100
-      )
-
-
-      ctx.fillStyle =
-        '#3e5473'
-
-      ctx.font =
-        '400 18px Arial, sans-serif'
-
-
-      ctx.fillText(
-        'Present',
-        190,
-        summaryY + 128
-      )
-
-
-      // Divider 1
-
-      ctx.fillStyle =
-        '#aed7f3'
-
-      ctx.fillRect(
-        370,
-        summaryY + 70,
-        2,
-        70
-      )
-
-
-      // -----------------------------------------------------
-      // Absent
-      // -----------------------------------------------------
-
-      ctx.fillStyle =
-        '#dc2935'
-
-      ctx.font =
-        '700 28px Arial, sans-serif'
-
-
-      ctx.fillText(
-        String(
-          absentCount
-        ),
-        540,
-        summaryY + 100
-      )
-
-
-      ctx.fillStyle =
-        '#3e5473'
-
-      ctx.font =
-        '400 18px Arial, sans-serif'
-
-
-      ctx.fillText(
-        'Absent',
-        540,
-        summaryY + 128
-      )
-
-
-      // Divider 2
-
-      ctx.fillStyle =
-        '#aed7f3'
-
-      ctx.fillRect(
-        710,
-        summaryY + 70,
-        2,
-        70
-      )
-
-
-      // -----------------------------------------------------
-      // Total
-      // -----------------------------------------------------
-
-      ctx.fillStyle =
-        '#126bd1'
-
-      ctx.font =
-        '700 28px Arial, sans-serif'
-
-
-      ctx.fillText(
-        String(
-          staff.length
-        ),
-        890,
-        summaryY + 100
-      )
-
-
-      ctx.fillStyle =
-        '#3e5473'
-
-      ctx.font =
-        '400 18px Arial, sans-serif'
-
-
-      ctx.fillText(
-        'Total Staff',
-        890,
-        summaryY + 128
-      )
-
+        ctx.textBaseline = 'alphabetic'
+      })
 
       // =====================================================
       // Noida Authority Sweepers
@@ -1436,247 +1435,214 @@ function Attendance({
 
       drawRoundedRect(
         ctx,
-        15,
+        pagePadding,
         authorityY,
-        1050,
+        contentWidth,
         authorityHeight,
-        18,
-        '#effcf5',
-        '#59dc9b',
-        2
+        22,
+        '#f0fbf5',
+        '#55cf8f',
+        1.8
       )
 
-
-      // People icon
-
-      drawPeopleIcon(
-        ctx,
-        105,
-        authorityY + 60
+      drawPeopleBadge(
+        92,
+        authorityY + 64,
+        0.85,
+        '#2eb774'
       )
 
-
-      // Vertical separator
-
-      ctx.fillStyle =
-        '#62d7a2'
-
+      ctx.fillStyle = '#43c684'
       ctx.fillRect(
-        185,
+        170,
         authorityY + 26,
         2,
-        68
+        72
       )
 
-
-      ctx.textAlign =
-        'left'
-
-      ctx.fillStyle =
-        '#102d58'
-
-      ctx.font =
-        '700 23px Arial, sans-serif'
-
-
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#11355f'
+      ctx.font = '700 28px Arial, sans-serif'
       ctx.fillText(
-        'Noida Authority Sweepers available today :',
-        225,
-        authorityY + 70
+        'Noida Authority Sweepers',
+        205,
+        authorityY + 52
       )
 
-
-      // Count badge
+      ctx.fillStyle = '#536b86'
+      ctx.font = '500 21px Arial, sans-serif'
+      ctx.fillText(
+        'Available today',
+        205,
+        authorityY + 82
+      )
 
       drawRoundedRect(
         ctx,
-        875,
-        authorityY + 18,
-        160,
-        84,
-        17,
-        '#d7f7e4',
-        '#68dfa6',
+        860,
+        authorityY + 22,
+        170,
+        78,
+        20,
+        '#d9f6e4',
+        '#70d8a2',
         1.5
       )
 
-
-      ctx.textAlign =
-        'center'
-
-      ctx.fillStyle =
-        '#079954'
-
-      ctx.font =
-        '700 38px Arial, sans-serif'
-
-
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#079552'
+      ctx.font = '700 42px Arial, sans-serif'
       ctx.fillText(
-        String(
-          authoritySweepers
-        ),
-        955,
-        authorityY + 70
+        String(authoritySweepers),
+        945,
+        authorityY + 61
+      )
+      ctx.textBaseline = 'alphabetic'
+
+      // =====================================================
+      // Powered-by panel
+      // =====================================================
+
+      drawRoundedRect(
+        ctx,
+        pagePadding,
+        poweredY,
+        contentWidth,
+        poweredHeight,
+        22,
+        '#fffaf0',
+        '#eab62c',
+        1.8
       )
 
+      ctx.beginPath()
+      ctx.fillStyle = '#f3aa11'
+      ctx.arc(
+        82,
+        poweredY + 55,
+        26,
+        0,
+        Math.PI * 2
+      )
+      ctx.fill()
+
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '700 24px Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('★', 82, poweredY + 56)
+
+      ctx.fillStyle = '#98a8b8'
+      ctx.fillRect(
+        155,
+        poweredY + 24,
+        2,
+        72
+      )
+
+      ctx.textBaseline = 'alphabetic'
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#14365e'
+      ctx.font = '700 22px Arial, sans-serif'
+      ctx.fillText(
+        'Powered by the RWA Pocket-A in-house App —',
+        192,
+        poweredY + 48
+      )
+
+      ctx.fillStyle = '#3f5872'
+      ctx.font = '500 20px Arial, sans-serif'
+      ctx.fillText(
+        'a step towards smarter, transparent & technology-driven RWA management.',
+        192,
+        poweredY + 80
+      )
 
       // =====================================================
       // Footer
       // =====================================================
 
+      const footerGradient = ctx.createLinearGradient(
+        pagePadding,
+        footerY,
+        pagePadding + contentWidth,
+        footerY
+      )
+      footerGradient.addColorStop(0, '#075596')
+      footerGradient.addColorStop(1, '#0677b7')
+
       drawRoundedRect(
         ctx,
-        15,
+        pagePadding,
         footerY,
-        1050,
+        contentWidth,
         footerHeight,
-        18,
-        '#fffaf0',
-        '#e5b42d',
-        2
+        22,
+        footerGradient
       )
 
-
-      // -----------------------------------------------------
-      // Small gear style icon
-      // -----------------------------------------------------
-
-      ctx.beginPath()
-
-      ctx.fillStyle =
-        '#f3aa11'
-
-      ctx.arc(
-        105,
-        footerY + 68,
-        26,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      ctx.beginPath()
-
-      ctx.fillStyle =
-        '#ffffff'
-
-      ctx.arc(
-        105,
-        footerY + 68,
-        9,
-        0,
-        Math.PI * 2
-      )
-
-      ctx.fill()
-
-
-      // Vertical separator
-
-      ctx.fillStyle =
-        '#94aac0'
-
-      ctx.fillRect(
-        185,
-        footerY + 30,
-        2,
-        75
-      )
-
-
-      // Footer message
-
-      ctx.textAlign =
-        'left'
-
-      ctx.fillStyle =
-        '#17365e'
-
-      ctx.font =
-        '400 19px Arial, sans-serif'
-
-
-      wrapCanvasText(
-        ctx,
-        'Powered by the RWA Pocket-A in-house App — a step towards smarter, transparent & technology-driven RWA management.',
-        225,
-        footerY + 55,
-        785,
-        30
-      )
-
-
-      // Horizontal divider
-
-      ctx.fillStyle =
-        '#9baebe'
-
-      ctx.fillRect(
-        55,
-        footerY + 128,
-        970,
-        1.5
-      )
-
-
-      // Supervisor
-
-      ctx.textAlign =
-        'center'
-
-      ctx.fillStyle =
-        '#2c486c'
-
-      ctx.font =
-        '700 21px Arial, sans-serif'
-
-
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '700 30px Arial, sans-serif'
       ctx.fillText(
-        'Supervisor Pocket-A',
+        'RWA Pocket-A',
         width / 2,
-        footerY + 166
+        footerY + 45
       )
 
+      ctx.fillStyle = '#d8eefc'
+      ctx.font = '500 18px Arial, sans-serif'
+      ctx.fillText(
+        'T O G E T H E R   F O R   A   B E T T E R   C O M M U N I T Y',
+        width / 2,
+        footerY + 78
+      )
 
       // =====================================================
       // Canvas → PNG
       // =====================================================
 
-      const blob =
-        await new Promise(
-          (
-            resolve,
-            reject
-          ) => {
+      // Use toDataURL -> Blob instead of canvas.toBlob().
+      // Some mobile/PWA browsers can leave toBlob callbacks pending,
+      // which makes the button stay on "Generating PNG..." forever.
+      const dataUrl = canvas.toDataURL(
+        'image/png',
+        1
+      )
 
-            canvas.toBlob(
-              (result) => {
+      const base64Data =
+        dataUrl.split(',')[1]
 
-                if (
-                  result
-                ) {
-                  resolve(
-                    result
-                  )
-                } else {
-                  reject(
-                    new Error(
-                      'Unable to generate PNG report.'
-                    )
-                  )
-                }
+      if (!base64Data) {
+        throw new Error(
+          'Unable to generate PNG report.'
+        )
+      }
 
-              },
-              'image/png',
-              1
-            )
-          }
+      const binary =
+        atob(base64Data)
+
+      const bytes =
+        new Uint8Array(
+          binary.length
         )
 
+      for (
+        let i = 0;
+        i < binary.length;
+        i += 1
+      ) {
+        bytes[i] =
+          binary.charCodeAt(i)
+      }
 
-      return blob
+      return new Blob(
+        [bytes],
+        {
+          type: 'image/png'
+        }
+      )
     }
 
 
@@ -1721,123 +1687,144 @@ function Attendance({
             [blob],
             fileName,
             {
-              type:
-                'image/png'
+              type: 'image/png'
             }
           )
 
 
-        const shareData = {
-          title:
-            'RWA Pocket-A Staff Daily Attendance',
-
-          text:
-            `RWA Pocket-A - Staff Daily Attendance - ${getDisplayDate()}`,
-
-          files: [
-            file
-          ]
-        }
+        // PNG is ready now. Do not keep the UI stuck on
+        // "Generating PNG..." while the native share sheet is open.
+        setSharing(false)
 
 
-        let canShareFiles =
-          false
+        const downloadPng = () => {
 
-
-        try {
-
-          canShareFiles =
-            Boolean(
-              navigator.share &&
-              (
-                !navigator.canShare ||
-                navigator.canShare(
-                  shareData
-                )
-              )
+          const downloadUrl =
+            URL.createObjectURL(
+              blob
             )
 
-        } catch {
 
-          canShareFiles =
-            false
+          const link =
+            document.createElement(
+              'a'
+            )
+
+          link.href =
+            downloadUrl
+
+          link.download =
+            fileName
+
+
+          document.body.appendChild(
+            link
+          )
+
+          link.click()
+
+          document.body.removeChild(
+            link
+          )
+
+
+          // Do not revoke immediately. Some mobile/desktop browsers
+          // need a little time to start the actual file download.
+          window.setTimeout(
+            () => {
+              URL.revokeObjectURL(
+                downloadUrl
+              )
+            },
+            30000
+          )
         }
+
+
+        const isMobileDevice =
+          /Android|iPhone|iPad|iPod/i.test(
+            navigator.userAgent
+          )
 
 
         // -----------------------------------------------------
-        // Mobile share sheet
+        // Mobile: use native share sheet when file sharing works
         // -----------------------------------------------------
 
         if (
-          canShareFiles
+          isMobileDevice &&
+          navigator.share
         ) {
 
-          try {
+          const shareData = {
+            title:
+              'RWA Pocket-A Staff Daily Attendance',
 
-            await navigator.share(
-              shareData
-            )
+            text:
+              `RWA Pocket-A - Staff Daily Attendance - ${getDisplayDate()}`,
 
-            return
+            files: [
+              file
+            ]
+          }
 
-          } catch (
-            shareError
+
+          let canShareFiles =
+            true
+
+
+          if (
+            navigator.canShare
           ) {
-
-            if (
-              shareError?.name ===
-              'AbortError'
-            ) {
-              return
+            try {
+              canShareFiles =
+                navigator.canShare({
+                  files: [file]
+                })
+            } catch {
+              canShareFiles =
+                false
             }
+          }
 
-            console.error(
+
+          if (
+            canShareFiles
+          ) {
+            try {
+              await navigator.share(
+                shareData
+              )
+
+              return
+            } catch (
               shareError
-            )
+            ) {
+
+              if (
+                shareError?.name ===
+                'AbortError'
+              ) {
+                return
+              }
+
+              console.error(
+                'Native share failed:',
+                shareError
+              )
+            }
           }
         }
 
 
         // -----------------------------------------------------
-        // Desktop fallback
+        // Desktop / unsupported mobile share: download PNG
         // -----------------------------------------------------
 
-        const downloadUrl =
-          URL.createObjectURL(
-            blob
-          )
-
-
-        const link =
-          document.createElement(
-            'a'
-          )
-
-        link.href =
-          downloadUrl
-
-        link.download =
-          fileName
-
-
-        document.body.appendChild(
-          link
-        )
-
-        link.click()
-
-        document.body.removeChild(
-          link
-        )
-
-
-        URL.revokeObjectURL(
-          downloadUrl
-        )
-
+        downloadPng()
 
         alert(
-          'Attendance PNG downloaded. Attach this image in WhatsApp.'
+          'Attendance PNG generated successfully. The image has been downloaded.'
         )
 
 
@@ -1846,6 +1833,7 @@ function Attendance({
       ) {
 
         console.error(
+          'Attendance PNG error:',
           shareError
         )
 
@@ -2228,12 +2216,22 @@ function Attendance({
             dirty ||
             sharing
           }
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
         >
 
-          {sharing
-            ? 'Generating PNG...'
-            : '🟢 Share Attendance PNG'
-          }
+          {sharing ? (
+            'Generating PNG...'
+          ) : (
+            <>
+              <WhatsAppIcon size={22} />
+              <span>Share Attendance PNG</span>
+            </>
+          )}
 
         </button>
 
