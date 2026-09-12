@@ -14,7 +14,8 @@ import './Rwbot.css'
 function RwbotHome({
   profile,
   onLogout,
-  onAsk
+  onAsk,
+  onManageDocuments
 }) {
   const flat = Array.isArray(profile.flat)
     ? profile.flat[0]
@@ -132,7 +133,10 @@ function RwbotHome({
           </button>
 
           {isRwaMember && (
-            <div className="rwbot-action-card">
+            <button
+              className="rwbot-action-card rwbot-action-button"
+              onClick={onManageDocuments}
+            >
 
               <div className="rwbot-action-icon">
                 <FileText size={28} />
@@ -156,7 +160,12 @@ function RwbotHome({
 
               </div>
 
-            </div>
+              <ArrowRight
+                className="rwbot-action-arrow"
+                size={20}
+              />
+
+            </button>
           )}
 
         </section>
@@ -168,28 +177,28 @@ function RwbotHome({
           </h3>
 
           <button
-            onClick={() => onAsk()}
+            onClick={onAsk}
             className="rwbot-question"
           >
             How much was spent on civil work?
           </button>
 
           <button
-            onClick={() => onAsk()}
+            onClick={onAsk}
             className="rwbot-question"
           >
             What was the total collection in January 2026?
           </button>
 
           <button
-            onClick={() => onAsk()}
+            onClick={onAsk}
             className="rwbot-question"
           >
             Summarize the August 2026 GBM.
           </button>
 
           <button
-            onClick={() => onAsk()}
+            onClick={onAsk}
             className="rwbot-question"
           >
             What was decided about parking?
