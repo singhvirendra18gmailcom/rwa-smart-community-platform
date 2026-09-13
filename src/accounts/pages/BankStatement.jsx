@@ -3,20 +3,27 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Link2,
+  PlusCircle,
   RefreshCw,
   Search,
   Upload,
+  X
 } from 'lucide-react'
 import {
   clearBankTransactionsForMonth,
   getBankStatements,
   getBankTransactions,
+  getFlatsWithResidents,
+  getIncomeHeads,
   getMonthExpenses,
   getMonthIncome,
+  getSettings,
   ignoreBankTransaction,
   matchBankTransaction,
+  nextReceiptNo,
   saveBankStatement,
   saveBankTransactions,
+  saveIncomeEntry,
   unmatchBankTransaction,
   uploadAccountsDocument
 } from '../api'
@@ -30,6 +37,7 @@ import {
 } from '../utils'
 import {
   EmptyState,
+  Field,
   LoadingBlock,
   Message,
   PageHeader,
@@ -50,32 +58,62 @@ function isBankEntryMatched(bankTransactions, entryId) {
   return bankTransactions.some((x) => x.reconciliation_status === 'MATCHED' && x.matched_entry_id === entryId)
 }
 
+function emptyCreateIncomeForm() {
+  return {
+    receipt_no: '',
+    income_head_id: '',
+    income_head_name: '',
+    flat_id: '',
+    flat_no: '',
+    resident_name: '',
+    received_from: '',
+    payment_mode: 'UPI',
+    cheque_no: '',
+    reference_no: '',
+    maintenance_from: '',
+    maintenance_to: '',
+    remarks: ''
+  }
+}
+
 export default function BankStatement({ month, setMonth }) {
   const [statements, setStatements] = useState([])
   const [bankRows, setBankRows] = useState([])
   const [income, setIncome] = useState([])
   const [expenses, setExpenses] = useState([])
+  const [incomeHeads, setIncomeHeads] = useState([])
+  const [flats, setFlats] = useState([])
+  const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [creatingIncome, setCreatingIncome] = useState(false)
   const [message, setMessage] = useState(null)
   const [file, setFile] = useState(null)
   const [incomeSearch, setIncomeSearch] = useState('')
   const [expenseSearch, setExpenseSearch] = useState('')
   const [manualSelections, setManualSelections] = useState({})
+  const [createIncomeRow, setCreateIncomeRow] = useState(null)
+  const [createIncomeForm, setCreateIncomeForm] = useState(emptyCreateIncomeForm())
 
   async function refresh() {
     setLoading(true)
     try {
-      const [s, b, i, e] = await Promise.all([
+      const [s, b, i, e, h, f, cfg] = await Promise.all([
         getBankStatements(month),
         getBankTransactions(month),
         getMonthIncome(month),
-        getMonthExpenses(month)
+        getMonthExpenses(month),
+        getIncomeHeads(),
+        getFlatsWithResidents(),
+        getSettings()
       ])
       setStatements(s)
       setBankRows(b)
       setIncome(i)
       setExpenses(e)
+      setIncomeHeads(h)
+      setFlats(f)
+      setSettings(cfg)
     } catch (e) {
       setMessage({ type: 'error', text: e.message || 'Unable to load bank reconciliation.' })
     } finally {
@@ -83,7 +121,11 @@ export default function BankStatement({ month, setMonth }) {
     }
   }
 
-  useEffect(() => { refresh() }, [month])
+  useEffect(() => {
+    setCreateIncomeRow(null)
+    setCreateIncomeForm(emptyCreateIncomeForm())
+    refresh()
+  }, [month])
 
   const credits = useMemo(() => bankRows.filter((x) => Number(x.credit || 0) > 0), [bankRows])
   const debits = useMemo(() => bankRows.filter((x) => Number(x.debit || 0) > 0), [bankRows])
@@ -112,7 +154,6 @@ export default function BankStatement({ month, setMonth }) {
       try {
         filePath = await uploadAccountsDocument(file, path)
       } catch (storageError) {
-        // Import can still proceed even if bucket policy/setup has not been applied yet.
         filePath = null
       }
 
@@ -134,7 +175,6 @@ export default function BankStatement({ month, setMonth }) {
           statement_month: monthStartFromKey(month)
         })))
 
-        // Safely auto-match only when a strong bank reference / UTR / cheque number agrees.
         const usedIncome = new Set()
         const usedExpense = new Set()
         for (const bankRow of inserted) {
@@ -196,6 +236,100 @@ export default function BankStatement({ month, setMonth }) {
     }
   }
 
+  async function startCreateIncome(row) {
+    try {
+      const receipt = await nextReceiptNo(row.transaction_date, settings?.receipt_prefix || 'RCP')
+      setCreateIncomeRow(row)
+      setCreateIncomeForm({
+        ...emptyCreateIncomeForm(),
+        receipt_no: receipt,
+        received_from: row.description || '',
+        reference_no: row.reference_no || '',
+        remarks: `Created from bank reconciliation${row.description ? `. Bank narration: ${row.description}` : ''}`
+      })
+      setMessage(null)
+      setTimeout(() => document.getElementById('create-bank-income')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    } catch (e) {
+      setMessage({ type: 'error', text: e.message || 'Unable to prepare income entry.' })
+    }
+  }
+
+  function onCreateIncomeHeadChange(id) {
+    const head = incomeHeads.find((x) => x.id === id)
+    setCreateIncomeForm((old) => ({
+      ...old,
+      income_head_id: id,
+      income_head_name: head?.name || '',
+      maintenance_from: head?.name?.toLowerCase().includes('maintenance') ? old.maintenance_from : '',
+      maintenance_to: head?.name?.toLowerCase().includes('maintenance') ? old.maintenance_to : ''
+    }))
+  }
+
+  function onCreateIncomeFlatChange(id) {
+    const flat = flats.find((x) => x.id === id)
+    setCreateIncomeForm((old) => ({
+      ...old,
+      flat_id: id,
+      flat_no: flat?.flat_no || '',
+      resident_name: flat?.resident_name || '',
+      received_from: flat?.resident_name || old.received_from
+    }))
+  }
+
+  async function createIncomeFromBank(e) {
+    e.preventDefault()
+    if (!createIncomeRow) return
+
+    const maintenanceSelected = createIncomeForm.income_head_name.toLowerCase().includes('maintenance')
+    if (!createIncomeForm.income_head_id || !createIncomeForm.receipt_no || !createIncomeForm.received_from.trim()) {
+      setMessage({ type: 'error', text: 'Select the Income Head and confirm Received From before creating the income entry.' })
+      return
+    }
+    if (maintenanceSelected && (!createIncomeForm.maintenance_from || !createIncomeForm.maintenance_to)) {
+      setMessage({ type: 'error', text: 'Maintenance From and Maintenance To are required for maintenance income.' })
+      return
+    }
+    if (createIncomeForm.payment_mode === 'CHEQUE' && !createIncomeForm.cheque_no.trim()) {
+      setMessage({ type: 'error', text: 'Cheque number is required when payment mode is Cheque.' })
+      return
+    }
+
+    setCreatingIncome(true)
+    try {
+      const payload = {
+        receipt_date: createIncomeRow.transaction_date,
+        receipt_no: createIncomeForm.receipt_no,
+        income_head_id: createIncomeForm.income_head_id,
+        income_head_name: createIncomeForm.income_head_name,
+        flat_id: createIncomeForm.flat_id || null,
+        flat_no: createIncomeForm.flat_no || null,
+        resident_name: createIncomeForm.resident_name || null,
+        received_from: createIncomeForm.received_from.trim(),
+        payment_date: createIncomeRow.transaction_date,
+        maintenance_from: createIncomeForm.maintenance_from ? `${createIncomeForm.maintenance_from}-01` : null,
+        maintenance_to: createIncomeForm.maintenance_to ? `${createIncomeForm.maintenance_to}-01` : null,
+        payment_mode: createIncomeForm.payment_mode,
+        cheque_no: createIncomeForm.payment_mode === 'CHEQUE' ? createIncomeForm.cheque_no.trim() : null,
+        reference_no: createIncomeForm.reference_no.trim() || createIncomeRow.reference_no || null,
+        amount: Number(createIncomeRow.credit || 0),
+        remarks: createIncomeForm.remarks.trim() || 'Created from bank reconciliation',
+        attachment_url: null,
+        status: 'POSTED'
+      }
+
+      const newEntry = await saveIncomeEntry(payload)
+      await matchBankTransaction(createIncomeRow.id, newEntry.id, 'INCOME', 'CREATED_FROM_BANK')
+      setCreateIncomeRow(null)
+      setCreateIncomeForm(emptyCreateIncomeForm())
+      setMessage({ type: 'success', text: `Income entry ${newEntry.receipt_no} created and matched with the bank credit. It is now included in monthly income.` })
+      await refresh()
+    } catch (e2) {
+      setMessage({ type: 'error', text: e2.message || 'Unable to create income entry from bank transaction.' })
+    } finally {
+      setCreatingIncome(false)
+    }
+  }
+
   const filteredCredits = credits.filter((x) => {
     const q = incomeSearch.trim().toLowerCase()
     return !q || [x.description, x.reference_no, x.transaction_date].some((v) => String(v || '').toLowerCase().includes(q))
@@ -237,6 +371,7 @@ export default function BankStatement({ month, setMonth }) {
                   {availableEntries.map((entry) => <option key={entry.id} value={entry.id}>{candidateLabel(entry, type)}</option>)}
                 </select>
                 <button className="acc-mini-button primary" disabled={!manualSelections[row.id]} onClick={() => confirmMatch(row, type, manualSelections[row.id])}><Link2 size={14} /> Match</button>
+                {type === 'INCOME' ? <button className="acc-mini-button success" onClick={() => startCreateIncome(row)}><PlusCircle size={14} /> Create Income Entry</button> : null}
                 <button className="acc-mini-button secondary" onClick={() => ignore(row)}>Ignore</button>
               </div>
             )}
@@ -245,6 +380,8 @@ export default function BankStatement({ month, setMonth }) {
       )
     })
   }
+
+  const maintenanceSelected = createIncomeForm.income_head_name.toLowerCase().includes('maintenance')
 
   return (
     <>
@@ -284,7 +421,7 @@ export default function BankStatement({ month, setMonth }) {
           <Section
             className="acc-recon-income"
             title="Online Income Reconciliation (Bank Credits)"
-            subtitle="Bank credits are matched only with Income entries paid by Cheque or UPI"
+            subtitle="Match an existing Income entry, or create a missed Income entry directly from an unmatched bank credit"
             actions={<div className="acc-search"><Search size={16} /><input value={incomeSearch} onChange={(e) => setIncomeSearch(e.target.value)} placeholder="Search credit..." /></div>}
           >
             {filteredCredits.length ? (
@@ -296,6 +433,75 @@ export default function BankStatement({ month, setMonth }) {
               </div>
             ) : <EmptyState>No bank credits imported for {monthLabel(month)}.</EmptyState>}
           </Section>
+
+          {createIncomeRow ? (
+            <div id="create-bank-income">
+              <Section
+                className="income-panel"
+                title="Create Missed Income Entry"
+                subtitle={`Create an Income entry from bank credit ${formatCurrency(createIncomeRow.credit)} dated ${formatDate(createIncomeRow.transaction_date)}. It will be matched automatically after saving.`}
+                actions={<button className="acc-mini-button secondary" onClick={() => { setCreateIncomeRow(null); setCreateIncomeForm(emptyCreateIncomeForm()) }}><X size={14} /> Cancel</button>}
+              >
+                <form className="acc-form-grid" onSubmit={createIncomeFromBank}>
+                  <Field label="Receipt Date">
+                    <input type="date" value={createIncomeRow.transaction_date} disabled />
+                  </Field>
+                  <Field label="Receipt No." required>
+                    <input value={createIncomeForm.receipt_no} onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, receipt_no: e.target.value })} />
+                  </Field>
+                  <Field label="Income Source / Head" required>
+                    <select value={createIncomeForm.income_head_id} onChange={(e) => onCreateIncomeHeadChange(e.target.value)}>
+                      <option value="">Select income head</option>
+                      {incomeHeads.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Flat No.">
+                    <select value={createIncomeForm.flat_id} onChange={(e) => onCreateIncomeFlatChange(e.target.value)}>
+                      <option value="">Not linked to a flat</option>
+                      {flats.map((x) => <option key={x.id} value={x.id}>{x.flat_no}{x.resident_name ? ` - ${x.resident_name}` : ''}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Received From" required>
+                    <input value={createIncomeForm.received_from} placeholder="Resident / company / individual" onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, received_from: e.target.value })} />
+                  </Field>
+                  <Field label="Payment Mode" required>
+                    <select value={createIncomeForm.payment_mode} onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, payment_mode: e.target.value, cheque_no: '' })}>
+                      <option value="UPI">Bank / UPI</option>
+                      <option value="CHEQUE">Cheque</option>
+                    </select>
+                  </Field>
+                  {createIncomeForm.payment_mode === 'CHEQUE' ? (
+                    <Field label="Cheque No." required>
+                      <input value={createIncomeForm.cheque_no} onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, cheque_no: e.target.value })} />
+                    </Field>
+                  ) : null}
+                  <Field label="Bank Reference">
+                    <input value={createIncomeForm.reference_no} placeholder="UTR / Transaction reference" onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, reference_no: e.target.value })} />
+                  </Field>
+                  <Field label="Amount">
+                    <input value={Number(createIncomeRow.credit || 0).toFixed(2)} disabled />
+                  </Field>
+                  {maintenanceSelected ? (
+                    <>
+                      <Field label="Maintenance From" required>
+                        <input type="month" value={createIncomeForm.maintenance_from} onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, maintenance_from: e.target.value })} />
+                      </Field>
+                      <Field label="Maintenance To" required>
+                        <input type="month" value={createIncomeForm.maintenance_to} onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, maintenance_to: e.target.value })} />
+                      </Field>
+                    </>
+                  ) : null}
+                  <Field label="Remarks" className="span-2">
+                    <input value={createIncomeForm.remarks} onChange={(e) => setCreateIncomeForm({ ...createIncomeForm, remarks: e.target.value })} />
+                  </Field>
+                  <div className="acc-form-actions span-full">
+                    <button type="button" className="acc-button secondary" onClick={() => { setCreateIncomeRow(null); setCreateIncomeForm(emptyCreateIncomeForm()) }} disabled={creatingIncome}>Cancel</button>
+                    <button type="submit" className="acc-button success" disabled={creatingIncome}><PlusCircle size={17} /> {creatingIncome ? 'Creating...' : 'Create & Match Income'}</button>
+                  </div>
+                </form>
+              </Section>
+            </div>
+          ) : null}
 
           <Section
             className="acc-recon-expense"
