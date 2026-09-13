@@ -9,6 +9,7 @@ import {
 import {
   getDayIncome,
   getFlatsWithResidents,
+  getIncomeByDateRange,
   getIncomeHeads,
   getMonthClosing,
   getMonthIncome,
@@ -58,13 +59,27 @@ const emptyForm = (date = toISODate()) => ({
   attachment_url: ''
 })
 
+function monthBounds(date) {
+  const d = new Date(`${date}T00:00:00`)
+  const year = d.getFullYear()
+  const month = d.getMonth()
+  const start = new Date(year, month, 1)
+  const end = new Date(year, month + 1, 0)
+  const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  return { start: iso(start), end: iso(end) }
+}
+
 export default function IncomeEntry({ appMonth, setAppMonth }) {
   const today = toISODate()
+  const initialRange = monthBounds(today)
   const [entryDate, setEntryDate] = useState(today)
+  const [rangeFrom, setRangeFrom] = useState(initialRange.start)
+  const [rangeTo, setRangeTo] = useState(initialRange.end)
   const [form, setForm] = useState(emptyForm(today))
   const [heads, setHeads] = useState([])
   const [flats, setFlats] = useState([])
   const [dayRows, setDayRows] = useState([])
+  const [rangeRows, setRangeRows] = useState([])
   const [monthRows, setMonthRows] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -76,14 +91,19 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
 
   const selectedMonth = monthKey(new Date(`${entryDate}T00:00:00`))
 
-  async function refresh(date = entryDate) {
+  async function refresh(date = entryDate, fromDate = rangeFrom, toDate = rangeTo) {
     setLoading(true)
     try {
       const m = monthKey(new Date(`${date}T00:00:00`))
-      const [h, f, day, month, cfg, closing] = await Promise.all([
+      const rangePromise = fromDate && toDate && fromDate <= toDate
+        ? getIncomeByDateRange(fromDate, toDate)
+        : Promise.resolve([])
+
+      const [h, f, day, range, month, cfg, closing] = await Promise.all([
         getIncomeHeads(),
         getFlatsWithResidents(),
         getDayIncome(date),
+        rangePromise,
         getMonthIncome(m),
         getSettings(),
         getMonthClosing(m)
@@ -91,6 +111,7 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
       setHeads(h)
       setFlats(f)
       setDayRows(day)
+      setRangeRows(range)
       setMonthRows(month)
       setSettings(cfg)
       setClosed(Boolean(closing?.is_closed))
@@ -102,7 +123,7 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
     }
   }
 
-  useEffect(() => { refresh(entryDate) }, [entryDate])
+  useEffect(() => { refresh(entryDate, rangeFrom, rangeTo) }, [entryDate, rangeFrom, rangeTo])
 
   useEffect(() => {
     if (!form.receipt_no && settings && settings.enable_receipt_numbering !== false && !form.id) {
@@ -117,10 +138,15 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return dayRows
-    return dayRows.filter((x) => [x.receipt_no, x.flat_no, x.resident_name, x.received_from, x.income_head_name]
+    if (!q) return rangeRows
+    return rangeRows.filter((x) => [x.receipt_no, x.flat_no, x.resident_name, x.received_from, x.income_head_name]
       .some((v) => String(v || '').toLowerCase().includes(q)))
-  }, [dayRows, search])
+  }, [rangeRows, search])
+
+  const filteredTotal = useMemo(
+    () => filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [filteredRows]
+  )
 
   const maintenanceSelected = form.income_head_name.toLowerCase().includes('maintenance')
 
@@ -204,7 +230,7 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
       setMessage({ type: 'success', text: form.id ? 'Income entry updated.' : 'Income entry saved successfully.' })
       setEntryDate(savedDate)
       await resetForm(savedDate)
-      await refresh(savedDate)
+      await refresh(savedDate, rangeFrom, rangeTo)
     } catch (e2) {
       setMessage({ type: 'error', text: e2.message || 'Unable to save income entry.' })
     } finally {
@@ -213,6 +239,7 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
   }
 
   function editRow(row) {
+    setEntryDate(row.receipt_date)
     setForm({
       ...emptyForm(row.receipt_date),
       ...row,
@@ -233,7 +260,7 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
     try {
       await voidIncomeEntry(row.id)
       setMessage({ type: 'success', text: `${row.receipt_no} has been voided.` })
-      await refresh(entryDate)
+      await refresh(entryDate, rangeFrom, rangeTo)
     } catch (e) {
       setMessage({ type: 'error', text: e.message || 'Unable to void income entry.' })
     }
@@ -340,20 +367,31 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
       </Section>
 
       <Section
-        title={`Income Entries - ${formatDate(entryDate)}`}
-        subtitle={`${filteredRows.length} entry/entries shown`}
+        title="Income Entries"
+        subtitle={`${filteredRows.length} entry/entries shown from ${formatDate(rangeFrom)} to ${formatDate(rangeTo)}`}
         actions={(
-          <div className="acc-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search receipt, flat or name" /></div>
+          <>
+            <label className="acc-date-picker">
+              <span>From Date</span>
+              <input type="date" value={rangeFrom} max={rangeTo} onChange={(e) => setRangeFrom(e.target.value)} />
+            </label>
+            <label className="acc-date-picker">
+              <span>To Date</span>
+              <input type="date" value={rangeTo} min={rangeFrom} onChange={(e) => setRangeTo(e.target.value)} />
+            </label>
+            <div className="acc-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search receipt, flat or name" /></div>
+          </>
         )}
       >
         {loading ? <LoadingBlock /> : filteredRows.length ? (
           <div className="acc-table-wrap">
             <table className="acc-table">
-              <thead><tr><th>#</th><th>Receipt No.</th><th>Flat</th><th>Resident / Received From</th><th>Income Head</th><th>Mode</th><th>Type</th><th className="num">Amount</th><th>Action</th></tr></thead>
+              <thead><tr><th>#</th><th>Date</th><th>Receipt No.</th><th>Flat</th><th>Resident / Received From</th><th>Income Head</th><th>Mode</th><th>Type</th><th className="num">Amount</th><th>Action</th></tr></thead>
               <tbody>
                 {filteredRows.map((row, index) => (
                   <tr key={row.id}>
                     <td>{index + 1}</td>
+                    <td>{formatDate(row.receipt_date)}</td>
                     <td><strong>{row.receipt_no}</strong></td>
                     <td>{row.flat_no || '—'}</td>
                     <td>{row.resident_name || row.received_from || '—'}</td>
@@ -363,17 +401,17 @@ export default function IncomeEntry({ appMonth, setAppMonth }) {
                     <td className="num"><strong>{formatCurrency(row.amount)}</strong></td>
                     <td>
                       <div className="acc-row-actions">
-                        <button title="Edit" disabled={closed || settings?.allow_editing_entries === false} onClick={() => editRow(row)}><Pencil size={15} /></button>
-                        <button title="Void" className="danger" disabled={closed || settings?.allow_editing_entries === false} onClick={() => removeRow(row)}><Trash2 size={15} /></button>
+                        <button title="Edit" disabled={settings?.allow_editing_entries === false} onClick={() => editRow(row)}><Pencil size={15} /></button>
+                        <button title="Void" className="danger" disabled={settings?.allow_editing_entries === false} onClick={() => removeRow(row)}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr><td colSpan="7">Total</td><td className="num">{formatCurrency(daySplit.total)}</td><td /></tr></tfoot>
+              <tfoot><tr><td colSpan="8">Displayed Total</td><td className="num">{formatCurrency(filteredTotal)}</td><td /></tr></tfoot>
             </table>
           </div>
-        ) : <EmptyState>No income recorded for this date.</EmptyState>}
+        ) : <EmptyState>No income recorded for the selected date range.</EmptyState>}
       </Section>
     </>
   )
