@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../supabase'
 import './Accounts.css'
+import './pages/FlatMaster.css'
 import Dashboard from './pages/Dashboard'
 import IncomeEntry from './pages/IncomeEntry'
 import ExpenseEntry from './pages/ExpenseEntry'
