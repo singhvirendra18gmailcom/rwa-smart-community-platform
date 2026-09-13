@@ -9,6 +9,7 @@ import {
 import {
   getDayExpenses,
   getExpenseHeads,
+  getExpensesByDateRange,
   getMonthClosing,
   getMonthExpenses,
   getSettings,
@@ -52,12 +53,26 @@ const emptyForm = (date = toISODate()) => ({
   attachment_url: ''
 })
 
+function monthBounds(date) {
+  const d = new Date(`${date}T00:00:00`)
+  const year = d.getFullYear()
+  const month = d.getMonth()
+  const start = new Date(year, month, 1)
+  const end = new Date(year, month + 1, 0)
+  const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  return { start: iso(start), end: iso(end) }
+}
+
 export default function ExpenseEntry({ setAppMonth }) {
   const today = toISODate()
+  const initialRange = monthBounds(today)
   const [entryDate, setEntryDate] = useState(today)
+  const [rangeFrom, setRangeFrom] = useState(initialRange.start)
+  const [rangeTo, setRangeTo] = useState(initialRange.end)
   const [form, setForm] = useState(emptyForm(today))
   const [heads, setHeads] = useState([])
   const [dayRows, setDayRows] = useState([])
+  const [rangeRows, setRangeRows] = useState([])
   const [monthRows, setMonthRows] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -69,19 +84,25 @@ export default function ExpenseEntry({ setAppMonth }) {
 
   const selectedMonth = monthKey(new Date(`${entryDate}T00:00:00`))
 
-  async function refresh(date = entryDate) {
+  async function refresh(date = entryDate, fromDate = rangeFrom, toDate = rangeTo) {
     setLoading(true)
     try {
       const m = monthKey(new Date(`${date}T00:00:00`))
-      const [h, day, month, cfg, closing] = await Promise.all([
+      const rangePromise = fromDate && toDate && fromDate <= toDate
+        ? getExpensesByDateRange(fromDate, toDate)
+        : Promise.resolve([])
+
+      const [h, day, range, month, cfg, closing] = await Promise.all([
         getExpenseHeads(),
         getDayExpenses(date),
+        rangePromise,
         getMonthExpenses(m),
         getSettings(),
         getMonthClosing(m)
       ])
       setHeads(h)
       setDayRows(day)
+      setRangeRows(range)
       setMonthRows(month)
       setSettings(cfg)
       setClosed(Boolean(closing?.is_closed))
@@ -93,7 +114,7 @@ export default function ExpenseEntry({ setAppMonth }) {
     }
   }
 
-  useEffect(() => { refresh(entryDate) }, [entryDate])
+  useEffect(() => { refresh(entryDate, rangeFrom, rangeTo) }, [entryDate, rangeFrom, rangeTo])
 
   useEffect(() => {
     if (!form.voucher_no && settings && settings.enable_voucher_numbering !== false && !form.id) {
@@ -108,10 +129,15 @@ export default function ExpenseEntry({ setAppMonth }) {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return dayRows
-    return dayRows.filter((x) => [x.voucher_no, x.paid_to, x.expense_head_name, x.description]
+    if (!q) return rangeRows
+    return rangeRows.filter((x) => [x.voucher_no, x.paid_to, x.expense_head_name, x.description]
       .some((v) => String(v || '').toLowerCase().includes(q)))
-  }, [dayRows, search])
+  }, [rangeRows, search])
+
+  const filteredTotal = useMemo(
+    () => filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [filteredRows]
+  )
 
   function onHeadChange(id) {
     const head = heads.find((x) => x.id === id)
@@ -168,7 +194,7 @@ export default function ExpenseEntry({ setAppMonth }) {
       setMessage({ type: 'success', text: form.id ? 'Expense entry updated.' : 'Expense entry saved successfully.' })
       setEntryDate(savedDate)
       await resetForm(savedDate)
-      await refresh(savedDate)
+      await refresh(savedDate, rangeFrom, rangeTo)
     } catch (e2) {
       setMessage({ type: 'error', text: e2.message || 'Unable to save expense entry.' })
     } finally {
@@ -177,6 +203,7 @@ export default function ExpenseEntry({ setAppMonth }) {
   }
 
   function editRow(row) {
+    setEntryDate(row.expense_date)
     setForm({
       ...emptyForm(row.expense_date),
       ...row,
@@ -196,7 +223,7 @@ export default function ExpenseEntry({ setAppMonth }) {
     try {
       await voidExpenseEntry(row.id)
       setMessage({ type: 'success', text: `${row.voucher_no} has been voided.` })
-      await refresh(entryDate)
+      await refresh(entryDate, rangeFrom, rangeTo)
     } catch (e) {
       setMessage({ type: 'error', text: e.message || 'Unable to void expense entry.' })
     }
@@ -285,20 +312,31 @@ export default function ExpenseEntry({ setAppMonth }) {
       </Section>
 
       <Section
-        title={`Expense Entries - ${formatDate(entryDate)}`}
-        subtitle={`${filteredRows.length} entry/entries shown`}
+        title="Expense Entries"
+        subtitle={`${filteredRows.length} entry/entries shown from ${formatDate(rangeFrom)} to ${formatDate(rangeTo)}`}
         actions={(
-          <div className="acc-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search voucher, paid to or head" /></div>
+          <>
+            <label className="acc-date-picker">
+              <span>From Date</span>
+              <input type="date" value={rangeFrom} max={rangeTo} onChange={(e) => setRangeFrom(e.target.value)} />
+            </label>
+            <label className="acc-date-picker">
+              <span>To Date</span>
+              <input type="date" value={rangeTo} min={rangeFrom} onChange={(e) => setRangeTo(e.target.value)} />
+            </label>
+            <div className="acc-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search voucher, paid to or head" /></div>
+          </>
         )}
       >
         {loading ? <LoadingBlock /> : filteredRows.length ? (
           <div className="acc-table-wrap">
             <table className="acc-table">
-              <thead><tr><th>#</th><th>Voucher No.</th><th>Paid To</th><th>Head</th><th>Description</th><th>Mode</th><th>Type</th><th className="num">Amount</th><th>Action</th></tr></thead>
+              <thead><tr><th>#</th><th>Date</th><th>Voucher No.</th><th>Paid To</th><th>Head</th><th>Description</th><th>Mode</th><th>Type</th><th className="num">Amount</th><th>Action</th></tr></thead>
               <tbody>
                 {filteredRows.map((row, index) => (
                   <tr key={row.id}>
                     <td>{index + 1}</td>
+                    <td>{formatDate(row.expense_date)}</td>
                     <td><strong>{row.voucher_no}</strong></td>
                     <td>{row.paid_to}</td>
                     <td>{row.expense_head_name || '—'}{!row.expense_head_id ? <><br /><small><strong>⚠ Unmapped</strong></small></> : null}</td>
@@ -308,17 +346,17 @@ export default function ExpenseEntry({ setAppMonth }) {
                     <td className="num"><strong>{formatCurrency(row.amount)}</strong></td>
                     <td>
                       <div className="acc-row-actions">
-                        <button title="Edit" disabled={closed || settings?.allow_editing_entries === false} onClick={() => editRow(row)}><Pencil size={15} /></button>
-                        <button title="Void" className="danger" disabled={closed || settings?.allow_editing_entries === false} onClick={() => removeRow(row)}><Trash2 size={15} /></button>
+                        <button title="Edit" disabled={settings?.allow_editing_entries === false} onClick={() => editRow(row)}><Pencil size={15} /></button>
+                        <button title="Void" className="danger" disabled={settings?.allow_editing_entries === false} onClick={() => removeRow(row)}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr><td colSpan="7">Total</td><td className="num">{formatCurrency(daySplit.total)}</td><td /></tr></tfoot>
+              <tfoot><tr><td colSpan="8">Displayed Total</td><td className="num">{formatCurrency(filteredTotal)}</td><td /></tr></tfoot>
             </table>
           </div>
-        ) : <EmptyState>No expense recorded for this date.</EmptyState>}
+        ) : <EmptyState>No expense recorded for the selected date range.</EmptyState>}
       </Section>
     </>
   )
