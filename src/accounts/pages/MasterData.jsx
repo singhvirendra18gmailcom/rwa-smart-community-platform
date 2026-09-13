@@ -10,13 +10,20 @@ import {
 import {
   getBankAccounts,
   getExpenseHeads,
-  getFlatsWithResidents,
   getIncomeHeads,
   saveBankAccount,
   saveExpenseHead,
   saveIncomeHead
 } from '../api'
+import { deriveFlatDetails, getFlatMaster, saveFlat } from '../flatMasterApi'
 import { EmptyState, Field, LoadingBlock, Message, PageHeader, Section, StatusBadge } from '../components/Common'
+
+const emptyFlatForm = () => ({
+  id: null,
+  flat_no: '',
+  owner_name: '',
+  active: true
+})
 
 export default function MasterData() {
   const [tab, setTab] = useState('income')
@@ -29,6 +36,8 @@ export default function MasterData() {
   const [search, setSearch] = useState('')
   const [headForm, setHeadForm] = useState({ id: null, name: '', display_order: 100, active: true })
   const [bankForm, setBankForm] = useState({ id: null, bank_name: '', account_name: 'RWA Pocket-A', account_no_last4: '', ifsc: '', active: true })
+  const [flatForm, setFlatForm] = useState(emptyFlatForm())
+  const [savingFlat, setSavingFlat] = useState(false)
 
   async function refresh() {
     setLoading(true)
@@ -36,7 +45,7 @@ export default function MasterData() {
       const [i, e, f, b] = await Promise.all([
         getIncomeHeads(false),
         getExpenseHeads(false),
-        getFlatsWithResidents(),
+        getFlatMaster(),
         getBankAccounts()
       ])
       setIncomeHeads(i)
@@ -54,13 +63,20 @@ export default function MasterData() {
 
   const currentHeads = tab === 'income' ? incomeHeads : expenseHeads
   const filteredHeads = currentHeads.filter((x) => !search.trim() || x.name.toLowerCase().includes(search.toLowerCase()))
-  const filteredFlats = useMemo(() => flats.filter((x) => !search.trim() || `${x.flat_no} ${x.flat_code} ${x.resident_name}`.toLowerCase().includes(search.toLowerCase())), [flats, search])
+  const filteredFlats = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return flats
+    return flats.filter((x) => `${x.flat_no} ${x.owner_name || ''} ${x.tower_no} ${x.floor_name || ''}`.toLowerCase().includes(q))
+  }, [flats, search])
+
+  const flatPreview = useMemo(() => deriveFlatDetails(flatForm.flat_no), [flatForm.flat_no])
 
   function changeTab(next) {
     setTab(next)
     setSearch('')
     setHeadForm({ id: null, name: '', display_order: 100, active: true })
     setBankForm({ id: null, bank_name: '', account_name: 'RWA Pocket-A', account_no_last4: '', ifsc: '', active: true })
+    setFlatForm(emptyFlatForm())
   }
 
   async function saveHead(e) {
@@ -87,6 +103,44 @@ export default function MasterData() {
     } catch (e) {
       setMessage({ type: 'error', text: e.message || 'Unable to update head.' })
     }
+  }
+
+  async function submitFlat(e) {
+    e.preventDefault()
+    if (!flatForm.flat_no.trim()) {
+      setMessage({ type: 'error', text: 'Flat number is required.' })
+      return
+    }
+
+    if (!flatPreview) {
+      setMessage({ type: 'error', text: 'Enter a valid flat number such as 1A, 12C or 36D.' })
+      return
+    }
+
+    setSavingFlat(true)
+    try {
+      await saveFlat(flatForm)
+      setMessage({ type: 'success', text: flatForm.id ? 'Flat and resident updated.' : 'Flat and resident added.' })
+      setFlatForm(emptyFlatForm())
+      await refresh()
+    } catch (e2) {
+      const duplicate = e2.code === '23505'
+      setMessage({
+        type: 'error',
+        text: duplicate ? 'This flat number already exists. Use Edit to update it.' : (e2.message || 'Unable to save flat and resident.')
+      })
+    } finally {
+      setSavingFlat(false)
+    }
+  }
+
+  function editFlat(row) {
+    setFlatForm({
+      id: row.id,
+      flat_no: row.flat_no || '',
+      owner_name: row.owner_name || '',
+      active: row.active !== false
+    })
   }
 
   async function submitBank(e) {
@@ -140,11 +194,50 @@ export default function MasterData() {
       ) : null}
 
       {!loading && tab === 'flats' ? (
-        <Section title="Flats & Residents" subtitle="Read from the existing RWA flats/profiles master so Accounts does not duplicate resident data" actions={<div className="acc-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search flat or resident" /></div>}>
-          {filteredFlats.length ? (
-            <div className="acc-table-wrap"><table className="acc-table"><thead><tr><th>#</th><th>Tower</th><th>Flat No.</th><th>Flat Code</th><th>Resident Name</th><th>Status</th></tr></thead><tbody>{filteredFlats.map((row, i) => <tr key={row.id}><td>{i + 1}</td><td>{row.tower_no}</td><td><strong>{row.flat_no}</strong></td><td>{row.flat_code}</td><td>{row.resident_name || '—'}</td><td><StatusBadge status={row.active ? 'ACTIVE' : 'INACTIVE'} /></td></tr>)}</tbody></table></div>
-          ) : <EmptyState>No flats available. The Accounts module will still allow manual resident/flat entry.</EmptyState>}
-        </Section>
+        <div className="acc-master-layout acc-master-layout-wide">
+          <Section
+            title="Flats & Residents"
+            subtitle="Existing RWA flat master with owner/resident information"
+            actions={<div className="acc-search"><Search size={16} /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search flat or owner" /></div>}
+          >
+            {filteredFlats.length ? (
+              <div className="acc-table-wrap"><table className="acc-table"><thead><tr><th>#</th><th>Tower</th><th>Flat No.</th><th>Floor</th><th>Owner / Resident Name</th><th>Status</th><th>Action</th></tr></thead><tbody>{filteredFlats.map((row, i) => <tr key={row.id}><td>{i + 1}</td><td>{row.tower_no}</td><td><strong>{row.flat_no}</strong></td><td>{row.floor_name || row.floor_code || '—'}</td><td>{row.owner_name || '—'}</td><td><StatusBadge status={row.active ? 'ACTIVE' : 'INACTIVE'} /></td><td><button className="acc-mini-button secondary" onClick={() => editFlat(row)}><Pencil size={14} /> Edit</button></td></tr>)}</tbody></table></div>
+            ) : <EmptyState>No matching flats.</EmptyState>}
+          </Section>
+
+          <Section title={flatForm.id ? 'Edit Flat / Resident' : 'Add Flat / Resident'} subtitle="Tower and floor are calculated automatically from the flat number">
+            <form className="acc-stack-form" onSubmit={submitFlat}>
+              <Field label="Flat No." required>
+                <input
+                  value={flatForm.flat_no}
+                  onChange={(e) => setFlatForm({ ...flatForm, flat_no: e.target.value.toUpperCase() })}
+                  placeholder="e.g. 36D"
+                />
+              </Field>
+
+              <Field label="Owner / Resident Name">
+                <input
+                  value={flatForm.owner_name}
+                  onChange={(e) => setFlatForm({ ...flatForm, owner_name: e.target.value })}
+                  placeholder="Enter owner name"
+                />
+              </Field>
+
+              <div className="acc-flat-preview">
+                <div><span>Unit No.</span><strong>{flatPreview?.unit_no ?? '—'}</strong></div>
+                <div><span>Tower</span><strong>{flatPreview?.tower_no ?? '—'}</strong></div>
+                <div><span>Floor</span><strong>{flatPreview?.floor_name ?? '—'}</strong></div>
+              </div>
+
+              <label className="acc-toggle-row"><input type="checkbox" checked={flatForm.active} onChange={(e) => setFlatForm({ ...flatForm, active: e.target.checked })} /><span><strong>Active flat</strong><small>Active flats are available in income entry screens</small></span></label>
+
+              <div className="acc-form-actions-inline">
+                {flatForm.id ? <button type="button" className="acc-button secondary" onClick={() => setFlatForm(emptyFlatForm())}>Cancel</button> : null}
+                <button className="acc-button primary" disabled={savingFlat}><Plus size={16} /> {savingFlat ? 'Saving...' : (flatForm.id ? 'Update Flat / Resident' : 'Add Flat / Resident')}</button>
+              </div>
+            </form>
+          </Section>
+        </div>
       ) : null}
 
       {!loading && tab === 'banks' ? (
