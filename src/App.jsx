@@ -7,7 +7,8 @@ import {
   ArrowRight,
   ClipboardCheck,
   MessageSquareWarning,
-  ArrowLeft
+  ArrowLeft,
+  WalletCards
 } from 'lucide-react'
 
 import './App.css'
@@ -17,6 +18,7 @@ import Login from './Login'
 import Attendance from './Attendance'
 import ManageStaff from './ManageStaff'
 import TowerInspection from './TowerInspection'
+import AccountsApp from './accounts/AccountsApp'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -83,6 +85,14 @@ function App() {
   if (screen === 'tower-inspection') {
     return (
       <TowerInspection
+        onBack={() => setScreen('dashboard')}
+      />
+    )
+  }
+
+  if (screen === 'accounts') {
+    return (
+      <AccountsApp
         onBack={() => setScreen('dashboard')}
       />
     )
@@ -276,6 +286,34 @@ function App() {
 
             <p>
               Scan tower QR, verify GPS and submit inspection
+            </p>
+
+          </div>
+
+          <ArrowRight size={20} />
+
+        </button>
+
+        <button
+          className="feature-card feature-attendance"
+          onClick={() => setScreen('accounts')}
+        >
+
+          <div className="feature-icon feature-icon-green">
+            <WalletCards
+              size={27}
+              strokeWidth={1.8}
+            />
+          </div>
+
+          <div className="feature-text">
+
+            <h3>
+              Income & Expense
+            </h3>
+
+            <p>
+              Daily accounts, bank reconciliation and monthly statement
             </p>
 
           </div>
