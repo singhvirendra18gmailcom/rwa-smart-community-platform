@@ -97,6 +97,28 @@ export async function getDayExpenses(date) {
     .order('created_at', { ascending: false }))
 }
 
+export async function getIncomeByDateRange(fromDate, toDate) {
+  return throwIfError(await supabase
+    .from('accounts_income_entries')
+    .select('*')
+    .gte('receipt_date', fromDate)
+    .lte('receipt_date', toDate)
+    .neq('status', 'VOID')
+    .order('receipt_date', { ascending: false })
+    .order('created_at', { ascending: false }))
+}
+
+export async function getExpensesByDateRange(fromDate, toDate) {
+  return throwIfError(await supabase
+    .from('accounts_expense_entries')
+    .select('*')
+    .gte('expense_date', fromDate)
+    .lte('expense_date', toDate)
+    .neq('status', 'VOID')
+    .order('expense_date', { ascending: false })
+    .order('created_at', { ascending: false }))
+}
+
 async function nextDocumentNo(table, dateColumn, prefix, date) {
   const year = new Date(`${date}T00:00:00`).getFullYear()
   const result = await supabase
@@ -237,7 +259,7 @@ export async function ignoreBankTransaction(bankId) {
 }
 
 export async function uploadAccountsDocument(file, path) {
-  const result = await supabase.storage.from('accounts-documents').upload(path, file, {
+  const result = await supabase.storage.from('accounts-documents').upload(path, {
     upsert: true,
     contentType: file.type || undefined
   })
