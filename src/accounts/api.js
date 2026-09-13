@@ -12,6 +12,11 @@ function throwIfError(result) {
   return result.data
 }
 
+function splitId(payload = {}) {
+  const { id, ...data } = payload
+  return { id, data }
+}
+
 export async function getSettings() {
   const result = await supabase.from('accounts_settings').select('*').eq('id', 1).maybeSingle()
   return throwIfError(result)
@@ -35,16 +40,18 @@ export async function getExpenseHeads(activeOnly = true) {
 }
 
 export async function saveIncomeHead(payload) {
-  const query = payload.id
-    ? supabase.from('accounts_income_heads').update(payload).eq('id', payload.id)
-    : supabase.from('accounts_income_heads').insert(payload)
+  const { id, data } = splitId(payload)
+  const query = id
+    ? supabase.from('accounts_income_heads').update(data).eq('id', id)
+    : supabase.from('accounts_income_heads').insert(data)
   return throwIfError(await query.select().single())
 }
 
 export async function saveExpenseHead(payload) {
-  const query = payload.id
-    ? supabase.from('accounts_expense_heads').update(payload).eq('id', payload.id)
-    : supabase.from('accounts_expense_heads').insert(payload)
+  const { id, data } = splitId(payload)
+  const query = id
+    ? supabase.from('accounts_expense_heads').update(data).eq('id', id)
+    : supabase.from('accounts_expense_heads').insert(data)
   return throwIfError(await query.select().single())
 }
 
@@ -110,16 +117,18 @@ export async function nextVoucherNo(date, prefix = 'VCH') {
 }
 
 export async function saveIncomeEntry(payload) {
-  const result = payload.id
-    ? await supabase.from('accounts_income_entries').update(payload).eq('id', payload.id).select().single()
-    : await supabase.from('accounts_income_entries').insert(payload).select().single()
+  const { id, data } = splitId(payload)
+  const result = id
+    ? await supabase.from('accounts_income_entries').update(data).eq('id', id).select().single()
+    : await supabase.from('accounts_income_entries').insert(data).select().single()
   return throwIfError(result)
 }
 
 export async function saveExpenseEntry(payload) {
-  const result = payload.id
-    ? await supabase.from('accounts_expense_entries').update(payload).eq('id', payload.id).select().single()
-    : await supabase.from('accounts_expense_entries').insert(payload).select().single()
+  const { id, data } = splitId(payload)
+  const result = id
+    ? await supabase.from('accounts_expense_entries').update(data).eq('id', id).select().single()
+    : await supabase.from('accounts_expense_entries').insert(data).select().single()
   return throwIfError(result)
 }
 
@@ -142,7 +151,8 @@ export async function getTransfers(month) {
 }
 
 export async function saveTransfer(payload) {
-  return throwIfError(await supabase.from('accounts_cash_bank_transfers').insert(payload).select().single())
+  const { data } = splitId(payload)
+  return throwIfError(await supabase.from('accounts_cash_bank_transfers').insert(data).select().single())
 }
 
 export async function deleteTransfer(id) {
@@ -158,9 +168,9 @@ export async function getBankStatements(month) {
 }
 
 export async function saveBankStatement(payload) {
-  return throwIfError(await supabase.from('accounts_bank_statements').upsert(payload, { onConflict: 'statement_month,file_name' }).select().single())
+  const { data } = splitId(payload)
+  return throwIfError(await supabase.from('accounts_bank_statements').upsert(data, { onConflict: 'statement_month,file_name' }).select().single())
 }
-
 
 export async function clearBankTransactionsForMonth(month) {
   const result = await supabase.from('accounts_bank_transactions').delete().eq('statement_month', monthStartFromKey(month))
@@ -176,7 +186,8 @@ export async function clearBankTransactionsForStatement(statementId) {
 
 export async function saveBankTransactions(rows) {
   if (!rows.length) return []
-  return throwIfError(await supabase.from('accounts_bank_transactions').insert(rows).select())
+  const cleanRows = rows.map((row) => splitId(row).data)
+  return throwIfError(await supabase.from('accounts_bank_transactions').insert(cleanRows).select())
 }
 
 export async function getBankTransactions(month) {
@@ -372,9 +383,6 @@ export async function getFlatsWithResidents() {
 
   return (result.data || []).map((flat) => ({
     ...flat,
-
-    // Keep these aliases so the existing MasterData UI
-    // does not need to be changed immediately.
     flat_code: flat.floor_code,
     resident_name: flat.owner_name || ''
   }))
@@ -394,8 +402,9 @@ export async function getBankAccounts() {
 }
 
 export async function saveBankAccount(payload) {
-  const query = payload.id
-    ? supabase.from('accounts_bank_accounts').update(payload).eq('id', payload.id)
-    : supabase.from('accounts_bank_accounts').insert(payload)
+  const { id, data } = splitId(payload)
+  const query = id
+    ? supabase.from('accounts_bank_accounts').update(data).eq('id', id)
+    : supabase.from('accounts_bank_accounts').insert(data)
   return throwIfError(await query.select().single())
 }
