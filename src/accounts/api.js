@@ -349,16 +349,34 @@ export async function closeMonth(month, statement) {
 }
 
 export async function getFlatsWithResidents() {
-  // Existing RWBOT schema: flats + profiles. Gracefully degrade if it is not present yet.
-  const flatsResult = await supabase.from('flats').select('id,tower_no,flat_no,flat_code,active').eq('active', true).order('tower_no').order('flat_no')
-  if (flatsResult.error) return []
+  const result = await supabase
+    .from('flats')
+    .select(`
+      id,
+      unit_no,
+      floor_code,
+      flat_no,
+      floor_name,
+      tower_no,
+      owner_name,
+      active
+    `)
+    .eq('active', true)
+    .order('unit_no', { ascending: true })
+    .order('floor_code', { ascending: true })
 
-  const profilesResult = await supabase.from('profiles').select('flat_id,full_name,active').eq('active', true)
-  const profiles = profilesResult.error ? [] : profilesResult.data || []
-  const profileMap = new Map(profiles.map((p) => [p.flat_id, p]))
-  return (flatsResult.data || []).map((flat) => ({
+  if (result.error) {
+    console.error('Error loading flats:', result.error)
+    throw result.error
+  }
+
+  return (result.data || []).map((flat) => ({
     ...flat,
-    resident_name: profileMap.get(flat.id)?.full_name || ''
+
+    // Keep these aliases so the existing MasterData UI
+    // does not need to be changed immediately.
+    flat_code: flat.floor_code,
+    resident_name: flat.owner_name || ''
   }))
 }
 
