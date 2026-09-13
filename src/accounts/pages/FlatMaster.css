@@ -1,0 +1,45 @@
+.acc-flat-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.acc-flat-preview > div {
+  padding: 10px;
+  border: 1px solid #e1e8f0;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.acc-flat-preview span,
+.acc-flat-preview strong {
+  display: block;
+}
+
+.acc-flat-preview span {
+  color: #7c8998;
+  font-size: 8px;
+}
+
+.acc-flat-preview strong {
+  margin-top: 4px;
+  color: #18375c;
+  font-size: 11px;
+}
+
+.acc-form-actions-inline {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 620px) {
+  .acc-flat-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .acc-form-actions-inline .acc-button {
+    flex: 1;
+  }
+}
