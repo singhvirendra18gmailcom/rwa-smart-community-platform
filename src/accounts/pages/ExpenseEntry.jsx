@@ -115,7 +115,7 @@ export default function ExpenseEntry({ setAppMonth }) {
 
   function onHeadChange(id) {
     const head = heads.find((x) => x.id === id)
-    setForm((old) => ({ ...old, expense_head_id: id, expense_head_name: head?.name || '' }))
+    setForm((old) => ({ ...old, expense_head_id: id, expense_head_name: head?.name || old.expense_head_name }))
   }
 
   async function resetForm(date = entryDate) {
@@ -134,7 +134,9 @@ export default function ExpenseEntry({ setAppMonth }) {
       return
     }
     if (!form.expense_head_id || !form.voucher_no || !form.expense_date || !form.paid_to.trim() || !form.amount) {
-      setMessage({ type: 'error', text: 'Please complete all mandatory fields.' })
+      setMessage({ type: 'error', text: form.id && !form.expense_head_id
+        ? `Please select a Master Data expense head for the imported head "${form.expense_head_name || 'Unmapped'}" before updating.`
+        : 'Please complete all mandatory fields.' })
       return
     }
     if (form.payment_mode === 'CHEQUE' && !form.cheque_no.trim()) {
@@ -179,6 +181,7 @@ export default function ExpenseEntry({ setAppMonth }) {
       ...emptyForm(row.expense_date),
       ...row,
       expense_head_id: row.expense_head_id || '',
+      expense_head_name: row.expense_head_name || '',
       amount: String(row.amount || ''),
       cheque_no: row.cheque_no || '',
       reference_no: row.reference_no || '',
@@ -217,6 +220,9 @@ export default function ExpenseEntry({ setAppMonth }) {
 
       {message ? <Message type={message.type} onClose={() => setMessage(null)}>{message.text}</Message> : null}
       {closed ? <Message type="warning">{monthLabel(selectedMonth)} is closed. Entries are view-only until the month is reopened.</Message> : null}
+      {form.id && !form.expense_head_id && form.expense_head_name ? (
+        <Message type="warning">Imported Head: <strong>{form.expense_head_name}</strong>. Select the correct Expense Head from Master Data before updating this voucher.</Message>
+      ) : null}
 
       <div className="acc-stat-grid acc-stat-grid-4">
         <StatCard label="Day Total Expense" value={daySplit.total} tone="red" helper={`Cash ${formatCurrency(daySplit.cash)} · Bank ${formatCurrency(daySplit.bank)}`} />
@@ -236,9 +242,9 @@ export default function ExpenseEntry({ setAppMonth }) {
           <Field label="Paid To" required>
             <input value={form.paid_to} disabled={closed} placeholder="Person / vendor / company" onChange={(e) => setForm({ ...form, paid_to: e.target.value })} />
           </Field>
-          <Field label="Expense Head" required>
+          <Field label="Expense Head" required hint={form.id && !form.expense_head_id && form.expense_head_name ? `Imported as: ${form.expense_head_name}` : undefined}>
             <select value={form.expense_head_id} disabled={closed} onChange={(e) => onHeadChange(e.target.value)}>
-              <option value="">Select expense head</option>
+              <option value="">{form.id && !form.expense_head_id && form.expense_head_name ? `Unmapped: ${form.expense_head_name}` : 'Select expense head'}</option>
               {heads.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
             </select>
           </Field>
@@ -295,7 +301,7 @@ export default function ExpenseEntry({ setAppMonth }) {
                     <td>{index + 1}</td>
                     <td><strong>{row.voucher_no}</strong></td>
                     <td>{row.paid_to}</td>
-                    <td>{row.expense_head_name}</td>
+                    <td>{row.expense_head_name || '—'}{!row.expense_head_id ? <><br /><small><strong>⚠ Unmapped</strong></small></> : null}</td>
                     <td>{row.description || '—'}</td>
                     <td>{row.payment_mode}</td>
                     <td><PaymentBadge mode={row.payment_mode} /></td>
