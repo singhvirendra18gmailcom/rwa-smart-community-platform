@@ -63,7 +63,7 @@ function RwbotDocuments({
       data,
       error: loadError
     } = await supabase
-      .from('documents')
+      .from('rwbot_documents')
       .select(`
         id,
         title,
@@ -218,7 +218,7 @@ function RwbotDocuments({
       const {
         error: storageError
       } = await supabase.storage
-        .from('rwbot-documents')
+        .from('documents')
         .upload(
           uploadedFilePath,
           file,
@@ -238,7 +238,7 @@ function RwbotDocuments({
       const {
         error: databaseError
       } = await supabase
-        .from('documents')
+        .from('rwbot_documents')
         .insert({
           title: title.trim(),
 
@@ -383,7 +383,7 @@ function RwbotDocuments({
       const {
         error: databaseError
       } = await supabase
-        .from('documents')
+        .from('rwbot_documents')
         .delete()
         .eq('id', document.id)
 
