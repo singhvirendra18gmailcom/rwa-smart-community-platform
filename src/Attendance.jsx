@@ -14,6 +14,44 @@ import { supabase } from './supabase'
 
 
 // =========================================================
+// WhatsApp Icon
+// =========================================================
+
+function WhatsAppIcon({ size = 22 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        fill="#25D366"
+      />
+
+      <path
+        d="M8.2 7.4c.2-.5.4-.5.8-.5h.6c.2 0 .4.1.5.4l.9 2.1c.1.3.1.5-.1.7l-.7.9c-.2.2-.2.4 0 .7.5.9 1.2 1.6 2 2.1.3.2.5.2.7 0l.9-1.1c.2-.2.4-.3.7-.2l2.2 1c.3.1.4.3.4.6 0 .4-.2 1.4-1 2-.8.7-1.8 1-2.8.8-1.1-.2-2.3-.7-3.4-1.5-1-.7-1.9-1.6-2.6-2.6-.8-1.1-1.3-2.3-1.5-3.4-.2-.8.1-1.6.5-2Z"
+        fill="#ffffff"
+      />
+
+      <path
+        d="M5.7 18.1 6.4 15.8"
+        stroke="#ffffff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+
+// =========================================================
 // Canvas Helper
 // =========================================================
 
@@ -1290,15 +1328,34 @@ function Attendance({
           y + 41
         )
 
-        ctx.textBaseline = 'alphabetic'
+        ctx.textBaseline = 'middle'
         ctx.textAlign = 'left'
+
+        const staffTextY = y + rowHeight / 2
+        const staffNameX = 185
+
         ctx.fillStyle = '#11355f'
-        ctx.font = '700 29px Arial, sans-serif'
-        ctx.fillText(person.name, 185, y + 34)
+        ctx.font = '700 34px Arial, sans-serif'
+        ctx.fillText(
+          person.name,
+          staffNameX,
+          staffTextY
+        )
+
+        const staffNameWidth =
+          ctx.measureText(
+            person.name
+          ).width
 
         ctx.fillStyle = '#536b86'
         ctx.font = '500 21px Arial, sans-serif'
-        ctx.fillText(person.profession, 185, y + 63)
+        ctx.fillText(
+          `— ${person.profession}`,
+          staffNameX +
+            staffNameWidth +
+            18,
+          staffTextY
+        )
 
         const badgeX = 785
         const badgeY = y + 18
@@ -2159,12 +2216,22 @@ function Attendance({
             dirty ||
             sharing
           }
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
         >
 
-          {sharing
-            ? 'Generating PNG...'
-            : '🟢 Share Attendance PNG'
-          }
+          {sharing ? (
+            'Generating PNG...'
+          ) : (
+            <>
+              <WhatsAppIcon size={22} />
+              <span>Share Attendance PNG</span>
+            </>
+          )}
 
         </button>
 
