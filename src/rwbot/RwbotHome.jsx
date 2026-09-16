@@ -1,5 +1,4 @@
 import {
-  Bot,
   LogOut,
   MessageCircleQuestion,
   FileText,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import useRwbotOwnerName from './useRwbotOwnerName'
+import rwbotMascotImage from './rwbotMascotImage'
 import './Rwbot.css'
 import './RwbotHome.css'
 
@@ -80,8 +80,12 @@ function RwbotHome({
       <header className="rwbot-home-header">
 
         <div className="rwbot-home-brand">
-          <div className="rwbot-home-brand-icon">
-            <Bot size={31} strokeWidth={1.9} />
+          <div className="rwbot-home-brand-icon rwbot-home-brand-image-wrap">
+            <img
+              src={rwbotMascotImage}
+              alt="RWBOT AI Assistant"
+              className="rwbot-home-brand-image"
+            />
           </div>
 
           <div>
@@ -153,16 +157,16 @@ function RwbotHome({
           </div>
 
           <div
-            className="rwbot-home-hero-art"
+            className="rwbot-home-hero-art rwbot-home-mascot-art"
             aria-hidden="true"
           >
-            <div className="rwbot-home-bot-glow" />
-
-            <div className="rwbot-home-bot">
-              <Bot size={58} strokeWidth={1.7} />
-              <span className="rwbot-home-bot-label">
-                RWBOT
-              </span>
+            <div className="rwbot-home-mascot-glow" />
+            <div className="rwbot-home-mascot-frame">
+              <img
+                src={rwbotMascotImage}
+                alt=""
+                className="rwbot-home-mascot-image"
+              />
             </div>
           </div>
 
