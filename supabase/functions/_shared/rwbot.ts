@@ -108,6 +108,10 @@ export function getGeminiModel() {
   return Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash"
 }
 
+export function getGeminiFallbackModel() {
+  return Deno.env.get("GEMINI_FALLBACK_MODEL") || "gemini-2.5-flash-lite"
+}
+
 export function getGeminiEmbeddingModel() {
   return Deno.env.get("GEMINI_EMBEDDING_MODEL") || "gemini-embedding-001"
 }
@@ -116,27 +120,62 @@ async function parseGeminiError(response: Response) {
   let detail = ""
 
   try {
-    const payload = await response.json()
+    const payload = await response.clone().json()
     detail = payload?.error?.message || JSON.stringify(payload)
   } catch {
-    detail = await response.text()
+    try {
+      detail = await response.clone().text()
+    } catch {
+      detail = ""
+    }
   }
 
   return detail || `${response.status} ${response.statusText}`
 }
 
-export async function generateGeminiText(
-  parts: Array<Record<string, unknown>>,
-  options: {
-    temperature?: number
-    maxOutputTokens?: number
-    model?: string
-  } = {},
-) {
-  const apiKey = getGeminiApiKey()
-  const model = options.model || getGeminiModel()
+function isRetryableGeminiStatus(status: number) {
+  return [429, 500, 502, 503, 504].includes(status)
+}
 
-  const response = await fetch(
+async function sleep(ms: number) {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchGeminiWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = 3,
+) {
+  let lastResponse: Response | null = null
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const response = await fetch(url, init)
+
+    if (response.ok) {
+      return response
+    }
+
+    lastResponse = response
+
+    if (!isRetryableGeminiStatus(response.status) || attempt === attempts) {
+      return response
+    }
+
+    const delayMs = 700 * Math.pow(2, attempt - 1)
+    await sleep(delayMs)
+  }
+
+  return lastResponse as Response
+}
+
+async function callGeminiGenerate(
+  model: string,
+  apiKey: string,
+  parts: Array<Record<string, unknown>>,
+  temperature: number,
+  maxOutputTokens: number,
+) {
+  return await fetchGeminiWithRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: "POST",
@@ -152,12 +191,49 @@ export async function generateGeminiText(
           },
         ],
         generationConfig: {
-          temperature: options.temperature ?? 0.15,
-          maxOutputTokens: options.maxOutputTokens ?? 8192,
+          temperature,
+          maxOutputTokens,
         },
       }),
     },
   )
+}
+
+export async function generateGeminiText(
+  parts: Array<Record<string, unknown>>,
+  options: {
+    temperature?: number
+    maxOutputTokens?: number
+    model?: string
+  } = {},
+) {
+  const apiKey = getGeminiApiKey()
+  const primaryModel = options.model || getGeminiModel()
+  const fallbackModel = getGeminiFallbackModel()
+  const temperature = options.temperature ?? 0.15
+  const maxOutputTokens = options.maxOutputTokens ?? 8192
+
+  let response = await callGeminiGenerate(
+    primaryModel,
+    apiKey,
+    parts,
+    temperature,
+    maxOutputTokens,
+  )
+
+  if (
+    !response.ok &&
+    isRetryableGeminiStatus(response.status) &&
+    fallbackModel !== primaryModel
+  ) {
+    response = await callGeminiGenerate(
+      fallbackModel,
+      apiKey,
+      parts,
+      temperature,
+      maxOutputTokens,
+    )
+  }
 
   if (!response.ok) {
     const detail = await parseGeminiError(response)
@@ -185,7 +261,7 @@ export async function embedText(
   const apiKey = getGeminiApiKey()
   const model = getGeminiEmbeddingModel()
 
-  const response = await fetch(
+  const response = await fetchGeminiWithRetry(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:embedContent`,
     {
       method: "POST",
@@ -237,7 +313,7 @@ export async function embedTexts(
   for (let offset = 0; offset < texts.length; offset += batchSize) {
     const batch = texts.slice(offset, offset + batchSize)
 
-    const response = await fetch(
+    const response = await fetchGeminiWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:batchEmbedContents`,
       {
         method: "POST",
