@@ -4,10 +4,15 @@ import {
   Bot,
   Send,
   UserRound,
-  Lightbulb
+  Lightbulb,
+  LoaderCircle,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react'
 
+import { supabase } from '../supabase'
 import './Rwbot.css'
+import './RwbotChat.css'
 
 function RwbotChat({
   profile,
@@ -15,97 +20,130 @@ function RwbotChat({
 }) {
   const [question, setQuestion] = useState('')
   const [messages, setMessages] = useState([])
+  const [asking, setAsking] = useState(false)
+  const [error, setError] = useState('')
 
   const flat = Array.isArray(profile.flat)
     ? profile.flat[0]
     : profile.flat
 
   const suggestedQuestions = [
+    'How many flats do we have?',
     'How much was spent on civil work?',
-    'What was the total collection in January 2026?',
     'Summarize the August 2026 GBM.',
     'What was decided about parking?'
   ]
 
-  const getPrototypeAnswer = (userQuestion) => {
-    const text = userQuestion.toLowerCase()
-
-    if (
-      text.includes('civil') ||
-      text.includes('spent') ||
-      text.includes('expense')
-    ) {
-      return {
-        answer:
-          'The RWBOT chat screen is working correctly. Financial records are not connected yet. In the next phase, I will calculate this answer from the RWA financial data instead of guessing the amount.',
-        source:
-          'Financial data connection pending'
-      }
-    }
-
-    if (
-      text.includes('collection') ||
-      text.includes('maintenance')
-    ) {
-      return {
-        answer:
-          'The collection database is not connected to RWBOT yet. Once connected, I will return the exact collection amount for the requested month directly from RWA records.',
-        source:
-          'Collection data connection pending'
-      }
-    }
-
-    if (
-      text.includes('gbm') ||
-      text.includes('meeting') ||
-      text.includes('parking')
-    ) {
-      return {
-        answer:
-          'The document knowledge base is not connected yet. Once RWA members upload GBM, MOM and other approved documents, I will search those records, answer the question and show the source document.',
-        source:
-          'Document knowledge base pending'
-      }
-    }
-
-    return {
-      answer:
-        'RWBOT is ready to receive your question. The next step is to connect approved RWA documents and structured financial records so I can provide factual answers with sources.',
-      source:
-        'RWBOT prototype'
-    }
-  }
-
-  const askQuestion = (text) => {
-    const cleanQuestion = text.trim()
-
-    if (!cleanQuestion) {
+  const openSource = async (source) => {
+    if (!source?.filePath) {
       return
     }
 
-    const result =
-      getPrototypeAnswer(cleanQuestion)
+    setError('')
+
+    const {
+      data,
+      error: signedUrlError
+    } = await supabase.storage
+      .from('rwbot-documents')
+      .createSignedUrl(
+        source.filePath,
+        60
+      )
+
+    if (signedUrlError || !data?.signedUrl) {
+      console.error(signedUrlError)
+      setError('Unable to open the source document.')
+      return
+    }
+
+    window.open(
+      data.signedUrl,
+      '_blank',
+      'noopener,noreferrer'
+    )
+  }
+
+  const askQuestion = async (text) => {
+    const cleanQuestion = text.trim()
+
+    if (!cleanQuestion || asking) {
+      return
+    }
+
+    setError('')
+    setQuestion('')
+    setAsking(true)
+
+    const userMessage = {
+      id: crypto.randomUUID(),
+      type: 'user',
+      text: cleanQuestion
+    }
 
     setMessages((current) => [
       ...current,
-      {
-        id: Date.now(),
-        type: 'user',
-        text: cleanQuestion
-      },
-      {
-        id: Date.now() + 1,
-        type: 'bot',
-        text: result.answer,
-        source: result.source
-      }
+      userMessage
     ])
 
-    setQuestion('')
+    try {
+      const {
+        data,
+        error: functionError
+      } = await supabase.functions.invoke(
+        'rwbot-ask',
+        {
+          body: {
+            question: cleanQuestion
+          }
+        }
+      )
+
+      if (functionError) {
+        throw functionError
+      }
+
+      if (!data?.answer) {
+        throw new Error('RWBOT returned an empty answer.')
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          type: 'bot',
+          text: data.answer,
+          sources: Array.isArray(data.sources)
+            ? data.sources
+            : []
+        }
+      ])
+    } catch (askError) {
+      console.error('RWBOT question failed:', askError)
+
+      const message =
+        askError?.message ||
+        'Unable to contact the RWBOT service.'
+
+      setError(message)
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          type: 'bot',
+          text:
+            'I could not complete that request. Please try again in a moment.',
+          sources: []
+        }
+      ])
+    } finally {
+      setAsking(false)
+    }
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
+  const handleSubmit = (event) => {
+    event.preventDefault()
     askQuestion(question)
   }
 
@@ -117,6 +155,8 @@ function RwbotChat({
         <button
           className="rwbot-back-button"
           onClick={onBack}
+          type="button"
+          aria-label="Back"
         >
           <ArrowLeft size={20} />
         </button>
@@ -129,10 +169,7 @@ function RwbotChat({
 
           <div>
             <h1>Ask RWBOT</h1>
-
-            <p>
-              RWA Transparency Assistant
-            </p>
+            <p>RWA Transparency Assistant</p>
           </div>
 
         </div>
@@ -142,17 +179,13 @@ function RwbotChat({
       <main className="rwbot-chat-main">
 
         <div className="rwbot-chat-user-info">
-
-          <span>
-            {profile.full_name}
-          </span>
+          <span>{profile.full_name}</span>
 
           {flat && (
             <span>
               Flat {flat.flat_no} • Tower {flat.tower_no}
             </span>
           )}
-
         </div>
 
         {messages.length === 0 && (
@@ -162,14 +195,12 @@ function RwbotChat({
               <Bot size={34} />
             </div>
 
-            <h2>
-              What would you like to know?
-            </h2>
+            <h2>What would you like to know?</h2>
 
             <p>
               Ask about RWA accounts, expenses,
               collections, GBM decisions, notices,
-              rules and records.
+              rules and approved records.
             </p>
 
             <div className="rwbot-suggestion-title">
@@ -178,20 +209,16 @@ function RwbotChat({
             </div>
 
             <div className="rwbot-chat-suggestions">
-
-              {suggestedQuestions.map(
-                (item) => (
-                  <button
-                    key={item}
-                    onClick={() =>
-                      askQuestion(item)
-                    }
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-
+              {suggestedQuestions.map((item) => (
+                <button
+                  key={item}
+                  onClick={() => askQuestion(item)}
+                  type="button"
+                  disabled={asking}
+                >
+                  {item}
+                </button>
+              ))}
             </div>
 
           </section>
@@ -200,7 +227,6 @@ function RwbotChat({
         <section className="rwbot-messages">
 
           {messages.map((message) => (
-
             <div
               key={message.id}
               className={
@@ -211,33 +237,98 @@ function RwbotChat({
             >
 
               <div className="rwbot-message-avatar">
-
                 {message.type === 'user'
                   ? <UserRound size={18} />
                   : <Bot size={18} />
                 }
-
               </div>
 
               <div className="rwbot-message-content">
 
-                <div className="rwbot-message-bubble">
+                <div className="rwbot-message-bubble rwbot-message-text">
                   {message.text}
                 </div>
 
-                {message.source && (
-                  <div className="rwbot-message-source">
-                    Source: {message.source}
-                  </div>
-                )}
+                {message.type === 'bot' &&
+                  Array.isArray(message.sources) &&
+                  message.sources.length > 0 && (
+                    <div className="rwbot-source-list">
+                      <span className="rwbot-source-heading">
+                        Sources
+                      </span>
+
+                      {message.sources.map((source, index) => {
+                        const citationPrefix =
+                          Array.isArray(source.labels) && source.labels.length > 0
+                            ? `[${source.labels.join(', ')}] `
+                            : ''
+
+                        const label = source.documentDate
+                          ? `${citationPrefix}${source.title} • ${source.documentDate}`
+                          : `${citationPrefix}${source.title}`
+
+                        if (!source.filePath) {
+                          return (
+                            <div
+                              className="rwbot-source-static"
+                              key={`${source.title}-${index}`}
+                            >
+                              {label}
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            className="rwbot-source-button"
+                            key={`${source.filePath}-${index}`}
+                            onClick={() => openSource(source)}
+                          >
+                            <span>
+                              {label}
+                              {source.pageNo
+                                ? ` • Page ${source.pageNo}`
+                                : ''
+                              }
+                            </span>
+
+                            <ExternalLink size={14} />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
 
               </div>
 
             </div>
-
           ))}
 
+          {asking && (
+            <div className="rwbot-message-row rwbot-message-bot">
+              <div className="rwbot-message-avatar">
+                <Bot size={18} />
+              </div>
+
+              <div className="rwbot-thinking">
+                <LoaderCircle
+                  size={17}
+                  className="rwbot-spin"
+                />
+                Searching RWA records...
+              </div>
+            </div>
+          )}
+
         </section>
+
+        {error && (
+          <div className="rwbot-chat-error">
+            <AlertCircle size={17} />
+            <span>{error}</span>
+          </div>
+        )}
 
       </main>
 
@@ -250,17 +341,18 @@ function RwbotChat({
 
           <textarea
             value={question}
-            onChange={(e) =>
-              setQuestion(e.target.value)
+            onChange={(event) =>
+              setQuestion(event.target.value)
             }
             placeholder="Ask RWBOT..."
             rows="1"
-            onKeyDown={(e) => {
+            disabled={asking}
+            onKeyDown={(event) => {
               if (
-                e.key === 'Enter' &&
-                !e.shiftKey
+                event.key === 'Enter' &&
+                !event.shiftKey
               ) {
-                e.preventDefault()
+                event.preventDefault()
                 askQuestion(question)
               }
             }}
@@ -269,15 +361,22 @@ function RwbotChat({
           <button
             type="submit"
             className="rwbot-send-button"
-            disabled={!question.trim()}
+            disabled={
+              asking ||
+              !question.trim()
+            }
+            aria-label="Send question"
           >
-            <Send size={19} />
+            {asking
+              ? <LoaderCircle size={19} className="rwbot-spin" />
+              : <Send size={19} />
+            }
           </button>
 
         </div>
 
         <p className="rwbot-chat-note">
-          RWBOT answers will be based on approved RWA records.
+          RWBOT answers from RWA records available to your account.
         </p>
 
       </form>

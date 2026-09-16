@@ -8,7 +8,8 @@ import {
   Download,
   CheckCircle2,
   AlertCircle,
-  LoaderCircle
+  LoaderCircle,
+  RefreshCw
 } from 'lucide-react'
 
 import { supabase } from '../supabase'
@@ -26,6 +27,7 @@ const ALLOWED_EXTENSIONS = [
 ]
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
+const STORAGE_BUCKET = 'rwbot-documents'
 
 function RwbotDocuments({
   profile,
@@ -34,19 +36,14 @@ function RwbotDocuments({
   const [documents, setDocuments] = useState([])
 
   const [title, setTitle] = useState('')
-  const [documentType, setDocumentType] =
-    useState('OTHER')
-
-  const [documentDate, setDocumentDate] =
-    useState('')
-
-  const [residentVisible, setResidentVisible] =
-    useState(true)
-
+  const [documentType, setDocumentType] = useState('OTHER')
+  const [documentDate, setDocumentDate] = useState('')
+  const [residentVisible, setResidentVisible] = useState(true)
   const [file, setFile] = useState(null)
 
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [processingDocumentId, setProcessingDocumentId] = useState(null)
 
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -57,7 +54,6 @@ function RwbotDocuments({
 
   const loadDocuments = async () => {
     setLoading(true)
-    setError('')
 
     const {
       data,
@@ -83,11 +79,7 @@ function RwbotDocuments({
 
     if (loadError) {
       console.error(loadError)
-
-      setError(
-        'Unable to load documents.'
-      )
-
+      setError('Unable to load documents.')
       setDocuments([])
       setLoading(false)
       return
@@ -98,9 +90,7 @@ function RwbotDocuments({
   }
 
   const getFileExtension = (fileName) => {
-    const parts = fileName
-      .toLowerCase()
-      .split('.')
+    const parts = fileName.toLowerCase().split('.')
 
     if (parts.length < 2) {
       return ''
@@ -114,19 +104,13 @@ function RwbotDocuments({
       return 'Please select a file.'
     }
 
-    const extension =
-      getFileExtension(selectedFile.name)
+    const extension = getFileExtension(selectedFile.name)
 
-    if (
-      !ALLOWED_EXTENSIONS.includes(extension)
-    ) {
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
       return 'Supported files: PDF, DOC, DOCX, JPG, JPEG, PNG and TXT.'
     }
 
-    if (
-      selectedFile.size >
-      MAX_FILE_SIZE
-    ) {
+    if (selectedFile.size > MAX_FILE_SIZE) {
       return 'File size must be 10 MB or less.'
     }
 
@@ -137,21 +121,18 @@ function RwbotDocuments({
     setError('')
     setMessage('')
 
-    const selectedFile =
-      event.target.files?.[0]
+    const selectedFile = event.target.files?.[0]
 
     if (!selectedFile) {
       setFile(null)
       return
     }
 
-    const validationError =
-      validateFile(selectedFile)
+    const validationError = validateFile(selectedFile)
 
     if (validationError) {
       setError(validationError)
       setFile(null)
-
       event.target.value = ''
       return
     }
@@ -159,25 +140,72 @@ function RwbotDocuments({
     setFile(selectedFile)
 
     if (!title.trim()) {
-      const suggestedTitle =
-        selectedFile.name
-          .replace(/\.[^/.]+$/, '')
-          .replace(/[_-]+/g, ' ')
+      const suggestedTitle = selectedFile.name
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[_-]+/g, ' ')
 
       setTitle(suggestedTitle)
     }
   }
 
-  const buildSafeFileName = (
-    originalName
-  ) => {
+  const buildSafeFileName = (originalName) => {
     return originalName
       .trim()
       .replace(/\s+/g, '-')
-      .replace(
-        /[^a-zA-Z0-9._-]/g,
-        ''
+      .replace(/[^a-zA-Z0-9._-]/g, '')
+  }
+
+  const processDocument = async (
+    documentId,
+    successMessage = 'Document processed and added to the RWBOT knowledge base.'
+  ) => {
+    setError('')
+    setMessage('')
+    setProcessingDocumentId(documentId)
+
+    try {
+      const {
+        data,
+        error: processError
+      } = await supabase.functions.invoke(
+        'rwbot-process-document',
+        {
+          body: {
+            documentId
+          }
+        }
       )
+
+      if (processError) {
+        throw processError
+      }
+
+      if (!data?.ok) {
+        throw new Error(
+          data?.error ||
+          'Document processing did not complete.'
+        )
+      }
+
+      setMessage(
+        data?.chunkCount
+          ? `${successMessage} ${data.chunkCount} searchable chunks created.`
+          : successMessage
+      )
+    } catch (processError) {
+      console.error(
+        'RWBOT document processing failed:',
+        processError
+      )
+
+      setError(
+        processError?.message ||
+        'Document was uploaded, but RWBOT could not process it.'
+      )
+    } finally {
+      setProcessingDocumentId(null)
+      await loadDocuments()
+    }
   }
 
   const handleUpload = async (event) => {
@@ -187,14 +215,11 @@ function RwbotDocuments({
     setMessage('')
 
     if (!title.trim()) {
-      setError(
-        'Please enter the document title.'
-      )
+      setError('Please enter the document title.')
       return
     }
 
-    const validationError =
-      validateFile(file)
+    const validationError = validateFile(file)
 
     if (validationError) {
       setError(validationError)
@@ -206,11 +231,8 @@ function RwbotDocuments({
     let uploadedFilePath = null
 
     try {
-      const safeFileName =
-        buildSafeFileName(file.name)
-
-      const uniquePart =
-        `${Date.now()}-${crypto.randomUUID()}`
+      const safeFileName = buildSafeFileName(file.name)
+      const uniquePart = `${Date.now()}-${crypto.randomUUID()}`
 
       uploadedFilePath =
         `${profile.id}/${uniquePart}-${safeFileName}`
@@ -218,7 +240,7 @@ function RwbotDocuments({
       const {
         error: storageError
       } = await supabase.storage
-        .from('documents')
+        .from(STORAGE_BUCKET)
         .upload(
           uploadedFilePath,
           file,
@@ -236,44 +258,30 @@ function RwbotDocuments({
       }
 
       const {
+        data: createdDocument,
         error: databaseError
       } = await supabase
         .from('rwbot_documents')
         .insert({
           title: title.trim(),
-
-          document_type:
-            documentType,
-
-          document_date:
-            documentDate || null,
-
-          file_name:
-            file.name,
-
-          file_path:
-            uploadedFilePath,
-
+          document_type: documentType,
+          document_date: documentDate || null,
+          file_name: file.name,
+          file_path: uploadedFilePath,
           mime_type:
             file.type ||
             'application/octet-stream',
-
-          file_size:
-            file.size,
-
-          uploaded_by:
-            profile.id,
-
-          resident_visible:
-            residentVisible,
-
-          processing_status:
-            'UPLOADED'
+          file_size: file.size,
+          uploaded_by: profile.id,
+          resident_visible: residentVisible,
+          processing_status: 'UPLOADED'
         })
+        .select('id')
+        .single()
 
       if (databaseError) {
         await supabase.storage
-          .from('rwbot-documents')
+          .from(STORAGE_BUCKET)
           .remove([
             uploadedFilePath
           ])
@@ -281,32 +289,35 @@ function RwbotDocuments({
         throw databaseError
       }
 
-      setMessage(
-        'Document uploaded successfully.'
-      )
-
       setTitle('')
       setDocumentType('OTHER')
       setDocumentDate('')
       setResidentVisible(true)
       setFile(null)
 
-      const fileInput =
-        document.getElementById(
-          'rwbot-file-input'
-        )
+      const fileInput = document.getElementById(
+        'rwbot-file-input'
+      )
 
       if (fileInput) {
         fileInput.value = ''
       }
 
+      setMessage(
+        'Document uploaded. RWBOT is processing it now...'
+      )
+
       await loadDocuments()
 
+      await processDocument(
+        createdDocument.id,
+        'Document uploaded and indexed successfully.'
+      )
     } catch (uploadError) {
       console.error(uploadError)
 
       setError(
-        uploadError.message ||
+        uploadError?.message ||
         'Unable to upload document.'
       )
     } finally {
@@ -314,96 +325,77 @@ function RwbotDocuments({
     }
   }
 
-  const handleDownload =
-    async (document) => {
+  const handleDownload = async (document) => {
+    setError('')
+    setMessage('')
 
-      setError('')
-      setMessage('')
-
-      const {
-        data,
-        error: signedUrlError
-      } = await supabase.storage
-        .from('rwbot-documents')
-        .createSignedUrl(
-          document.file_path,
-          60
-        )
-
-      if (signedUrlError) {
-        console.error(
-          signedUrlError
-        )
-
-        setError(
-          'Unable to open document.'
-        )
-        return
-      }
-
-      window.open(
-        data.signedUrl,
-        '_blank',
-        'noopener,noreferrer'
-      )
-    }
-
-  const handleDelete =
-    async (document) => {
-
-      const confirmed =
-        window.confirm(
-          `Delete "${document.title}"?`
-        )
-
-      if (!confirmed) {
-        return
-      }
-
-      setError('')
-      setMessage('')
-
-      const {
-        error: storageError
-      } = await supabase.storage
-        .from('rwbot-documents')
-        .remove([
-          document.file_path
-        ])
-
-      if (storageError) {
-        console.error(storageError)
-
-        setError(
-          'Unable to delete the stored file.'
-        )
-        return
-      }
-
-      const {
-        error: databaseError
-      } = await supabase
-        .from('rwbot_documents')
-        .delete()
-        .eq('id', document.id)
-
-      if (databaseError) {
-        console.error(
-          databaseError
-        )
-
-        setError(
-          'File was removed, but the database record could not be deleted.'
-        )
-        return
-      }
-
-      setMessage(
-        'Document deleted successfully.'
+    const {
+      data,
+      error: signedUrlError
+    } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(
+        document.file_path,
+        60
       )
 
-      await loadDocuments()
+    if (signedUrlError || !data?.signedUrl) {
+      console.error(signedUrlError)
+      setError('Unable to open document.')
+      return
     }
+
+    window.open(
+      data.signedUrl,
+      '_blank',
+      'noopener,noreferrer'
+    )
+  }
+
+  const handleDelete = async (document) => {
+    const confirmed = window.confirm(
+      `Delete "${document.title}"?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setError('')
+    setMessage('')
+
+    const {
+      error: storageError
+    } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove([
+        document.file_path
+      ])
+
+    if (storageError) {
+      console.error(storageError)
+      setError('Unable to delete the stored file.')
+      return
+    }
+
+    const {
+      error: databaseError
+    } = await supabase
+      .from('rwbot_documents')
+      .delete()
+      .eq('id', document.id)
+
+    if (databaseError) {
+      console.error(databaseError)
+      setError(
+        'File was removed, but the database record could not be deleted.'
+      )
+      return
+    }
+
+    setMessage('Document deleted successfully.')
+    await loadDocuments()
+  }
 
   const formatFileSize = (bytes) => {
     if (!bytes) {
@@ -411,15 +403,26 @@ function RwbotDocuments({
     }
 
     if (bytes < 1024 * 1024) {
-      return `${Math.round(
-        bytes / 1024
-      )} KB`
+      return `${Math.round(bytes / 1024)} KB`
     }
 
     return `${(
       bytes /
       (1024 * 1024)
     ).toFixed(1)} MB`
+  }
+
+  const statusLabel = (status) => {
+    switch (status) {
+      case 'READY':
+        return 'READY'
+      case 'PROCESSING':
+        return 'PROCESSING'
+      case 'FAILED':
+        return 'FAILED'
+      default:
+        return 'UPLOADED'
+    }
   }
 
   return (
@@ -430,6 +433,8 @@ function RwbotDocuments({
         <button
           className="rwbot-back-button"
           onClick={onBack}
+          type="button"
+          aria-label="Back"
         >
           <ArrowLeft size={20} />
         </button>
@@ -441,19 +446,13 @@ function RwbotDocuments({
           </div>
 
           <div>
-            <h1>
-              Manage Documents
-            </h1>
-
-            <p>
-              RWBOT Knowledge Base
-            </p>
+            <h1>Manage Documents</h1>
+            <p>RWBOT Knowledge Base</p>
           </div>
 
         </div>
 
       </header>
-
 
       <main className="rwbot-documents-main">
 
@@ -462,130 +461,75 @@ function RwbotDocuments({
           <div className="rwbot-section-heading">
 
             <div>
-              <h2>
-                Upload Document
-              </h2>
-
-              <p>
-                RWA Members only
-              </p>
+              <h2>Upload Document</h2>
+              <p>RWA Members only</p>
             </div>
 
             <Upload size={24} />
 
           </div>
 
-
           <form
             className="rwbot-upload-form"
             onSubmit={handleUpload}
           >
 
-            <label>
-              Document Title
-            </label>
+            <label>Document Title</label>
 
             <input
               type="text"
               value={title}
               onChange={(event) =>
-                setTitle(
-                  event.target.value
-                )
+                setTitle(event.target.value)
               }
               placeholder="e.g. August 2026 GBM Minutes"
             />
 
-
             <div className="rwbot-form-grid">
 
               <div>
-
-                <label>
-                  Document Type
-                </label>
+                <label>Document Type</label>
 
                 <select
                   value={documentType}
                   onChange={(event) =>
-                    setDocumentType(
-                      event.target.value
-                    )
+                    setDocumentType(event.target.value)
                   }
                 >
-
-                  <option value="GBM">
-                    GBM
-                  </option>
-
-                  <option value="MOM">
-                    Executive Body MOM
-                  </option>
-
-                  <option value="NOTICE">
-                    Notice
-                  </option>
-
-                  <option value="FINANCIAL">
-                    Financial Statement
-                  </option>
-
-                  <option value="BANK_STATEMENT">
-                    Bank Statement
-                  </option>
-
-                  <option value="RULE">
-                    Rules / Policy
-                  </option>
-
-                  <option value="SOP">
-                    SOP
-                  </option>
-
-                  <option value="OTHER">
-                    Other
-                  </option>
-
+                  <option value="GBM">GBM</option>
+                  <option value="MOM">Executive Body MOM</option>
+                  <option value="NOTICE">Notice</option>
+                  <option value="FINANCIAL">Financial Statement</option>
+                  <option value="BANK_STATEMENT">Bank Statement</option>
+                  <option value="RULE">Rules / Policy</option>
+                  <option value="SOP">SOP</option>
+                  <option value="OTHER">Other</option>
                 </select>
-
               </div>
 
-
               <div>
-
-                <label>
-                  Document Date
-                </label>
+                <label>Document Date</label>
 
                 <input
                   type="date"
                   value={documentDate}
                   onChange={(event) =>
-                    setDocumentDate(
-                      event.target.value
-                    )
+                    setDocumentDate(event.target.value)
                   }
                 />
-
               </div>
 
             </div>
 
-
-            <label>
-              Select File
-            </label>
+            <label>Select File</label>
 
             <input
               id="rwbot-file-input"
               className="rwbot-file-input"
               type="file"
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-              onChange={
-                handleFileChange
-              }
+              onChange={handleFileChange}
             />
-
 
             {file && (
               <div className="rwbot-selected-file">
@@ -593,34 +537,20 @@ function RwbotDocuments({
                 <FileText size={18} />
 
                 <div>
-
-                  <strong>
-                    {file.name}
-                  </strong>
-
-                  <span>
-                    {formatFileSize(
-                      file.size
-                    )}
-                  </span>
-
+                  <strong>{file.name}</strong>
+                  <span>{formatFileSize(file.size)}</span>
                 </div>
 
               </div>
             )}
 
-
             <label className="rwbot-visibility-option">
 
               <input
                 type="checkbox"
-                checked={
-                  residentVisible
-                }
+                checked={residentVisible}
                 onChange={(event) =>
-                  setResidentVisible(
-                    event.target.checked
-                  )
+                  setResidentVisible(event.target.checked)
                 }
               />
 
@@ -630,45 +560,34 @@ function RwbotDocuments({
 
             </label>
 
-
             <p className="rwbot-upload-help">
               Supported: PDF, DOC, DOCX,
               JPG, JPEG, PNG and TXT.
-              Maximum 10 MB.
+              Maximum 10 MB. New uploads are
+              automatically added to the searchable
+              RWBOT knowledge base.
             </p>
-
 
             {message && (
               <div className="rwbot-success">
-
-                <CheckCircle2
-                  size={18}
-                />
-
+                <CheckCircle2 size={18} />
                 {message}
-
               </div>
             )}
-
 
             {error && (
               <div className="rwbot-error rwbot-document-error">
-
-                <AlertCircle
-                  size={18}
-                />
-
+                <AlertCircle size={18} />
                 {error}
-
               </div>
             )}
-
 
             <button
               type="submit"
               className="rwbot-primary-button rwbot-upload-button"
               disabled={
                 uploading ||
+                processingDocumentId !== null ||
                 !file
               }
             >
@@ -679,13 +598,11 @@ function RwbotDocuments({
                     size={18}
                     className="rwbot-spin"
                   />
-
                   Uploading...
                 </>
               ) : (
                 <>
                   <Upload size={18} />
-
                   Upload Document
                 </>
               )}
@@ -696,69 +613,55 @@ function RwbotDocuments({
 
         </section>
 
-
         <section className="rwbot-document-list-card">
 
           <div className="rwbot-section-heading">
 
             <div>
-
-              <h2>
-                Uploaded Documents
-              </h2>
-
+              <h2>Uploaded Documents</h2>
               <p>
-                {documents.length}
-                {' '}
+                {documents.length}{' '}
                 document
                 {documents.length === 1
                   ? ''
                   : 's'
                 }
               </p>
-
             </div>
 
           </div>
 
-
           {loading ? (
 
             <div className="rwbot-document-loading">
-
               <LoaderCircle
                 className="rwbot-spin"
                 size={22}
               />
-
               Loading documents...
-
             </div>
 
           ) : documents.length === 0 ? (
 
             <div className="rwbot-empty-documents">
-
               <FileText size={34} />
-
-              <strong>
-                No documents uploaded yet
-              </strong>
-
+              <strong>No documents uploaded yet</strong>
               <span>
                 Upload your first RWA
                 document above.
               </span>
-
             </div>
 
           ) : (
 
             <div className="rwbot-document-list">
 
-              {documents.map(
-                (document) => (
+              {documents.map((document) => {
+                const isProcessing =
+                  processingDocumentId === document.id ||
+                  document.processing_status === 'PROCESSING'
 
+                return (
                   <div
                     key={document.id}
                     className="rwbot-document-row"
@@ -767,7 +670,6 @@ function RwbotDocuments({
                     <div className="rwbot-document-icon">
                       <FileText size={21} />
                     </div>
-
 
                     <div className="rwbot-document-info">
 
@@ -795,12 +697,13 @@ function RwbotDocuments({
                         }
                       </span>
 
-
                       <div className="rwbot-document-badges">
-
                         <span>
-                          {
-                            document.processing_status
+                          {isProcessing
+                            ? 'PROCESSING'
+                            : statusLabel(
+                                document.processing_status
+                              )
                           }
                         </span>
 
@@ -810,35 +713,48 @@ function RwbotDocuments({
                             : 'RWA Only'
                           }
                         </span>
-
                       </div>
 
                     </div>
-
 
                     <div className="rwbot-document-actions">
 
                       <button
                         type="button"
+                        title="Process / reprocess for RWBOT"
+                        disabled={isProcessing}
+                        onClick={() =>
+                          processDocument(document.id)
+                        }
+                      >
+                        {isProcessing
+                          ? (
+                            <LoaderCircle
+                              size={18}
+                              className="rwbot-spin"
+                            />
+                          )
+                          : <RefreshCw size={18} />
+                        }
+                      </button>
+
+                      <button
+                        type="button"
                         title="Open document"
                         onClick={() =>
-                          handleDownload(
-                            document
-                          )
+                          handleDownload(document)
                         }
                       >
                         <Download size={18} />
                       </button>
 
-
                       <button
                         type="button"
                         className="rwbot-delete-button"
                         title="Delete document"
+                        disabled={isProcessing}
                         onClick={() =>
-                          handleDelete(
-                            document
-                          )
+                          handleDelete(document)
                         }
                       >
                         <Trash2 size={18} />
@@ -847,12 +763,10 @@ function RwbotDocuments({
                     </div>
 
                   </div>
-
                 )
-              )}
+              })}
 
             </div>
-
           )}
 
         </section>
