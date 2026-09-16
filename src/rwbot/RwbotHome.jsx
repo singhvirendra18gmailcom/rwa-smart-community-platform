@@ -1,4 +1,10 @@
 import {
+  useEffect,
+  useState
+} from 'react'
+
+import {
+  Bot,
   LogOut,
   MessageCircleQuestion,
   FileText,
@@ -34,6 +40,42 @@ function getGreeting() {
   return 'Good evening,'
 }
 
+function dataUriToObjectUrl(dataUri) {
+  if (!dataUri || typeof dataUri !== 'string') {
+    return null
+  }
+
+  const commaIndex = dataUri.indexOf(',')
+
+  if (commaIndex < 0) {
+    return null
+  }
+
+  const metadata = dataUri.slice(0, commaIndex)
+  const encoded = dataUri.slice(commaIndex + 1)
+  const mimeMatch = metadata.match(/^data:([^;]+);base64$/i)
+
+  if (!mimeMatch || !encoded) {
+    return null
+  }
+
+  const binary = window.atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  const blob = new Blob(
+    [bytes],
+    {
+      type: mimeMatch[1]
+    }
+  )
+
+  return URL.createObjectURL(blob)
+}
+
 function RwbotHome({
   profile,
   onLogout,
@@ -45,8 +87,38 @@ function RwbotHome({
     displayName
   } = useRwbotOwnerName(profile)
 
+  const [mascotUrl, setMascotUrl] = useState('')
+  const [mascotFailed, setMascotFailed] = useState(false)
+
+  useEffect(() => {
+    let objectUrl = null
+
+    try {
+      objectUrl = dataUriToObjectUrl(rwbotMascotImage)
+
+      if (objectUrl) {
+        setMascotUrl(objectUrl)
+        setMascotFailed(false)
+      } else {
+        setMascotFailed(true)
+      }
+    } catch (error) {
+      console.error('Unable to prepare RWBOT mascot image:', error)
+      setMascotFailed(true)
+    }
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
+    }
+  }, [])
+
   const isRwaMember =
     profile.role === 'RWA_MEMBER'
+
+  const showMascot =
+    mascotUrl && !mascotFailed
 
   const quickQuestions = [
     {
@@ -82,11 +154,16 @@ function RwbotHome({
 
         <div className="rwbot-home-brand">
           <div className="rwbot-home-brand-icon rwbot-home-brand-image-wrap">
-            <img
-              src={rwbotMascotImage}
-              alt="RWBOT AI Assistant"
-              className="rwbot-home-brand-image"
-            />
+            {showMascot ? (
+              <img
+                src={mascotUrl}
+                alt="RWBOT AI Assistant"
+                className="rwbot-home-brand-image"
+                onError={() => setMascotFailed(true)}
+              />
+            ) : (
+              <Bot size={28} strokeWidth={1.9} />
+            )}
           </div>
 
           <div>
@@ -162,12 +239,20 @@ function RwbotHome({
             aria-hidden="true"
           >
             <div className="rwbot-home-mascot-glow" />
+
             <div className="rwbot-home-mascot-frame">
-              <img
-                src={rwbotMascotImage}
-                alt=""
-                className="rwbot-home-mascot-image"
-              />
+              {showMascot ? (
+                <img
+                  src={mascotUrl}
+                  alt=""
+                  className="rwbot-home-mascot-image"
+                  onError={() => setMascotFailed(true)}
+                />
+              ) : (
+                <div className="rwbot-home-mascot-fallback">
+                  <Bot size={72} strokeWidth={1.5} />
+                </div>
+              )}
             </div>
           </div>
 
