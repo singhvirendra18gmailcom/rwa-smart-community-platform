@@ -9,6 +9,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 
+import useRwbotOwnerName from './useRwbotOwnerName'
 import './Rwbot.css'
 
 function RwbotHome({
@@ -17,9 +18,10 @@ function RwbotHome({
   onAsk,
   onManageDocuments
 }) {
-  const flat = Array.isArray(profile.flat)
-    ? profile.flat[0]
-    : profile.flat
+  const {
+    flat,
+    displayName
+  } = useRwbotOwnerName(profile)
 
   const isRwaMember =
     profile.role === 'RWA_MEMBER'
@@ -64,7 +66,7 @@ function RwbotHome({
           </p>
 
           <h2>
-            {profile.full_name}
+            {displayName}
           </h2>
 
           {flat && (
