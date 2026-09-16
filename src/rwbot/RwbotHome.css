@@ -1,0 +1,676 @@
+/* =========================================================
+   RWBOT HOME — MOBILE-FIRST DASHBOARD
+   Scoped to .rwbot-home so existing RWBOT login/chat screens
+   remain unchanged.
+   ========================================================= */
+
+.rwbot-home {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(180deg, #f8fbfe 0%, #f4f8fb 55%, #ffffff 100%);
+  color: #173451;
+}
+
+.rwbot-home-header {
+  min-height: 84px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #e3ebf1;
+  box-shadow: 0 2px 12px rgba(19, 61, 94, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+}
+
+.rwbot-home-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rwbot-home-brand-icon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #e4f4fb, #dff0ff);
+  color: #146ba5;
+  box-shadow: inset 0 0 0 1px rgba(20, 107, 165, 0.07);
+}
+
+.rwbot-home-brand h1 {
+  margin: 0;
+  color: #103a63;
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.rwbot-home-brand p {
+  margin: 5px 0 0;
+  color: #75889a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rwbot-home-society {
+  display: none;
+  margin-left: auto;
+  text-align: right;
+}
+
+.rwbot-home-society strong {
+  display: block;
+  color: #173c60;
+  font-size: 12px;
+}
+
+.rwbot-home-society span {
+  display: block;
+  margin-top: 2px;
+  color: #7b8b9a;
+  font-size: 10px;
+}
+
+.rwbot-home-logout {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d8e3eb;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #536b7f;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.rwbot-home-logout:hover {
+  transform: translateY(-1px);
+  border-color: #adc8da;
+}
+
+.rwbot-home-main {
+  width: 100%;
+  max-width: 920px;
+  flex: 1;
+  margin: 0 auto;
+  padding: 18px 16px 28px;
+}
+
+/* Hero */
+
+.rwbot-home-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 270px;
+  padding: 25px 22px 22px;
+  border: 1px solid #dceef3;
+  border-radius: 25px;
+  background:
+    radial-gradient(circle at 82% 22%, rgba(255, 255, 255, 0.9), transparent 22%),
+    linear-gradient(135deg, #e9f9f7 0%, #e5f6fb 48%, #eef8ff 100%);
+  box-shadow: 0 10px 30px rgba(21, 77, 108, 0.08);
+}
+
+.rwbot-home-hero::before,
+.rwbot-home-hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.rwbot-home-hero::before {
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: -80px;
+  background: rgba(57, 185, 176, 0.08);
+}
+
+.rwbot-home-hero::after {
+  width: 120px;
+  height: 120px;
+  right: 90px;
+  bottom: -78px;
+  background: rgba(47, 138, 204, 0.08);
+}
+
+.rwbot-home-hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 64%;
+}
+
+.rwbot-home-greeting {
+  margin: 0 0 6px;
+  color: #1b557b;
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.rwbot-home-hero h2 {
+  margin: 0;
+  color: #0f3d68;
+  font-size: clamp(28px, 8vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.rwbot-home-resident-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.rwbot-home-resident-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 11px;
+  border: 1px solid rgba(80, 130, 160, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #395d77;
+  font-size: 11px;
+  font-weight: 650;
+  box-shadow: 0 4px 12px rgba(22, 72, 104, 0.04);
+}
+
+.rwbot-home-role {
+  color: #216e5f;
+  background: rgba(238, 252, 247, 0.94);
+}
+
+.rwbot-home-tagline {
+  margin: 20px 0 0;
+  color: #238274;
+  font-size: 16px;
+  font-style: italic;
+  font-weight: 650;
+}
+
+.rwbot-home-hero-art {
+  position: absolute;
+  right: 12px;
+  bottom: 6px;
+  width: 35%;
+  min-width: 118px;
+  max-width: 210px;
+  height: 82%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1;
+}
+
+.rwbot-home-bot-glow {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  bottom: 33px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 0 0 18px rgba(255, 255, 255, 0.25);
+}
+
+.rwbot-home-bot {
+  position: relative;
+  width: 106px;
+  height: 106px;
+  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #59a7d4;
+  border-radius: 34px;
+  background: #ffffff;
+  color: #0b4f78;
+  box-shadow: 0 13px 25px rgba(10, 78, 118, 0.15);
+}
+
+.rwbot-home-bot::before {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 24px;
+  top: -24px;
+  background: #2f84bd;
+}
+
+.rwbot-home-bot::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  top: -32px;
+  border-radius: 50%;
+  background: #2f84bd;
+}
+
+.rwbot-home-bot-label {
+  position: absolute;
+  bottom: 7px;
+  color: #174f73;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.rwbot-home-speech {
+  position: absolute;
+  right: 73px;
+  top: 22px;
+  display: none;
+  max-width: 150px;
+  padding: 10px 12px;
+  border-radius: 17px 17px 4px 17px;
+  background: linear-gradient(145deg, #159a90, #0d8a83);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  box-shadow: 0 8px 20px rgba(15, 139, 130, 0.16);
+}
+
+/* Primary action */
+
+.rwbot-home-primary {
+  width: 100%;
+  margin-top: 18px;
+  padding: 22px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 0;
+  border-radius: 23px;
+  background: linear-gradient(135deg, #1676b8 0%, #0f659d 55%, #0d5a8d 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 97, 152, 0.22);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.rwbot-home-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 32px rgba(15, 97, 152, 0.27);
+}
+
+.rwbot-home-primary-icon {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.rwbot-home-primary-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rwbot-home-primary h3 {
+  margin: 0 0 5px;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.rwbot-home-primary p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.rwbot-home-primary-arrow {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #1370ad;
+}
+
+/* Quick questions */
+
+.rwbot-home-quick {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #e0e9ef;
+  border-radius: 23px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(28, 65, 92, 0.05);
+}
+
+.rwbot-home-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.rwbot-home-section-title h3 {
+  margin: 0;
+  color: #173d62;
+  font-size: 18px;
+}
+
+.rwbot-home-section-title span {
+  color: #1682c3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rwbot-home-quick-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.rwbot-home-quick-card {
+  min-height: 94px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 17px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.rwbot-home-quick-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(31, 66, 91, 0.07);
+}
+
+.rwbot-home-quick-card.accounts {
+  background: #edf9f3;
+  border-color: #d9f1e6;
+}
+
+.rwbot-home-quick-card.gbm {
+  background: #edf5fc;
+  border-color: #dcebf7;
+}
+
+.rwbot-home-quick-card.parking {
+  background: #fff7e9;
+  border-color: #f7e8c9;
+}
+
+.rwbot-home-quick-card.notices {
+  background: #fff0f1;
+  border-color: #f5dfe1;
+}
+
+.rwbot-home-quick-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.accounts .rwbot-home-quick-icon {
+  background: #d1f0df;
+  color: #128451;
+}
+
+.gbm .rwbot-home-quick-icon {
+  background: #d8ebfb;
+  color: #1678be;
+}
+
+.parking .rwbot-home-quick-icon {
+  background: #fce7bd;
+  color: #b76813;
+}
+
+.notices .rwbot-home-quick-icon {
+  background: #f9d7da;
+  color: #cf4650;
+}
+
+.rwbot-home-quick-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.rwbot-home-quick-copy strong {
+  display: block;
+  color: #153f61;
+  font-size: 13px;
+}
+
+.rwbot-home-quick-copy span {
+  display: block;
+  margin-top: 4px;
+  color: #668096;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.rwbot-home-quick-chevron {
+  flex-shrink: 0;
+  color: #5d7181;
+}
+
+/* Member tools */
+
+.rwbot-home-member-tools {
+  margin-top: 14px;
+}
+
+.rwbot-home-member-button {
+  width: 100%;
+  padding: 14px 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #dce7ee;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #315069;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rwbot-home-member-button > svg:first-child {
+  color: #177bb5;
+}
+
+.rwbot-home-member-button div {
+  min-width: 0;
+  flex: 1;
+}
+
+.rwbot-home-member-button strong {
+  display: block;
+  font-size: 12px;
+}
+
+.rwbot-home-member-button span {
+  display: block;
+  margin-top: 2px;
+  color: #81909d;
+  font-size: 10px;
+}
+
+/* Trust strip */
+
+.rwbot-home-trust {
+  margin-top: 18px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #d8f0ed;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #eefaf8, #edf9fb);
+  color: #24685f;
+}
+
+.rwbot-home-trust-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: #14a090;
+  color: #ffffff;
+}
+
+.rwbot-home-trust strong {
+  display: block;
+  font-size: 11px;
+}
+
+.rwbot-home-trust span {
+  display: block;
+  margin-top: 3px;
+  color: #6d8785;
+  font-size: 9px;
+}
+
+.rwbot-home-footer {
+  padding: 18px 16px 22px;
+  text-align: center;
+  color: #7b8ea0;
+  font-size: 10px;
+}
+
+.rwbot-home-footer strong {
+  color: #49677f;
+}
+
+.rwbot-home-footer p {
+  margin: 6px auto 0;
+  max-width: 620px;
+  color: #9aa8b4;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@media (min-width: 560px) {
+  .rwbot-home-society {
+    display: block;
+  }
+
+  .rwbot-home-speech {
+    display: block;
+  }
+
+  .rwbot-home-quick-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rwbot-home-main {
+    padding: 24px 22px 34px;
+  }
+
+  .rwbot-home-hero {
+    min-height: 285px;
+    padding: 30px 30px;
+  }
+
+  .rwbot-home-hero-copy {
+    max-width: 58%;
+  }
+}
+
+@media (max-width: 390px) {
+  .rwbot-home-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .rwbot-home-brand-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .rwbot-home-brand h1 {
+    font-size: 22px;
+  }
+
+  .rwbot-home-brand p {
+    font-size: 10px;
+  }
+
+  .rwbot-home-main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .rwbot-home-hero {
+    min-height: 250px;
+    padding: 21px 18px;
+  }
+
+  .rwbot-home-hero-copy {
+    max-width: 66%;
+  }
+
+  .rwbot-home-hero h2 {
+    font-size: 27px;
+  }
+
+  .rwbot-home-bot {
+    width: 92px;
+    height: 92px;
+  }
+
+  .rwbot-home-bot-glow {
+    width: 110px;
+    height: 110px;
+  }
+
+  .rwbot-home-primary {
+    padding: 19px 15px;
+    gap: 12px;
+  }
+
+  .rwbot-home-primary-icon {
+    width: 54px;
+    height: 54px;
+  }
+
+  .rwbot-home-primary h3 {
+    font-size: 21px;
+  }
+
+  .rwbot-home-primary-arrow {
+    width: 40px;
+    height: 40px;
+  }
+}
