@@ -1,10 +1,4 @@
 import {
-  useEffect,
-  useState
-} from 'react'
-
-import {
-  Bot,
   LogOut,
   MessageCircleQuestion,
   FileText,
@@ -21,10 +15,12 @@ import {
 } from 'lucide-react'
 
 import useRwbotOwnerName from './useRwbotOwnerName'
-import rwbotMascotImage from './rwbotMascotImage'
+import rwbotMascot from '../assets/rwbot-mascot.png'
+
 import './Rwbot.css'
 import './RwbotHome.css'
 import './RwbotMascot.css'
+
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -40,41 +36,6 @@ function getGreeting() {
   return 'Good evening,'
 }
 
-function dataUriToObjectUrl(dataUri) {
-  if (!dataUri || typeof dataUri !== 'string') {
-    return null
-  }
-
-  const commaIndex = dataUri.indexOf(',')
-
-  if (commaIndex < 0) {
-    return null
-  }
-
-  const metadata = dataUri.slice(0, commaIndex)
-  const encoded = dataUri.slice(commaIndex + 1)
-  const mimeMatch = metadata.match(/^data:([^;]+);base64$/i)
-
-  if (!mimeMatch || !encoded) {
-    return null
-  }
-
-  const binary = window.atob(encoded)
-  const bytes = new Uint8Array(binary.length)
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-
-  const blob = new Blob(
-    [bytes],
-    {
-      type: mimeMatch[1]
-    }
-  )
-
-  return URL.createObjectURL(blob)
-}
 
 function RwbotHome({
   profile,
@@ -87,65 +48,41 @@ function RwbotHome({
     displayName
   } = useRwbotOwnerName(profile)
 
-  const [mascotUrl, setMascotUrl] = useState('')
-  const [mascotFailed, setMascotFailed] = useState(false)
-
-  useEffect(() => {
-    let objectUrl = null
-
-    try {
-      objectUrl = dataUriToObjectUrl(rwbotMascotImage)
-
-      if (objectUrl) {
-        setMascotUrl(objectUrl)
-        setMascotFailed(false)
-      } else {
-        setMascotFailed(true)
-      }
-    } catch (error) {
-      console.error('Unable to prepare RWBOT mascot image:', error)
-      setMascotFailed(true)
-    }
-
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
-      }
-    }
-  }, [])
-
   const isRwaMember =
     profile.role === 'RWA_MEMBER'
 
-  const showMascot =
-    mascotUrl && !mascotFailed
 
   const quickQuestions = [
     {
       key: 'accounts',
       title: 'Accounts & Expenses',
-      description: 'Collections, payments, monthly statements',
+      description:
+        'Collections, payments, monthly statements',
       icon: CircleDollarSign
     },
     {
       key: 'gbm',
       title: 'GBM Decisions',
-      description: 'Meeting minutes, resolutions, action items',
+      description:
+        'Meeting minutes, resolutions, action items',
       icon: Landmark
     },
     {
       key: 'parking',
       title: 'Parking Rules',
-      description: 'Parking policy, allocation and guidelines',
+      description:
+        'Parking policy, allocation and guidelines',
       icon: CarFront
     },
     {
       key: 'notices',
       title: 'Notices & Policies',
-      description: 'RWA notices, rules and important updates',
+      description:
+        'RWA notices, rules and important updates',
       icon: Megaphone
     }
   ]
+
 
   return (
     <div className="rwbot-home">
@@ -153,29 +90,35 @@ function RwbotHome({
       <header className="rwbot-home-header">
 
         <div className="rwbot-home-brand">
+
           <div className="rwbot-home-brand-icon rwbot-home-brand-image-wrap">
-            {showMascot ? (
-              <img
-                src={mascotUrl}
-                alt="RWBOT AI Assistant"
-                className="rwbot-home-brand-image"
-                onError={() => setMascotFailed(true)}
-              />
-            ) : (
-              <Bot size={28} strokeWidth={1.9} />
-            )}
+            <img
+              src={rwbotMascot}
+              alt="RWBOT AI Assistant"
+              className="rwbot-home-brand-image"
+            />
           </div>
 
           <div>
             <h1>RWBOT</h1>
-            <p>RWA Transparency Assistant</p>
+            <p>
+              RWA Transparency Assistant
+            </p>
           </div>
+
         </div>
 
+
         <div className="rwbot-home-society">
-          <strong>RWA Pocket-A</strong>
-          <span>Sector-105, Noida</span>
+          <strong>
+            RWA Pocket-A
+          </strong>
+
+          <span>
+            Sector-105, Noida
+          </span>
         </div>
+
 
         <button
           className="rwbot-home-logout"
@@ -189,6 +132,7 @@ function RwbotHome({
 
       </header>
 
+
       <main className="rwbot-home-main">
 
         <section className="rwbot-home-hero">
@@ -199,7 +143,10 @@ function RwbotHome({
               {getGreeting()}
             </p>
 
-            <h2>{displayName}</h2>
+            <h2>
+              {displayName}
+            </h2>
+
 
             {flat && (
               <div className="rwbot-home-resident-chips">
@@ -224,39 +171,35 @@ function RwbotHome({
               </div>
             )}
 
+
             <p className="rwbot-home-tagline">
               Ask. Know. Stay Informed.
             </p>
 
           </div>
 
+
           <div className="rwbot-home-speech">
             Your RWA Information Assistant
           </div>
 
-          <div
-            className="rwbot-home-hero-art rwbot-home-mascot-art"
-            aria-hidden="true"
-          >
+
+          <div className="rwbot-home-mascot-art">
+
             <div className="rwbot-home-mascot-glow" />
 
             <div className="rwbot-home-mascot-frame">
-              {showMascot ? (
-                <img
-                  src={mascotUrl}
-                  alt=""
-                  className="rwbot-home-mascot-image"
-                  onError={() => setMascotFailed(true)}
-                />
-              ) : (
-                <div className="rwbot-home-mascot-fallback">
-                  <Bot size={72} strokeWidth={1.5} />
-                </div>
-              )}
+              <img
+                src={rwbotMascot}
+                alt="RWBOT AI Assistant"
+                className="rwbot-home-mascot-image"
+              />
             </div>
+
           </div>
 
         </section>
+
 
         <button
           className="rwbot-home-primary"
@@ -265,14 +208,22 @@ function RwbotHome({
         >
 
           <div className="rwbot-home-primary-icon">
-            <MessageCircleQuestion size={35} />
+            <MessageCircleQuestion
+              size={35}
+            />
           </div>
 
           <div className="rwbot-home-primary-copy">
-            <h3>Ask RWBOT</h3>
+
+            <h3>
+              Ask RWBOT
+            </h3>
+
             <p>
-              Get answers from approved RWA records and documents.
+              Get answers from approved RWA
+              records and documents.
             </p>
+
           </div>
 
           <span className="rwbot-home-primary-arrow">
@@ -281,12 +232,21 @@ function RwbotHome({
 
         </button>
 
+
         <section className="rwbot-home-quick">
 
           <div className="rwbot-home-section-title">
-            <h3>Quick Questions</h3>
-            <span>Explore topics</span>
+
+            <h3>
+              Quick Questions
+            </h3>
+
+            <span>
+              Explore topics
+            </span>
+
           </div>
+
 
           <div className="rwbot-home-quick-grid">
 
@@ -296,7 +256,9 @@ function RwbotHome({
               return (
                 <button
                   key={item.key}
-                  className={`rwbot-home-quick-card ${item.key}`}
+                  className={
+                    `rwbot-home-quick-card ${item.key}`
+                  }
                   onClick={onAsk}
                   type="button"
                 >
@@ -305,10 +267,19 @@ function RwbotHome({
                     <Icon size={24} />
                   </span>
 
+
                   <span className="rwbot-home-quick-copy">
-                    <strong>{item.title}</strong>
-                    <span>{item.description}</span>
+
+                    <strong>
+                      {item.title}
+                    </strong>
+
+                    <span>
+                      {item.description}
+                    </span>
+
                   </span>
+
 
                   <ChevronRight
                     className="rwbot-home-quick-chevron"
@@ -323,57 +294,87 @@ function RwbotHome({
 
         </section>
 
+
         {isRwaMember && (
           <section className="rwbot-home-member-tools">
+
             <button
               className="rwbot-home-member-button"
               onClick={onManageDocuments}
               type="button"
             >
+
               <FileText size={22} />
 
               <div>
-                <strong>Manage Knowledge Base</strong>
+
+                <strong>
+                  Manage Knowledge Base
+                </strong>
+
                 <span>
-                  Upload and manage approved RWA documents
+                  Upload and manage approved
+                  RWA documents
                 </span>
+
               </div>
 
               <ChevronRight size={19} />
+
             </button>
+
           </section>
         )}
 
+
         <section className="rwbot-home-trust">
+
           <div className="rwbot-home-trust-icon">
             <Shield size={21} />
           </div>
 
           <div>
+
             <strong>
-              Answers are based on approved RWA records and documents.
+              Answers are based on approved
+              RWA records and documents.
             </strong>
+
             <span>
-              Transparent information for a better informed community.
+              Transparent information for a
+              better informed community.
             </span>
+
           </div>
+
         </section>
 
       </main>
 
+
       <footer className="rwbot-home-footer">
-        <strong>RWA Pocket-A</strong>
+
+        <strong>
+          RWA Pocket-A
+        </strong>
+
         {' '}•{' '}
-        <span>Sector-105, Noida</span>
+
+        <span>
+          Sector-105, Noida
+        </span>
 
         <p>
-          Powered by the RWA Pocket-A in-house App — a step towards smarter,
-          transparent & technology-driven RWA management.
+          Powered by the RWA Pocket-A in-house App —
+          a step towards smarter, transparent &
+          technology-driven RWA management.
         </p>
+
       </footer>
 
     </div>
   )
 }
+
 
 export default RwbotHome
