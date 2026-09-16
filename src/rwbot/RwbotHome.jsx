@@ -18,6 +18,7 @@ import useRwbotOwnerName from './useRwbotOwnerName'
 import rwbotMascotImage from './rwbotMascotImage'
 import './Rwbot.css'
 import './RwbotHome.css'
+import './RwbotMascot.css'
 
 function getGreeting() {
   const hour = new Date().getHours()
