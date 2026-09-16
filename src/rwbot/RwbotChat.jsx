@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { supabase } from '../supabase'
+import useRwbotOwnerName from './useRwbotOwnerName'
 import './Rwbot.css'
 import './RwbotChat.css'
 
@@ -23,9 +24,10 @@ function RwbotChat({
   const [asking, setAsking] = useState(false)
   const [error, setError] = useState('')
 
-  const flat = Array.isArray(profile.flat)
-    ? profile.flat[0]
-    : profile.flat
+  const {
+    flat,
+    displayName
+  } = useRwbotOwnerName(profile)
 
   const suggestedQuestions = [
     'How many flats do we have?',
@@ -179,7 +181,7 @@ function RwbotChat({
       <main className="rwbot-chat-main">
 
         <div className="rwbot-chat-user-info">
-          <span>{profile.full_name}</span>
+          <span>{displayName}</span>
 
           {flat && (
             <span>
