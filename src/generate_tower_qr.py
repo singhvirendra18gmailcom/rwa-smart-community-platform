@@ -2,6 +2,10 @@ import os
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 
+# =========================================================
+# LOCATIONS / QR TOKENS
+# =========================================================
+
 locations = {
     "Tower 1": "30623123-7892-4586-b763-670fe8c4710d",
     "Tower 2": "95540a35-897e-4a75-ac8b-6a54ca99cc18",
@@ -22,31 +26,66 @@ locations = {
 OUTPUT_DIR = "inspection_qr_codes"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Windows fonts
+# =========================================================
+# WINDOWS FONTS
+# =========================================================
+
 FONT_BOLD = "C:/Windows/Fonts/arialbd.ttf"
 FONT_NORMAL = "C:/Windows/Fonts/arial.ttf"
 
-title_font = ImageFont.truetype(
-    FONT_BOLD,
-    60
-)
+brand_font = ImageFont.truetype(FONT_BOLD, 25)
+title_font = ImageFont.truetype(FONT_BOLD, 64)
+header_subtitle_font = ImageFont.truetype(FONT_NORMAL, 27)
 
-instruction_font = ImageFont.truetype(
-    FONT_BOLD,
-    34
-)
+instruction_font = ImageFont.truetype(FONT_BOLD, 34)
+subtitle_font = ImageFont.truetype(FONT_NORMAL, 25)
 
-footer_font = ImageFont.truetype(
-    FONT_BOLD,
-    32
-)
+footer_brand_font = ImageFont.truetype(FONT_BOLD, 27)
+footer_font = ImageFont.truetype(FONT_NORMAL, 22)
 
-subtitle_font = ImageFont.truetype(
-    FONT_NORMAL,
-    26
-)
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
+
+def centered_text(draw, text, y, font, fill, card_width):
+    bbox = draw.textbbox((0, 0), text, font=font)
+    width = bbox[2] - bbox[0]
+
+    draw.text(
+        ((card_width - width) / 2, y),
+        text,
+        fill=fill,
+        font=font
+    )
+
+
+# =========================================================
+# GENERATE QR CARDS
+# =========================================================
 
 for name, token in locations.items():
+
+    is_park = name.startswith("Park")
+
+    # -----------------------------------------------------
+    # COLORS
+    # -----------------------------------------------------
+
+    if is_park:
+        header_color = "#176B3A"
+        header_dark = "#10502B"
+        accent_color = "#2E8B57"
+        light_bg = "#EDF8F1"
+        border_color = "#B9DDC6"
+    else:
+        header_color = "#155A96"
+        header_dark = "#103F6B"
+        accent_color = "#2878B9"
+        light_bg = "#EEF6FD"
+        border_color = "#B9D7F0"
+
+    text_dark = "#243447"
+    text_light = "#64748B"
 
     # =====================================================
     # QR CODE
@@ -59,7 +98,7 @@ for name, token in locations.items():
         border=4,
     )
 
-    # Exact DB token goes inside QR
+    # Exact DB token inside QR
     qr.add_data(token)
     qr.make(fit=True)
 
@@ -78,227 +117,220 @@ for name, token in locations.items():
     card = Image.new(
         "RGB",
         (card_width, card_height),
-        "white"
+        "#F8FAFC"
     )
 
     draw = ImageDraw.Draw(card)
 
     # =====================================================
-    # BORDER
+    # OUTER CARD
     # =====================================================
 
     draw.rounded_rectangle(
-        (15, 15, 785, 985),
-        radius=30,
-        outline="#B7D6F4",
-        width=5
+        (14, 14, 786, 986),
+        radius=32,
+        fill="white",
+        outline=border_color,
+        width=4
     )
 
     # =====================================================
-    # HEADER
+    # BEAUTIFIED HEADER
     # =====================================================
 
-    is_park = name.startswith("Park")
-
-    header_color = (
-        "#16723A"
-        if is_park
-        else "#155A96"
-    )
-
+    # Main header
     draw.rounded_rectangle(
-        (30, 30, 770, 190),
+        (30, 30, 770, 210),
         radius=28,
         fill=header_color
     )
 
+    # Dark branding strip
+    draw.rounded_rectangle(
+        (30, 30, 770, 84),
+        radius=28,
+        fill=header_dark
+    )
+
+    # Cover lower rounded part of branding strip
+    draw.rectangle(
+        (30, 58, 770, 84),
+        fill=header_dark
+    )
+
+    # Small decorative line
+    draw.rounded_rectangle(
+        (330, 95, 470, 101),
+        radius=3,
+        fill="#FFFFFF"
+    )
+
+    # Brand
+    centered_text(
+        draw,
+        "RWA POCKET-A",
+        45,
+        brand_font,
+        "#FFFFFF",
+        card_width
+    )
+
+    # Location name
     title_bbox = draw.textbbox(
         (0, 0),
         name,
         font=title_font
     )
 
-    title_width = (
-        title_bbox[2]
-        - title_bbox[0]
-    )
-
-    title_height = (
-        title_bbox[3]
-        - title_bbox[1]
-    )
+    title_width = title_bbox[2] - title_bbox[0]
 
     draw.text(
         (
             (card_width - title_width) / 2,
-            105 - title_height / 2
+            112
         ),
         name,
         fill="white",
         font=title_font
     )
 
+    # Inspection type
+    header_text = (
+        "DAILY PARK INSPECTION"
+        if is_park
+        else "DAILY TOWER INSPECTION"
+    )
+
+    centered_text(
+        draw,
+        header_text,
+        178,
+        header_subtitle_font,
+        "#DCEAF7" if not is_park else "#DDF3E5",
+        card_width
+    )
+
     # =====================================================
-    # QR
+    # QR AREA
     # =====================================================
 
-    qr_size = 540
+    qr_size = 520
 
     qr_image = qr_image.resize(
         (qr_size, qr_size),
         Image.Resampling.NEAREST
     )
 
-    qr_x = (
-        card_width - qr_size
-    ) // 2
+    qr_x = (card_width - qr_size) // 2
+    qr_y = 245
 
-    qr_y = 225
+    # QR shadow
+    draw.rounded_rectangle(
+        (
+            qr_x - 17,
+            qr_y - 17,
+            qr_x + qr_size + 17,
+            qr_y + qr_size + 17
+        ),
+        radius=25,
+        fill="#E5E7EB"
+    )
+
+    # QR white frame
+    draw.rounded_rectangle(
+        (
+            qr_x - 11,
+            qr_y - 11,
+            qr_x + qr_size + 11,
+            qr_y + qr_size + 11
+        ),
+        radius=21,
+        fill="white"
+    )
 
     card.paste(
         qr_image,
-        (
-            qr_x,
-            qr_y
-        )
+        (qr_x, qr_y)
     )
 
     # =====================================================
-    # INSTRUCTION BOX
+    # INSTRUCTION PANEL
     # =====================================================
 
-    box_top = 790
-    box_bottom = 875
+    box_top = 800
+    box_bottom = 885
 
     draw.rounded_rectangle(
         (
-            60,
+            65,
             box_top,
-            740,
+            735,
             box_bottom
         ),
         radius=20,
-        fill=(
-            "#EAF7EE"
-            if is_park
-            else "#EAF4FD"
-        )
+        fill=light_bg,
+        outline=border_color,
+        width=2
     )
 
-    instruction = "Scan QR Code"
-
-    instruction_bbox = draw.textbbox(
-        (0, 0),
-        instruction,
-        font=instruction_font
-    )
-
-    instruction_width = (
-        instruction_bbox[2]
-        - instruction_bbox[0]
-    )
-
-    draw.text(
-        (
-            (
-                card_width
-                - instruction_width
-            ) / 2,
-            800
-        ),
-        instruction,
-        fill=header_color,
-        font=instruction_font
+    centered_text(
+        draw,
+        "SCAN QR CODE",
+        810,
+        instruction_font,
+        header_color,
+        card_width
     )
 
     second_line = (
-        "at this park during inspection"
+        "Scan at this park during inspection"
         if is_park
-        else "at this tower during inspection"
+        else "Scan at this tower during inspection"
     )
 
-    second_bbox = draw.textbbox(
-        (0, 0),
+    centered_text(
+        draw,
         second_line,
-        font=subtitle_font
-    )
-
-    second_width = (
-        second_bbox[2]
-        - second_bbox[0]
-    )
-
-    draw.text(
-        (
-            (
-                card_width
-                - second_width
-            ) / 2,
-            840
-        ),
-        second_line,
-        fill="#394E65",
-        font=subtitle_font
+        851,
+        subtitle_font,
+        text_dark,
+        card_width
     )
 
     # =====================================================
-    # FOOTER
+    # BEAUTIFIED FOOTER
     # =====================================================
 
-    footer = "RWA POCKET-A"
-
-    footer_bbox = draw.textbbox(
-        (0, 0),
-        footer,
-        font=footer_font
+    # Divider
+    draw.line(
+        (90, 911, 710, 911),
+        fill=border_color,
+        width=2
     )
 
-    footer_width = (
-        footer_bbox[2]
-        - footer_bbox[0]
+    # Small accent mark
+    draw.rounded_rectangle(
+        (335, 908, 465, 914),
+        radius=3,
+        fill=accent_color
     )
 
-    draw.text(
-        (
-            (
-                card_width
-                - footer_width
-            ) / 2,
-            900
-        ),
-        footer,
-        fill=header_color,
-        font=footer_font
+    centered_text(
+        draw,
+        "Powered by RWA-AI",
+        925,
+        footer_brand_font,
+        header_color,
+        card_width
     )
 
-    subtitle = (
-        "Park Inspection"
-        if is_park
-        else "Tower Inspection"
-    )
-
-    subtitle_bbox = draw.textbbox(
-        (0, 0),
-        subtitle,
-        font=subtitle_font
-    )
-
-    subtitle_width = (
-        subtitle_bbox[2]
-        - subtitle_bbox[0]
-    )
-
-    draw.text(
-        (
-            (
-                card_width
-                - subtitle_width
-            ) / 2,
-            942
-        ),
-        subtitle,
-        fill="#637387",
-        font=subtitle_font
+    centered_text(
+        draw,
+        "RWA Pocket-A • Smart & Transparent Inspection",
+        960,
+        footer_font,
+        text_light,
+        card_width
     )
 
     # =====================================================
@@ -325,11 +357,7 @@ for name, token in locations.items():
         f"{name} -> {token}"
     )
 
-print()
-print(
-    "All 14 QR codes generated successfully."
-)
 
-print(
-    f"Folder: {OUTPUT_DIR}"
-)
+print()
+print("All 14 QR codes generated successfully.")
+print(f"Folder: {OUTPUT_DIR}")

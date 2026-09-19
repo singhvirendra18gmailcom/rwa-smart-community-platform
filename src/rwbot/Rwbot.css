@@ -1,0 +1,760 @@
+/* =========================================================
+   RWBOT LOGIN MODE
+   ========================================================= */
+
+.login-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 5px;
+  background: #f1f5f9;
+  border-radius: 12px;
+}
+
+.login-mode-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.login-mode-button.active {
+  background: #ffffff;
+  color: #1e5c91;
+  box-shadow: 0 2px 8px rgba(30, 60, 90, 0.1);
+}
+
+.rwbot-flat-help {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: #8995a2;
+}
+
+
+/* =========================================================
+   FIRST PASSWORD SCREEN
+   ========================================================= */
+
+.rwbot-auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background:
+    linear-gradient(
+      145deg,
+      #eef6ff,
+      #f7fafc 52%,
+      #eef8f3
+    );
+}
+
+.rwbot-auth-card {
+  width: 100%;
+  max-width: 410px;
+  padding: 32px 26px;
+  background: #ffffff;
+  border: 1px solid #e3e9ef;
+  border-radius: 20px;
+  box-shadow: 0 16px 45px rgba(35, 55, 75, 0.1);
+}
+
+.rwbot-logo {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: #1e5c91;
+  color: white;
+}
+
+.rwbot-auth-card h1 {
+  margin: 0;
+  text-align: center;
+  color: #193c60;
+  font-size: 30px;
+}
+
+.rwbot-auth-card h2 {
+  margin: 7px 0 0;
+  text-align: center;
+  color: #425469;
+  font-size: 18px;
+}
+
+.rwbot-tagline {
+  margin: 7px 0 22px;
+  text-align: center;
+  color: #527866;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.rwbot-first-login {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 13px;
+  background: #eff8f3;
+  border-radius: 10px;
+  color: #386451;
+}
+
+.rwbot-first-login div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rwbot-first-login strong {
+  font-size: 13px;
+}
+
+.rwbot-first-login span {
+  font-size: 12px;
+}
+
+.rwbot-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.rwbot-password-form label {
+  margin-top: 7px;
+  color: #45576a;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.rwbot-password-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 1px solid #ccd6df;
+  border-radius: 10px;
+  background: white;
+}
+
+.rwbot-password-input svg {
+  flex-shrink: 0;
+  color: #738497;
+}
+
+.rwbot-password-input input {
+  min-width: 0;
+  flex: 1;
+  padding: 12px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+}
+
+.rwbot-password-input button {
+  display: flex;
+  border: 0;
+  padding: 5px;
+  background: transparent;
+  color: #748497;
+  cursor: pointer;
+}
+
+.rwbot-primary-button {
+  margin-top: 14px;
+  padding: 13px;
+  border: 0;
+  border-radius: 10px;
+  background: #1e5c91;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rwbot-primary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rwbot-error {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #fff0f0;
+  color: #a72b2b;
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   RWBOT HOME
+   ========================================================= */
+
+.rwbot-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f7fa;
+  color: #233245;
+}
+
+.rwbot-header {
+  min-height: 78px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  background: #ffffff;
+  border-bottom: 1px solid #e3e8ed;
+}
+
+.rwbot-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rwbot-header-icon {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: #eaf3fb;
+  color: #1e5c91;
+}
+
+.rwbot-header h1 {
+  margin: 0;
+  color: #193c60;
+  font-size: 23px;
+}
+
+.rwbot-header p {
+  margin: 2px 0 0;
+  color: #718092;
+  font-size: 11px;
+}
+
+.rwbot-logout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #d2dae2;
+  border-radius: 9px;
+  background: white;
+  color: #526174;
+  cursor: pointer;
+}
+
+.rwbot-main {
+  width: 100%;
+  max-width: 850px;
+  flex: 1;
+  margin: 0 auto;
+  padding: 28px 17px 40px;
+}
+
+.rwbot-welcome {
+  text-align: center;
+}
+
+.rwbot-welcome-small {
+  margin: 0;
+  color: #8793a0;
+  font-size: 12px;
+}
+
+.rwbot-welcome h2 {
+  margin: 3px 0 10px;
+  color: #273a4e;
+  font-size: 23px;
+}
+
+.rwbot-resident-info {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.rwbot-resident-info span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #e1e7ec;
+  color: #536475;
+  font-size: 12px;
+}
+
+.rwbot-role-badge {
+  width: fit-content;
+  margin: 10px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: #eaf6ef;
+  color: #397158;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.rwbot-welcome-tagline {
+  margin: 15px 0 22px;
+  color: #527866;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.rwbot-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.rwbot-action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #dde5ec;
+  border-radius: 15px;
+  box-shadow: 0 5px 16px rgba(40, 60, 80, 0.05);
+}
+
+.rwbot-action-button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rwbot-action-button:hover {
+  border-color: #bfd2e3;
+}
+
+.rwbot-action-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: #eaf3fb;
+  color: #1e5c91;
+}
+
+.rwbot-action-content {
+  flex: 1;
+}
+
+.rwbot-action-content h3 {
+  margin: 1px 0 6px;
+  color: #2b3e52;
+  font-size: 17px;
+}
+
+.rwbot-action-content p {
+  margin: 0;
+  color: #718092;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.rwbot-next-label {
+  display: inline-block;
+  margin-top: 9px;
+  color: #527866;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.rwbot-action-arrow {
+  flex-shrink: 0;
+  margin-top: 12px;
+  color: #8493a2;
+}
+
+.rwbot-question-section {
+  margin-top: 25px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e1e7ec;
+  border-radius: 15px;
+}
+
+.rwbot-question-section h3 {
+  margin: 0 0 14px;
+  color: #435467;
+  font-size: 14px;
+}
+
+.rwbot-question {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 12px;
+  border: 0;
+  background: #f6f8fa;
+  border-radius: 9px;
+  color: #5d6d7d;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rwbot-question:hover {
+  background: #eef3f7;
+}
+
+.rwbot-footer {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  border-top: 1px solid #e1e6eb;
+  background: #ffffff;
+  color: #788592;
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   RWBOT CHAT
+   ========================================================= */
+
+.rwbot-chat-header {
+  min-height: 70px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8ee;
+}
+
+.rwbot-back-button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7e0e8;
+  border-radius: 10px;
+  background: white;
+  color: #526274;
+  cursor: pointer;
+}
+
+.rwbot-chat-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rwbot-chat-brand-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #eaf3fb;
+  color: #1e5c91;
+}
+
+.rwbot-chat-brand h1 {
+  margin: 0;
+  font-size: 18px;
+  color: #243c56;
+}
+
+.rwbot-chat-brand p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #8190a0;
+}
+
+.rwbot-chat-main {
+  width: 100%;
+  max-width: 850px;
+  flex: 1;
+  margin: 0 auto;
+  padding: 18px 16px 120px;
+}
+
+.rwbot-chat-user-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+  color: #83909e;
+  font-size: 11px;
+}
+
+.rwbot-chat-intro {
+  max-width: 620px;
+  margin: 35px auto;
+  text-align: center;
+}
+
+.rwbot-chat-intro-icon {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: #eaf3fb;
+  color: #1e5c91;
+}
+
+.rwbot-chat-intro h2 {
+  margin: 0;
+  color: #2e4358;
+  font-size: 21px;
+}
+
+.rwbot-chat-intro p {
+  max-width: 500px;
+  margin: 9px auto 22px;
+  color: #718092;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rwbot-suggestion-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #56705f;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.rwbot-chat-suggestions {
+  display: grid;
+  gap: 8px;
+}
+
+.rwbot-chat-suggestions button {
+  padding: 11px 13px;
+  border: 1px solid #e0e6ec;
+  border-radius: 10px;
+  background: white;
+  color: #536476;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rwbot-chat-suggestions button:hover {
+  background: #f5f8fa;
+}
+
+.rwbot-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rwbot-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.rwbot-message-user {
+  flex-direction: row-reverse;
+}
+
+.rwbot-message-avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eaf3fb;
+  color: #1e5c91;
+}
+
+.rwbot-message-user .rwbot-message-avatar {
+  background: #eaf6ef;
+  color: #3d7158;
+}
+
+.rwbot-message-content {
+  max-width: 75%;
+}
+
+.rwbot-message-user .rwbot-message-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.rwbot-message-bubble {
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: white;
+  border: 1px solid #e0e6ec;
+  color: #435466;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rwbot-message-user .rwbot-message-bubble {
+  background: #1e5c91;
+  border-color: #1e5c91;
+  color: white;
+}
+
+.rwbot-message-source {
+  margin-top: 5px;
+  color: #8794a1;
+  font-size: 10px;
+}
+
+.rwbot-chat-input-area {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px 10px;
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid #e0e6ec;
+}
+
+.rwbot-chat-input-wrap {
+  width: 100%;
+  max-width: 850px;
+  margin: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  padding: 8px 8px 8px 13px;
+  border: 1px solid #ccd7e1;
+  border-radius: 14px;
+  background: white;
+}
+
+.rwbot-chat-input-wrap textarea {
+  flex: 1;
+  min-height: 36px;
+  max-height: 100px;
+  resize: none;
+  padding: 8px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #26384b;
+  font: inherit;
+  font-size: 13px;
+}
+
+.rwbot-send-button {
+  flex-shrink: 0;
+  width: 39px;
+  height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 11px;
+  background: #1e5c91;
+  color: white;
+  cursor: pointer;
+}
+
+.rwbot-send-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rwbot-chat-note {
+  margin: 5px auto 0;
+  text-align: center;
+  color: #929daa;
+  font-size: 9px;
+}
+
+
+@media (max-width: 600px) {
+
+  .login-mode-button {
+    font-size: 12px;
+  }
+
+  .rwbot-header {
+    padding: 12px 14px;
+  }
+
+  .rwbot-header-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .rwbot-header h1 {
+    font-size: 21px;
+  }
+
+  .rwbot-logout {
+    font-size: 0;
+  }
+
+  .rwbot-logout svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .rwbot-main {
+    padding: 23px 14px 35px;
+  }
+
+  .rwbot-auth-card {
+    padding: 28px 21px;
+  }
+
+  .rwbot-chat-main {
+    padding: 15px 12px 115px;
+  }
+
+  .rwbot-chat-user-info {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .rwbot-message-content {
+    max-width: 84%;
+  }
+
+  .rwbot-chat-input-area {
+    padding: 9px 10px 8px;
+  }
+}
