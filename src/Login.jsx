@@ -1,4 +1,5 @@
 import { useState } from 'react'
+
 import {
   Building2,
   Mail,
@@ -8,34 +9,59 @@ import {
   Eye,
   EyeOff,
   Bot,
-  Home
+  Home,
+  UserRound
 } from 'lucide-react'
 
 import { supabase } from './supabase'
+
+import rwbotMascot from './assets/rwbot-mascot.png'
+
 import './App.css'
-import './rwbot/Rwbot.css'
+import './Login.css'
+
 
 function Login() {
-  const [loginMode, setLoginMode] = useState('supervisor')
 
-  const [email, setEmail] = useState(
-    'supervisor@rwapocketa.local'
-  )
+  // RWBOT is the default login screen
+  const [loginMode, setLoginMode] =
+    useState('rwbot')
 
-  const [flatNo, setFlatNo] = useState('')
+  const [email, setEmail] =
+    useState(
+      'supervisor@rwapocketa.local'
+    )
 
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [flatNo, setFlatNo] =
+    useState('')
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [password, setPassword] =
+    useState('')
+
+  const [
+    showPassword,
+    setShowPassword
+  ] = useState(false)
+
+  const [loading, setLoading] =
+    useState(false)
+
+  const [error, setError] =
+    useState('')
+
+
+  const isRwbot =
+    loginMode === 'rwbot'
+
 
   const selectMode = (mode) => {
     setLoginMode(mode)
+
     setPassword('')
     setError('')
     setShowPassword(false)
   }
+
 
   const normalizeFlatNo = (value) => {
     return value
@@ -44,211 +70,367 @@ function Login() {
       .toUpperCase()
   }
 
+
   const isValidFlatNo = (value) => {
-    return /^(?:[1-9]|[1-3][0-9]|4[0-8])[ABCD]$/.test(value)
+    return /^(?:[1-9]|[1-3][0-9]|4[0-8])[ABCD]$/.test(
+      value
+    )
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
+
+  const handleLogin = async (event) => {
+
+    event.preventDefault()
 
     setLoading(true)
     setError('')
 
     let loginEmail = email
 
-    if (loginMode === 'rwbot') {
-      const normalizedFlat = normalizeFlatNo(flatNo)
 
-      if (!isValidFlatNo(normalizedFlat)) {
-        setError(
-          'Please enter a valid flat number, for example 1A, 12C or 48D.'
+    // =====================================================
+    // RWBOT LOGIN
+    // =====================================================
+
+    if (isRwbot) {
+
+      const normalizedFlat =
+        normalizeFlatNo(flatNo)
+
+
+      if (
+        !isValidFlatNo(
+          normalizedFlat
         )
+      ) {
+
+        setError(
+          'Enter a valid flat number, for example 1A, 12B or 48D.'
+        )
+
         setLoading(false)
+
         return
       }
+
 
       loginEmail =
         `${normalizedFlat.toLowerCase()}@rwbot.invalid`
     }
 
-    const { error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password
-      })
+
+    // =====================================================
+    // SUPABASE AUTH
+    // =====================================================
+
+    const {
+      error: loginError
+    } =
+      await supabase.auth
+        .signInWithPassword({
+          email: loginEmail,
+          password
+        })
+
 
     if (loginError) {
-      if (loginMode === 'rwbot') {
+
+      if (isRwbot) {
+
         setError(
-          'Invalid flat number or password. Please contact RWA if you need login access.'
+          'Invalid flat number or password.'
         )
+
       } else {
-        setError('Invalid email or password')
+
+        setError(
+          'Invalid email or password.'
+        )
       }
 
+
       setLoading(false)
+
       return
     }
+
 
     setLoading(false)
   }
 
+
   return (
-    <div className="login-page">
 
-      <header className="login-hero">
+    <div className="rwa-login-page">
 
-        <div className="login-brand-icon">
-          {loginMode === 'rwbot'
-            ? (
-              <Bot size={36} strokeWidth={1.8} />
-            )
-            : (
-              <Building2 size={36} strokeWidth={1.8} />
-            )
-          }
-        </div>
 
-        <div className="login-brand-text">
+      {/* ===================================================
+          HERO
+          =================================================== */}
 
-          {loginMode === 'rwbot' ? (
-            <>
-              <h1>RWBOT</h1>
+      <section
+        className={
+          isRwbot
+            ? 'rwa-login-hero rwa-login-hero-rwbot'
+            : 'rwa-login-hero rwa-login-hero-supervisor'
+        }
+      >
+
+
+        <div className="rwa-login-hero-copy">
+
+
+          <div className="rwa-login-brand-row">
+
+
+            <div className="rwa-login-brand-icon">
+
+              {isRwbot ? (
+
+                <img
+                  src={rwbotMascot}
+                  alt="RWBOT"
+                />
+
+              ) : (
+
+                <Building2
+                  size={34}
+                  strokeWidth={1.8}
+                />
+
+              )}
+
+            </div>
+
+
+            <div>
+
+              <h1>
+
+                {isRwbot
+                  ? 'RWBOT'
+                  : 'RWA Pocket-A'
+                }
+
+              </h1>
+
 
               <p>
-                RWA Transparency Assistant
+
+                {isRwbot
+                  ? 'RWA Transparency Assistant'
+                  : 'Supervisor Operations'
+                }
+
               </p>
 
-              <span>
-                Ask. Know. Stay Informed.
-              </span>
-            </>
-          ) : (
-            <>
-              <h1>RWA Pocket-A</h1>
+            </div>
 
-              <p>
-                Sector -105 Noida
-              </p>
 
-              <span>
-                Safer Homes • Stronger Community
-              </span>
-            </>
-          )}
+          </div>
+
+
+          <div className="rwa-login-tagline">
+
+            {isRwbot
+              ? 'ASK. KNOW. STAY INFORMED.'
+              : 'SECURE. MANAGE. ENABLE.'
+            }
+
+          </div>
+
 
         </div>
 
-      </header>
 
-      <main className="login-main">
+        {/* RWBOT mascot on right */}
 
-        <div className="login-card">
+        {isRwbot && (
 
-          <div className="login-mode-switch">
+          <div className="rwa-login-hero-mascot">
+
+            <div className="rwa-login-mascot-glow" />
+
+            <div className="rwa-login-mascot-frame">
+
+              <img
+                src={rwbotMascot}
+                alt=""
+              />
+
+            </div>
+
+          </div>
+        )}
+
+
+        {/* Supervisor graphic */}
+
+        {!isRwbot && (
+
+          <div className="rwa-login-supervisor-art">
+
+            <div className="rwa-login-supervisor-art-circle">
+
+              <Building2
+                size={74}
+                strokeWidth={1.3}
+              />
+
+            </div>
+
+          </div>
+        )}
+
+
+      </section>
+
+
+      {/* ===================================================
+          LOGIN CARD
+          =================================================== */}
+
+      <main className="rwa-login-main">
+
+
+        <section className="rwa-login-card">
+
+
+          {/* =================================================
+              MODE SWITCH
+              ================================================= */}
+
+          <div className="rwa-login-mode-switch">
+
 
             <button
               type="button"
               className={
-                loginMode === 'supervisor'
-                  ? 'login-mode-button active'
-                  : 'login-mode-button'
+                !isRwbot
+                  ? 'rwa-login-mode active'
+                  : 'rwa-login-mode'
               }
               onClick={() =>
-                selectMode('supervisor')
+                selectMode(
+                  'supervisor'
+                )
               }
             >
+
               <ShieldCheck size={18} />
+
               Supervisor
+
             </button>
+
 
             <button
               type="button"
               className={
-                loginMode === 'rwbot'
-                  ? 'login-mode-button active'
-                  : 'login-mode-button'
+                isRwbot
+                  ? 'rwa-login-mode active'
+                  : 'rwa-login-mode'
               }
               onClick={() =>
-                selectMode('rwbot')
+                selectMode(
+                  'rwbot'
+                )
               }
             >
+
               <Bot size={18} />
+
               RWBOT
+
             </button>
 
-          </div>
-
-          <div className="login-user-icon">
-
-            {loginMode === 'rwbot'
-              ? (
-                <Bot
-                  size={42}
-                  strokeWidth={1.7}
-                />
-              )
-              : (
-                <ShieldCheck
-                  size={42}
-                  strokeWidth={1.7}
-                />
-              )
-            }
 
           </div>
 
-          <h2>
-            {loginMode === 'rwbot'
-              ? 'Resident Login'
-              : 'Supervisor Login'
-            }
-          </h2>
 
-          <p className="login-subtitle">
+          {/* =================================================
+              LOGIN IDENTITY
+              ================================================= */}
 
-            {loginMode === 'rwbot'
-              ? 'Residents and RWA members can access RWBOT'
-              : 'Sign in to manage daily RWA operations'
-            }
+          <div className="rwa-login-heading">
 
-          </p>
 
-          <form onSubmit={handleLogin}>
+            <div className="rwa-login-heading-icon">
 
-            {loginMode === 'supervisor' ? (
-              <>
-                <label>Email</label>
+              {isRwbot ? (
 
-                <div className="login-input-wrap">
+                <img
+                  src={rwbotMascot}
+                  alt=""
+                />
 
-                  <Mail size={20} />
+              ) : (
 
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) =>
-                      setEmail(e.target.value)
-                    }
-                    required
-                  />
+                <UserRound
+                  size={38}
+                  strokeWidth={1.7}
+                />
 
-                </div>
-              </>
-            ) : (
-              <>
-                <label>Flat Number</label>
+              )}
 
-                <div className="login-input-wrap">
+            </div>
 
-                  <Home size={20} />
+
+            <h2>
+
+              {isRwbot
+                ? 'Resident Login'
+                : 'Supervisor Login'
+              }
+
+            </h2>
+
+
+          </div>
+
+
+          {/* =================================================
+              FORM
+              ================================================= */}
+
+          <form
+            className="rwa-login-form"
+            onSubmit={handleLogin}
+          >
+
+
+            {/* ===============================================
+                USERNAME / FLAT
+                =============================================== */}
+
+            {isRwbot ? (
+
+              <div className="rwa-login-field">
+
+
+                <label>
+                  Flat Number
+                </label>
+
+
+                <div className="rwa-login-input">
+
+
+                  <div className="rwa-login-input-icon">
+
+                    <Home size={22} />
+
+                  </div>
+
 
                   <input
                     type="text"
                     value={flatNo}
-                    onChange={(e) =>
+                    onChange={(event) =>
                       setFlatNo(
-                        e.target.value.toUpperCase()
+                        event.target.value
+                          .toUpperCase()
                       )
                     }
                     placeholder="e.g. 1A"
@@ -256,99 +438,178 @@ function Login() {
                     required
                   />
 
+
                 </div>
 
-                <p className="rwbot-flat-help">
-                  Example: 1A, 12B, 37C
-                </p>
-              </>
+
+              </div>
+
+            ) : (
+
+              <div className="rwa-login-field">
+
+
+                <label>
+                  Email
+                </label>
+
+
+                <div className="rwa-login-input">
+
+
+                  <div className="rwa-login-input-icon">
+
+                    <Mail size={22} />
+
+                  </div>
+
+
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(event) =>
+                      setEmail(
+                        event.target.value
+                      )
+                    }
+                    placeholder="Supervisor email"
+                    autoComplete="username"
+                    required
+                  />
+
+
+                </div>
+
+
+              </div>
+
             )}
 
-            <label>Password</label>
 
-            <div className="login-input-wrap">
+            {/* ===============================================
+                PASSWORD
+                =============================================== */}
 
-              <LockKeyhole size={20} />
+            <div className="rwa-login-field">
 
-              <input
-                type={
-                  showPassword
-                    ? 'text'
-                    : 'password'
-                }
-                value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)
-                }
-                placeholder="Enter password"
-                autoComplete="current-password"
-                required
-              />
 
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() =>
-                  setShowPassword(
-                    (value) => !value
-                  )
-                }
-                aria-label="Toggle password visibility"
-              >
-                {showPassword
-                  ? <EyeOff size={20} />
-                  : <Eye size={20} />
-                }
-              </button>
+              <label>
+                Password
+              </label>
+
+
+              <div className="rwa-login-input">
+
+
+                <div className="rwa-login-input-icon">
+
+                  <LockKeyhole size={22} />
+
+                </div>
+
+
+                <input
+                  type={
+                    showPassword
+                      ? 'text'
+                      : 'password'
+                  }
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Enter password"
+                  autoComplete="current-password"
+                  required
+                />
+
+
+                <button
+                  type="button"
+                  className="rwa-login-password-toggle"
+                  onClick={() =>
+                    setShowPassword(
+                      (current) =>
+                        !current
+                    )
+                  }
+                  aria-label={
+                    showPassword
+                      ? 'Hide password'
+                      : 'Show password'
+                  }
+                >
+
+                  {showPassword
+                    ? <EyeOff size={22} />
+                    : <Eye size={22} />
+                  }
+
+                </button>
+
+
+              </div>
+
 
             </div>
 
+
+            {/* ===============================================
+                ERROR
+                =============================================== */}
+
             {error && (
-              <p className="login-error">
+
+              <div className="rwa-login-error">
+
                 {error}
-              </p>
+
+              </div>
+
             )}
+
+
+            {/* ===============================================
+                LOGIN BUTTON
+                =============================================== */}
 
             <button
               type="submit"
-              className="login-button"
+              className="rwa-login-submit"
               disabled={loading}
             >
-              <LogIn size={20} />
+
+
+              <LogIn size={23} />
+
 
               {loading
                 ? 'Signing in...'
-                : 'Sign In'
+                : isRwbot
+                  ? 'Enter RWBOT'
+                  : 'Sign In'
               }
+
+
             </button>
+
 
           </form>
 
-          <div className="login-divider">
 
-            <span>
-              {loginMode === 'rwbot'
-                ? 'RWA Pocket-A'
-                : 'RWA AI'
-              }
-            </span>
+        </section>
 
-          </div>
-
-          <p className="login-tagline">
-
-            {loginMode === 'rwbot'
-              ? 'RWA Transparency Assistant'
-              : 'For a Better, Safer and Cleaner Society'
-            }
-
-          </p>
-
-        </div>
 
       </main>
 
-      <footer className="login-footer">
+
+      {/* ===================================================
+          FOOTER
+          =================================================== */}
+
+      <footer className="rwa-login-footer">
 
         <strong>
           RWA Pocket-A
@@ -357,13 +618,16 @@ function Login() {
         <span>•</span>
 
         <span>
-          Sector -105 Noida
+          Sector-105, Noida
         </span>
 
       </footer>
 
+
     </div>
+
   )
 }
+
 
 export default Login
