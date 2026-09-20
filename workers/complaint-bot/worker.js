@@ -261,8 +261,9 @@ async function processConversation(env, mobile, originalText, session) {
     const current = await getSession(env, mobile)
     if (!current) throw new Error('Complaint session not found.')
     const complaint = await createComplaint(env, mobile, current)
+    const complaintsAhead = await getComplaintsAhead(env, complaint.id)
     await deleteSession(env, mobile)
-    await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current))
+    await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
     return
   }
 
@@ -405,11 +406,9 @@ function confirmChoiceMessage(lang) {
 }
 
 async function createComplaint(env, mobile, session) {
-  const complaintNo = await generateComplaintNumber(env)
   const now = new Date().toISOString()
   const description = session.description || buildDefaultDescription(session)
   const payload = {
-    complaint_no: complaintNo,
     category_id: Number(session.category_id),
     flat_no: session.flat_no || session.location_text || 'COMMON AREA',
     mobile_no: mobile,
@@ -446,28 +445,29 @@ function buildDefaultDescription(session) {
   return parts.join(' - ')
 }
 
-async function generateComplaintNumber(env) {
+async function getComplaintsAhead(env, complaintId) {
   try {
-    const result = await supabaseRequest(env, '/rest/v1/rpc/generate_complaint_no', {
-      method: 'POST', body: JSON.stringify({})
+    const result = await supabaseRequest(env, '/rest/v1/rpc/get_complaints_ahead', {
+      method: 'POST',
+      body: JSON.stringify({ p_complaint_id: complaintId })
     })
-    if (typeof result === 'string' && result.trim()) return result.trim()
-    if (result?.generate_complaint_no) return String(result.generate_complaint_no)
+    const value = Number(result)
+    return Number.isFinite(value) ? value : 0
   } catch (error) {
-    console.error('Complaint number RPC error:', error)
+    console.error('Queue-ahead calculation error:', error)
+    return 0
   }
-  return `CMP-${new Date().getUTCFullYear()}-${Date.now().toString().slice(-8)}`
 }
 
-function complaintCreatedMessage(complaint, session) {
+function complaintCreatedMessage(complaint, session, complaintsAhead = 0) {
   const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
   const location = session.flat_no || session.location_text || ''
   const priority = getPriorityLabel(session)
   if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*Category:* ${c?.hi}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n\nSupervisor द्वारा शिकायत प्राप्त करने के बाद आपको सूचित किया जाएगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*Category:* ${c?.hi}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*आपसे पहले शिकायतें:* ${complaintsAhead}\n\nSupervisor द्वारा शिकायत प्राप्त करने के बाद आपको सूचित किया जाएगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
   }
-  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n\nYou will be notified after the Supervisor acknowledges the complaint.\n\nThank you.\n\n*— RWA Pocket-A*`
+  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Complaints ahead of you:* ${complaintsAhead}\n\nYou will be notified after the Supervisor acknowledges the complaint.\n\nThank you.\n\n*— RWA Pocket-A*`
 }
 
 function getPriorityLabel(session) {
