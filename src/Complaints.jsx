@@ -72,11 +72,11 @@ function Complaints({ onBack }) {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
+    if (value === 'PLUMBER' || value === 'PLUMBING') {
       return <Wrench size={21} />
     }
 
-    if (value === 'ELECTRICAL') {
+    if (value === 'ELECTRICIAN' || value === 'ELECTRICAL') {
       return <Zap size={21} />
     }
 
@@ -87,43 +87,48 @@ function Complaints({ onBack }) {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
-      return 'Plumbing'
+    const labels = {
+      PLUMBER: 'Plumber',
+      PLUMBING: 'Plumber',
+      ELECTRICIAN: 'Electrician',
+      ELECTRICAL: 'Electrician',
+      SEWERAGE_ISSUE: 'Sewerage Issue',
+      CAMERA_RECORDING: 'Camera Recording',
+      HORTICULTURE: 'Horticulture',
+      STREET_LIGHT: 'Street Light'
     }
 
-    if (value === 'ELECTRICAL') {
-      return 'Electrical'
-    }
-
-    return 'Other'
+    return labels[value] || 'Other'
   }
 
   const getHindiCategoryName = category => {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
-      return 'प्लंबिंग'
+    const labels = {
+      PLUMBER: 'प्लंबर',
+      PLUMBING: 'प्लंबर',
+      ELECTRICIAN: 'इलेक्ट्रीशियन',
+      ELECTRICAL: 'इलेक्ट्रीशियन',
+      SEWERAGE_ISSUE: 'सीवरेज',
+      CAMERA_RECORDING: 'कैमरा रिकॉर्डिंग',
+      HORTICULTURE: 'हॉर्टिकल्चर',
+      STREET_LIGHT: 'स्ट्रीट लाइट'
     }
 
-    if (value === 'ELECTRICAL') {
-      return 'इलेक्ट्रिकल'
-    }
-
-    return 'संबंधित सेवा'
+    return labels[value] || 'संबंधित सेवा'
   }
 
   const getHindiWorkerName = category => {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
-      return 'प्लंबर'
-    }
-
-    if (value === 'ELECTRICAL') {
-      return 'इलेक्ट्रीशियन'
-    }
+    if (value === 'PLUMBER' || value === 'PLUMBING') return 'प्लंबर'
+    if (value === 'ELECTRICIAN' || value === 'ELECTRICAL') return 'इलेक्ट्रीशियन'
+    if (value === 'SEWERAGE_ISSUE') return 'सीवरेज कर्मचारी'
+    if (value === 'CAMERA_RECORDING') return 'सुरक्षा टीम'
+    if (value === 'HORTICULTURE') return 'माली'
+    if (value === 'STREET_LIGHT') return 'इलेक्ट्रीशियन'
 
     return 'संबंधित कर्मचारी'
   }
@@ -770,6 +775,33 @@ ${queueText}
                         <p>
                           <strong>Mobile:</strong>{' '}
                           {complaint.mobile_no}
+                        </p>
+                      )}
+
+                      <div className="complaint-priority-badges">
+                        {complaint.is_urgent && (
+                          <span className="complaint-priority-badge urgent">
+                            Urgent
+                          </span>
+                        )}
+                        {complaint.elderly_citizen_70_plus && (
+                          <span className="complaint-priority-badge elderly">
+                            Elderly 70+
+                          </span>
+                        )}
+                      </div>
+
+                      {complaint.location_text && (
+                        <p>
+                          <strong>Location:</strong>{' '}
+                          {complaint.location_text}
+                        </p>
+                      )}
+
+                      {complaint.issue_type && (
+                        <p>
+                          <strong>Issue:</strong>{' '}
+                          {complaint.issue_type.replaceAll('_', ' ')}
                         </p>
                       )}
 
