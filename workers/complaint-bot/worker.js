@@ -366,7 +366,7 @@ async function processConversation(env, mobile, originalText, session) {
       return
     }
 
-    if (text === '1') {
+    if (text === '2') {
       const urgent = defaultUrgency(categoryId)
       const next = [1, 2].includes(categoryId) ? 'ELDERLY' : 'ADD_NOTE'
       await updateSession(env, mobile, {
@@ -490,26 +490,9 @@ function locationQuestion(lang, category) {
 }
 
 function urgentQuestion(categoryId, lang) {
-  const criteria = {
-    1: {
-      en: '• No water supply\n• Unstoppable water flow\n• Major pipe/tank/common-line leakage',
-      hi: '• पानी की सप्लाई बिल्कुल नहीं है\n• पानी का बहाव बंद नहीं हो रहा\n• Major pipe/tank/common-line leakage'
-    },
-    2: {
-      en: '• No electricity\n• Short circuit / sparking\n• Any hazardous electrical situation',
-      hi: '• बिजली बिल्कुल नहीं है\n• Short circuit / sparking\n• कोई खतरनाक electrical situation'
-    },
-    3: {
-      en: '• Sewage overflowing\n• Sewer water entering a flat/common area\n• Major blockage causing continuous accumulation',
-      hi: '• सीवर ओवरफ्लो हो रहा है\n• सीवर का पानी flat/common area में आ रहा है\n• Major blockage से लगातार पानी जमा हो रहा है'
-    },
-    6: {
-      en: '• Exposed/live wire or sparking\n• Damaged/fallen pole creating immediate danger',
-      hi: '• खुली/live wire या sparking\n• क्षतिग्रस्त/गिरा हुआ pole जिससे तत्काल खतरा हो'
-    }
-  }[categoryId]
-  if (lang === 'HI') return `क्या यह *Urgent Problem* है?\n\nUrgent केवल इन स्थितियों में चुनें:\n${criteria.hi}\n\n*1.* Yes — Urgent\n*2.* No — Normal`
-  return `Is this an *Urgent Problem*?\n\nChoose Urgent only for:\n${criteria.en}\n\n*1.* Yes — Urgent\n*2.* No — Normal`
+  return lang === 'HI'
+    ? 'शिकायत की प्राथमिकता चुनें:\n\n*1.* Normal\n*2.* Urgent'
+    : 'Select complaint priority:\n\n*1.* Normal\n*2.* Urgent'
 }
 
 function defaultUrgency(categoryId) {
