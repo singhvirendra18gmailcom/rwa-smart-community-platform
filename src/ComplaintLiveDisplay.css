@@ -20,3 +20,38 @@
  .live-card>button{padding:9px 5px;font-size:12px}
  .live-summary{margin-bottom:8px}
 }
+
+/* Dense supervisor attention board */
+.live-content{padding-top:8px}
+.live-summary{min-height:36px;margin-bottom:8px}
+.live-summary strong{font-size:19px}
+.live-summary>button{padding:7px 10px}
+.live-card{height:178px;padding:10px}
+.live-flat{font-size:25px;margin:7px 0 2px}
+.live-badges{min-height:18px}
+.live-badges:empty{display:none}
+.live-card p{margin:4px 0 7px;min-height:30px;max-height:30px}
+.live-card>button{padding:8px 5px}
+@media(max-width:420px){
+ .live-header{padding:8px}
+ .live-header>button{padding:8px}
+ .live-header h1{font-size:17px}
+ .live-header p{font-size:10px}
+ .live-refresh{width:36px}
+ .live-content{padding:7px}
+ .live-summary{min-height:34px;margin-bottom:7px}
+ .live-summary strong{font-size:18px}
+ .live-summary>button{padding:6px 9px;font-size:10px}
+ .live-grid{gap:7px}
+ .live-card{height:166px;padding:8px}
+ .live-card-top{gap:4px}
+ .live-number{font-size:15px}
+ .live-category{font-size:10px}
+ .live-time{font-size:8px}
+ .live-flat{font-size:22px;margin:5px 0 1px}
+ .live-badges{min-height:17px}
+ .live-badges span{font-size:8px;padding:2px 5px}
+ .live-card p{font-size:10px;margin:3px 0 5px;line-height:1.25;min-height:25px;max-height:25px}
+ .live-card>button{padding:7px 3px;font-size:10px;border-radius:8px}
+ .live-card>button svg{width:15px;height:15px}
+}
