@@ -395,7 +395,7 @@ async function processConversation(env, mobile, originalText, session) {
       return
     }
     await updateSession(env, mobile, {
-      elderly_citizen_70_plus: text === '1',
+      elderly_citizen_70_plus: text === '2',
       step: 'ADD_NOTE'
     })
     await sendWhatsAppMessage(env, mobile, addNoteQuestion(lang))
@@ -506,8 +506,8 @@ function defaultUrgency(categoryId) {
 
 function elderlyQuestion(lang) {
   return lang === 'HI'
-    ? 'क्या आप *70 वर्ष या उससे अधिक आयु के Elderly Citizen* हैं?\n\n*1.* Yes\n*2.* No'
-    : 'Are you an *Elderly Citizen (70 years or above)*?\n\n*1.* Yes\n*2.* No'
+    ? 'क्या आप *70 वर्ष या उससे अधिक आयु के Elderly Citizen* हैं?\n\n*1.* No\n*2.* Yes'
+    : 'Are you an *Elderly Citizen (70 years or above)*?\n\n*1.* No\n*2.* Yes'
 }
 
 function addNoteQuestion(lang) {
