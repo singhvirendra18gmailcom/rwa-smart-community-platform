@@ -53,6 +53,12 @@ export default {
           return webhookResponse()
         }
 
+        const reopenMatch = originalText.match(/^reopen\s+([a-z][0-9]+)$/i)
+        if (reopenMatch) {
+          await reopenComplaint(env, from, reopenMatch[1].toUpperCase())
+          return webhookResponse()
+        }
+
         if (['cancel', 'restart', 'रद्द'].includes(command)) {
           const session = await getSession(env, from)
           await deleteSession(env, from)
@@ -75,6 +81,47 @@ export default {
 
     return new Response('RWA Pocket-A Complaint Bot', { status: 200 })
   }
+}
+
+async function reopenComplaint(env, mobile, complaintNo) {
+  const rows = await supabaseRequest(
+    env,
+    `/rest/v1/complaints?complaint_no=eq.${encodeURIComponent(complaintNo)}&mobile_no=eq.${encodeURIComponent(mobile)}&status=in.(RESOLVED,CLOSED)&order=created_at.desc&limit=1&select=id,complaint_no,preferred_language`,
+    { method: 'GET' }
+  )
+
+  if (!Array.isArray(rows) || !rows.length) {
+    await sendWhatsAppMessage(
+      env,
+      mobile,
+      `We could not find a resolved complaint *${complaintNo}* registered with this WhatsApp number.\n\nPlease check the complaint number or send *Hi* for a new complaint.\n\n— RWA Pocket-A`
+    )
+    return
+  }
+
+  const complaint = rows[0]
+  const now = new Date().toISOString()
+
+  await supabaseRequest(
+    env,
+    `/rest/v1/complaints?id=eq.${complaint.id}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        status: 'REOPENED',
+        reopened_at: now,
+        updated_at: now
+      })
+    }
+  )
+
+  const lang = complaint.preferred_language || 'EN'
+  const message = lang === 'HI'
+    ? `आपकी शिकायत *${complaintNo}* दोबारा खोल दी गई है। 🔄\n\nSupervisor को सूचित कर दिया गया है और शिकायत पर पुनः कार्यवाही की जाएगी।\n\n*— RWA Pocket-A*`
+    : `Your complaint *${complaintNo}* has been reopened. 🔄\n\nThe Supervisor has been notified and the complaint will be attended again.\n\n*— RWA Pocket-A*`
+
+  await sendWhatsAppMessage(env, mobile, message)
 }
 
 async function startComplaint(env, mobile) {
