@@ -1,0 +1,67 @@
+.live-page{min-height:100vh;background:#f4f6fa}.live-header{background:#312e81;color:#fff;padding:14px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;position:sticky;top:0;z-index:5}.live-header>button{border:0;border-radius:10px;background:#ffffff20;color:#fff;padding:10px;display:flex;gap:5px;align-items:center}.live-header h1{margin:0;font-size:20px}.live-header p{margin:2px 0 0;font-size:11px;opacity:.8}.live-refresh{width:40px;justify-content:center}.live-content{max-width:760px;margin:auto;padding:12px}.live-summary{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.live-summary>div{display:flex;align-items:center;gap:7px}.live-summary strong{font-size:22px}.live-summary span{font-size:12px;color:#667085}.live-summary>button{border:1px solid #d0d5dd;background:#fff;border-radius:9px;padding:9px 11px;font-weight:600}.live-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.live-card{border-radius:14px;padding:12px;border:1px solid #dbe1ea;background:#fff;box-shadow:0 2px 7px #1018280d}.live-card.plumber{background:#1e5a8a;border-color:#16476e;color:#fff}.live-card.electrician{background:#b45309;border-color:#92400e;color:#fff}.live-card.housekeeping{background:#237a4b;border-color:#166534;color:#fff}.live-card.sewerage{background:#0e7490;border-color:#155e75;color:#fff}.live-card.camera{background:#6d4bb5;border-color:#5b3a9e;color:#fff}.live-card.horticulture{background:#4d7c0f;border-color:#3f6212;color:#fff}.live-card.streetlight{background:#c2410c;border-color:#9a3412;color:#fff}.live-card.other{background:#4b5563;border-color:#374151;color:#fff}.live-card .live-time,.live-card p{color:rgba(255,255,255,.9)}.live-card>button{background:#fff;color:#111827}.live-card-top{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px}.live-number{font-weight:800;font-size:17px}.live-category{font-weight:700;font-size:12px}.live-time{display:flex;align-items:center;gap:3px;font-size:10px;opacity:.75}.live-flat{font-size:27px;font-weight:800;margin:8px 0 4px}.live-badges{min-height:21px;display:flex;gap:5px}.live-badges span{font-size:10px;font-weight:800;padding:3px 7px;border-radius:12px}.urgent-badge{background:#dc2626;color:#fff}.elderly-badge{background:#7c3aed;color:#fff}.live-card p{margin:7px 0 10px;font-size:12px;line-height:1.3;min-height:31px}.live-card>button{width:100%;border:0;border-radius:9px;padding:10px;background:#111827;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}.live-error,.live-empty{background:#fff;border:1px solid #e4e7ec;border-radius:14px;padding:25px;text-align:center}.live-error{color:#b42318}.live-empty{display:flex;flex-direction:column;align-items:center;gap:7px;color:#667085}.live-empty strong{color:#344054}@media(max-width:420px){.live-content{padding:8px}.live-grid{gap:7px}.live-card{padding:9px}.live-flat{font-size:24px}.live-category{font-size:11px}.live-card p{font-size:11px}.live-summary>button{font-size:11px}.live-header{padding:10px 8px}.live-header h1{font-size:18px}}
+
+/* Compact mobile attention board */
+.live-card{height:245px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}
+.live-card-top{grid-template-columns:auto minmax(0,1fr) auto}
+.live-category{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-time{white-space:nowrap}
+.live-flat{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-card p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:31px;max-height:34px}
+.live-card>button{margin-top:auto}
+@media(max-width:420px){
+ .live-card{height:218px;padding:9px}
+ .live-card-top{gap:5px}
+ .live-number{font-size:16px}
+ .live-category{font-size:10px}
+ .live-time{font-size:9px}
+ .live-time svg{width:11px;height:11px}
+ .live-flat{font-size:23px;margin:6px 0 3px}
+ .live-card p{margin:5px 0 7px;min-height:28px;max-height:30px}
+ .live-card>button{padding:9px 5px;font-size:12px}
+ .live-summary{margin-bottom:8px}
+}
+
+/* Dense supervisor attention board */
+.live-content{padding-top:8px}
+.live-summary{min-height:36px;margin-bottom:8px}
+.live-summary strong{font-size:19px}
+.live-summary>button{padding:7px 10px}
+.live-card{height:178px;padding:10px}
+.live-flat{font-size:25px;margin:7px 0 2px}
+.live-badges{min-height:18px}
+.live-badges:empty{display:none}
+.live-card p{margin:4px 0 7px;min-height:30px;max-height:30px}
+.live-card>button{padding:8px 5px}
+@media(max-width:420px){
+ .live-header{padding:8px}
+ .live-header>button{padding:8px}
+ .live-header h1{font-size:17px}
+ .live-header p{font-size:10px}
+ .live-refresh{width:36px}
+ .live-content{padding:7px}
+ .live-summary{min-height:34px;margin-bottom:7px}
+ .live-summary strong{font-size:18px}
+ .live-summary>button{padding:6px 9px;font-size:10px}
+ .live-grid{gap:7px}
+ .live-card{height:166px;padding:8px}
+ .live-card-top{gap:4px}
+ .live-number{font-size:15px}
+ .live-category{font-size:10px}
+ .live-time{font-size:8px}
+ .live-flat{font-size:22px;margin:5px 0 1px}
+ .live-badges{min-height:17px}
+ .live-badges span{font-size:8px;padding:2px 5px}
+ .live-card p{font-size:10px;margin:3px 0 5px;line-height:1.25;min-height:25px;max-height:25px}
+ .live-card>button{padding:7px 3px;font-size:10px;border-radius:8px}
+ .live-card>button svg{width:15px;height:15px}
+}
+
+/* Flat/location is the primary supervisor attention target */
+.live-flat{text-align:center;font-size:38px;line-height:1;font-weight:900;margin:9px 0 5px}
+.live-badges{justify-content:center}
+.live-card p{text-align:center}
+@media(max-width:420px){
+ .live-flat{font-size:36px;line-height:1;margin:7px 0 4px}
+ .live-badges{justify-content:center}
+ .live-card p{text-align:center}
+}

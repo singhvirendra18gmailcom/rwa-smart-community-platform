@@ -72,11 +72,11 @@ function Complaints({ onBack }) {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
+    if (value === 'PLUMBER' || value === 'PLUMBING') {
       return <Wrench size={21} />
     }
 
-    if (value === 'ELECTRICAL') {
+    if (value === 'ELECTRICIAN' || value === 'ELECTRICAL') {
       return <Zap size={21} />
     }
 
@@ -87,43 +87,53 @@ function Complaints({ onBack }) {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
-      return 'Plumbing'
+    const labels = {
+      PLUMBER: 'Plumber',
+      PLUMBING: 'Plumber',
+      ELECTRICIAN: 'Electrician',
+      ELECTRICAL: 'Electrician',
+      SEWERAGE_ISSUE: 'Sewerage Issue',
+      CAMERA_RECORDING: 'Camera Recording',
+      HORTICULTURE: 'Horticulture',
+      STREET_LIGHT: 'Street Light',
+      HOUSEKEEPING_GARBAGE: 'Housekeeping/Garbage',
+      OTHER: 'Other'
     }
 
-    if (value === 'ELECTRICAL') {
-      return 'Electrical'
-    }
-
-    return 'Other'
+    return labels[value] || 'Other'
   }
 
   const getHindiCategoryName = category => {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
-      return 'प्लंबिंग'
+    const labels = {
+      PLUMBER: 'प्लंबर',
+      PLUMBING: 'प्लंबर',
+      ELECTRICIAN: 'इलेक्ट्रीशियन',
+      ELECTRICAL: 'इलेक्ट्रीशियन',
+      SEWERAGE_ISSUE: 'सीवरेज',
+      CAMERA_RECORDING: 'कैमरा रिकॉर्डिंग',
+      HORTICULTURE: 'हॉर्टिकल्चर',
+      STREET_LIGHT: 'स्ट्रीट लाइट',
+      HOUSEKEEPING_GARBAGE: 'हाउसकीपिंग/कचरा',
+      OTHER: 'अन्य'
     }
 
-    if (value === 'ELECTRICAL') {
-      return 'इलेक्ट्रिकल'
-    }
-
-    return 'संबंधित सेवा'
+    return labels[value] || 'संबंधित सेवा'
   }
 
   const getHindiWorkerName = category => {
     const value =
       category?.toUpperCase() || ''
 
-    if (value === 'PLUMBING') {
-      return 'प्लंबर'
-    }
-
-    if (value === 'ELECTRICAL') {
-      return 'इलेक्ट्रीशियन'
-    }
+    if (value === 'PLUMBER' || value === 'PLUMBING') return 'प्लंबर'
+    if (value === 'ELECTRICIAN' || value === 'ELECTRICAL') return 'इलेक्ट्रीशियन'
+    if (value === 'SEWERAGE_ISSUE') return 'सीवरेज कर्मचारी'
+    if (value === 'CAMERA_RECORDING') return 'सुरक्षा टीम'
+    if (value === 'HORTICULTURE') return 'माली'
+    if (value === 'STREET_LIGHT') return 'इलेक्ट्रीशियन'
+    if (value === 'HOUSEKEEPING_GARBAGE') return 'हाउसकीपिंग कर्मचारी'
 
     return 'संबंधित कर्मचारी'
   }
@@ -230,35 +240,18 @@ function Complaints({ onBack }) {
     return number
   }
 
-  const buildHindiAcknowledgementMessage = (
-    complaint,
-    complaintsAhead
-  ) => {
+  const buildHindiAcknowledgementMessage = complaint => {
     const category =
       getCategoryName(complaint)
-
-    const hindiCategory =
-      getHindiCategoryName(category)
 
     const worker =
       getHindiWorkerName(category)
 
-    let queueText
-
-    if (complaintsAhead > 0) {
-      queueText =
-        `वर्तमान में आपकी शिकायत से पहले *${hindiCategory} की ${complaintsAhead} शिकायतें* लंबित हैं। ` +
-        `हमारा ${worker} यथाशीघ्र आपकी शिकायत पर कार्यवाही करेगा।`
-    } else {
-      queueText =
-        `हमारा ${worker} यथाशीघ्र आपकी शिकायत पर कार्यवाही करेगा।`
-    }
-
     return `*आदरणीय महोदय/महोदया,*
 
-आपकी शिकायत प्राप्त हो गई है।
+आपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅
 
-${queueText}
+हमारा *${worker}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।
 
 *शिकायत संख्या:* ${complaint.complaint_no}
 *दिनांक एवं समय:* ${formatHindiDateTime(
@@ -278,7 +271,10 @@ ${queueText}
 
 आपकी शिकायत *${complaint.complaint_no}* का समाधान कर दिया गया है।
 
-यदि समस्या अभी भी बनी हुई है, तो कृपया हमें सूचित करें।
+यदि समस्या अभी भी बनी हुई है, तो इस संदेश का उत्तर दें:
+*REOPEN ${complaint.complaint_no}*
+
+आपकी शिकायत दोबारा खोल दी जाएगी और Supervisor को सूचित किया जाएगा।
 
 *शिकायत संख्या:* ${complaint.complaint_no}
 *दिनांक एवं समय:* ${formatHindiDateTime(resolvedAt)}
@@ -323,128 +319,47 @@ ${queueText}
     }
   }
 
-  const acknowledgeComplaint = async complaint => {
-    let whatsappWindow = null
+  const runComplaintAction = async (complaint, action) => {
+    const response = await fetch(
+      `https://rwa-complaint-bot.singh-virendra18.workers.dev/api/complaints/${action}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ complaint_id: complaint.id })
+      }
+    )
+    const result = await response.json()
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || `Unable to ${action} complaint.`)
+    }
+    if (result.whatsapp_sent === false) {
+      setError(result.warning || 'Status updated, but WhatsApp notification could not be sent.')
+    }
+  }
 
+  const acknowledgeComplaint = async complaint => {
     try {
       setAcknowledgingId(complaint.id)
       setError('')
-
-      whatsappWindow =
-        window.open('', '_blank')
-
-      const {
-        data: complaintsAhead,
-        error: queueError
-      } = await supabase.rpc(
-        'get_complaints_ahead',
-        {
-          p_complaint_id: complaint.id
-        }
-      )
-
-      if (queueError) {
-        throw queueError
-      }
-
-      const now =
-        new Date().toISOString()
-
-      const { error: updateError } =
-        await supabase
-          .from('complaints')
-          .update({
-            status: 'ACKNOWLEDGED',
-            updated_at: now
-          })
-          .eq('id', complaint.id)
-
-      if (updateError) {
-        throw updateError
-      }
-
-      const message =
-        buildHindiAcknowledgementMessage(
-          complaint,
-          Number(complaintsAhead || 0)
-        )
-
-      openWhatsApp(
-        complaint,
-        message,
-        whatsappWindow
-      )
-
+      await runComplaintAction(complaint, 'acknowledge')
       await loadComplaints()
-
     } catch (err) {
       console.error(err)
-
-      if (whatsappWindow) {
-        whatsappWindow.close()
-      }
-
-      setError(
-        err.message ||
-          'Unable to acknowledge complaint.'
-      )
+      setError(err.message || 'Unable to acknowledge complaint.')
     } finally {
       setAcknowledgingId(null)
     }
   }
 
   const resolveComplaint = async complaint => {
-    let whatsappWindow = null
-
     try {
       setResolvingId(complaint.id)
       setError('')
-
-      whatsappWindow =
-        window.open('', '_blank')
-
-      const now =
-        new Date().toISOString()
-
-      const { error: updateError } =
-        await supabase
-          .from('complaints')
-          .update({
-            status: 'RESOLVED',
-            work_done_at: now,
-            updated_at: now
-          })
-          .eq('id', complaint.id)
-
-      if (updateError) {
-        throw updateError
-      }
-
-      const message =
-        buildHindiResolvedMessage(
-          complaint,
-          now
-        )
-
-      openWhatsApp(
-        complaint,
-        message,
-        whatsappWindow
-      )
-
+      await runComplaintAction(complaint, 'resolve')
       await loadComplaints()
-
     } catch (err) {
       console.error(err)
-
-      if (whatsappWindow) {
-        whatsappWindow.close()
-      }
-
-      setError(
-        err.message ||
-          'Unable to resolve complaint.'
-      )
+      setError(err.message || 'Unable to resolve complaint.')
     } finally {
       setResolvingId(null)
     }
@@ -770,6 +685,33 @@ ${queueText}
                         <p>
                           <strong>Mobile:</strong>{' '}
                           {complaint.mobile_no}
+                        </p>
+                      )}
+
+                      <div className="complaint-priority-badges">
+                        {complaint.is_urgent && (
+                          <span className="complaint-priority-badge urgent">
+                            Urgent
+                          </span>
+                        )}
+                        {complaint.elderly_citizen_70_plus && (
+                          <span className="complaint-priority-badge elderly">
+                            Elderly 70+
+                          </span>
+                        )}
+                      </div>
+
+                      {complaint.location_text && (
+                        <p>
+                          <strong>Location:</strong>{' '}
+                          {complaint.location_text}
+                        </p>
+                      )}
+
+                      {complaint.issue_type && (
+                        <p>
+                          <strong>Issue:</strong>{' '}
+                          {complaint.issue_type.replaceAll('_', ' ')}
                         </p>
                       )}
 
