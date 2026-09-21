@@ -93,9 +93,15 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
               const category = c.service_categories?.name || 'OTHER'
               const label = LABELS[category] || 'Other'
               const type = category === 'PLUMBER' || category === 'PLUMBING' ? 'plumber'
-                : category === 'ELECTRICIAN' || category === 'ELECTRICAL' ? 'electrician' : 'other'
+                : category === 'ELECTRICIAN' || category === 'ELECTRICAL' ? 'electrician'
+                : category === 'HOUSEKEEPING_GARBAGE' ? 'housekeeping'
+                : category === 'SEWERAGE_ISSUE' ? 'sewerage'
+                : category === 'CAMERA_RECORDING' ? 'camera'
+                : category === 'HORTICULTURE' ? 'horticulture'
+                : category === 'STREET_LIGHT' ? 'streetlight'
+                : 'other'
               return (
-                <article className={`live-card ${type} ${c.is_urgent ? 'urgent' : ''}`} key={c.id}>
+                <article className={`live-card ${type}`} key={c.id}>
                   <div className="live-card-top">
                     <span className="live-number">{c.complaint_no}</span>
                     <span className="live-category">{label}</span>
