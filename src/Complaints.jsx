@@ -95,7 +95,9 @@ function Complaints({ onBack }) {
       SEWERAGE_ISSUE: 'Sewerage Issue',
       CAMERA_RECORDING: 'Camera Recording',
       HORTICULTURE: 'Horticulture',
-      STREET_LIGHT: 'Street Light'
+      STREET_LIGHT: 'Street Light',
+      HOUSEKEEPING_GARBAGE: 'Housekeeping/Garbage',
+      OTHER: 'Other'
     }
 
     return labels[value] || 'Other'
@@ -113,7 +115,9 @@ function Complaints({ onBack }) {
       SEWERAGE_ISSUE: 'सीवरेज',
       CAMERA_RECORDING: 'कैमरा रिकॉर्डिंग',
       HORTICULTURE: 'हॉर्टिकल्चर',
-      STREET_LIGHT: 'स्ट्रीट लाइट'
+      STREET_LIGHT: 'स्ट्रीट लाइट',
+      HOUSEKEEPING_GARBAGE: 'हाउसकीपिंग/कचरा',
+      OTHER: 'अन्य'
     }
 
     return labels[value] || 'संबंधित सेवा'
@@ -129,6 +133,7 @@ function Complaints({ onBack }) {
     if (value === 'CAMERA_RECORDING') return 'सुरक्षा टीम'
     if (value === 'HORTICULTURE') return 'माली'
     if (value === 'STREET_LIGHT') return 'इलेक्ट्रीशियन'
+    if (value === 'HOUSEKEEPING_GARBAGE') return 'हाउसकीपिंग कर्मचारी'
 
     return 'संबंधित कर्मचारी'
   }
