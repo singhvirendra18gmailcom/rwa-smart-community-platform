@@ -125,7 +125,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
                     {c.is_urgent && <span className="urgent-badge">URGENT</span>}
                     {c.elderly_citizen_70_plus && <span className="elderly-badge">70+</span>}
                   </div>
-                  <p>{c.description || c.issue_type?.replaceAll('_', ' ') || 'Complaint received'}</p>
+                  <p>{c.description || c.issue_type?.replaceAll('_', ' ') || ''}</p>
                   <button disabled={workingId === c.id} onClick={() => acknowledge(c)}>
                     <Check size={18}/>{workingId === c.id ? 'Acknowledging...' : 'ACKNOWLEDGE'}
                   </button>
