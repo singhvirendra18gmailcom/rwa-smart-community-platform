@@ -50,15 +50,44 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
     return priority(a) - priority(b) || new Date(a.created_at) - new Date(b.created_at)
   }), [complaints])
 
+  const normalizeMobile = mobile => {
+    let number = String(mobile || '').replace(/\D/g, '')
+    if (number.length === 10) number = `91${number}`
+    return number
+  }
+
+  const workerName = category => {
+    if (['PLUMBER', 'PLUMBING'].includes(category)) return 'प्लंबर'
+    if (['ELECTRICIAN', 'ELECTRICAL', 'STREET_LIGHT'].includes(category)) return 'इलेक्ट्रीशियन'
+    if (category === 'HOUSEKEEPING_GARBAGE') return 'हाउसकीपिंग कर्मचारी'
+    if (category === 'SEWERAGE_ISSUE') return 'सीवरेज कर्मचारी'
+    if (category === 'CAMERA_RECORDING') return 'सुरक्षा टीम'
+    if (category === 'HORTICULTURE') return 'माली'
+    return 'संबंधित कर्मचारी'
+  }
+
+  const acknowledgementMessage = complaint => {
+    const category = complaint.service_categories?.name || 'OTHER'
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅\n\nहमारा *${workerName(category)}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nआपके धैर्य एवं सहयोग के लिए धन्यवाद।\n\n*— RWA Pocket-A*`
+  }
+
   const acknowledge = async complaint => {
     try {
       setWorkingId(complaint.id)
       setError('')
+      const phone = normalizeMobile(complaint.mobile_no)
+      const whatsappWindow = phone ? window.open('', '_blank') : null
       const { error: updateError } = await supabase
         .from('complaints')
         .update({ status: 'ACKNOWLEDGED', updated_at: new Date().toISOString() })
         .eq('id', complaint.id)
-      if (updateError) throw updateError
+      if (updateError) {
+        if (whatsappWindow) whatsappWindow.close()
+        throw updateError
+      }
+      if (phone && whatsappWindow) {
+        whatsappWindow.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(acknowledgementMessage(complaint))}`
+      }
       await load()
     } catch (e) {
       setError(e.message || 'Unable to acknowledge complaint.')
