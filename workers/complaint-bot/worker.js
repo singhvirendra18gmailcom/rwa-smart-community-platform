@@ -407,7 +407,7 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, addNoteQuestion(lang))
       return
     }
-    if (text === '1') {
+    if (text === '2') {
       await updateSession(env, mobile, { wants_description: true, step: 'DESCRIPTION' })
       await sendWhatsAppMessage(env, mobile, descriptionQuestion(lang))
       return
@@ -512,8 +512,8 @@ function elderlyQuestion(lang) {
 
 function addNoteQuestion(lang) {
   return lang === 'HI'
-    ? 'क्या आप समस्या के बारे में कोई *Note/Description* जोड़ना चाहते हैं?\n\n*1.* Yes\n*2.* No'
-    : 'Would you like to add any *note/description* about the problem?\n\n*1.* Yes\n*2.* No'
+    ? 'क्या आप समस्या के बारे में कोई *Note/Description* जोड़ना चाहते हैं?\n\n*1.* No\n*2.* Yes'
+    : 'Would you like to add any *note/description* about the problem?\n\n*1.* No\n*2.* Yes'
 }
 
 function descriptionQuestion(lang) {
