@@ -319,113 +319,47 @@ function Complaints({ onBack }) {
     }
   }
 
-  const acknowledgeComplaint = async complaint => {
-    let whatsappWindow = null
+  const runComplaintAction = async (complaint, action) => {
+    const response = await fetch(
+      `https://rwa-complaint-bot.singh-virendra18.workers.dev/api/complaints/${action}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ complaint_id: complaint.id })
+      }
+    )
+    const result = await response.json()
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || `Unable to ${action} complaint.`)
+    }
+    if (result.whatsapp_sent === false) {
+      setError(result.warning || 'Status updated, but WhatsApp notification could not be sent.')
+    }
+  }
 
+  const acknowledgeComplaint = async complaint => {
     try {
       setAcknowledgingId(complaint.id)
       setError('')
-
-      whatsappWindow =
-        window.open('', '_blank')
-
-      const now =
-        new Date().toISOString()
-
-      const { error: updateError } =
-        await supabase
-          .from('complaints')
-          .update({
-            status: 'ACKNOWLEDGED',
-            updated_at: now
-          })
-          .eq('id', complaint.id)
-
-      if (updateError) {
-        throw updateError
-      }
-
-      const message =
-        buildHindiAcknowledgementMessage(
-          complaint
-        )
-
-      openWhatsApp(
-        complaint,
-        message,
-        whatsappWindow
-      )
-
+      await runComplaintAction(complaint, 'acknowledge')
       await loadComplaints()
-
     } catch (err) {
       console.error(err)
-
-      if (whatsappWindow) {
-        whatsappWindow.close()
-      }
-
-      setError(
-        err.message ||
-          'Unable to acknowledge complaint.'
-      )
+      setError(err.message || 'Unable to acknowledge complaint.')
     } finally {
       setAcknowledgingId(null)
     }
   }
 
   const resolveComplaint = async complaint => {
-    let whatsappWindow = null
-
     try {
       setResolvingId(complaint.id)
       setError('')
-
-      whatsappWindow =
-        window.open('', '_blank')
-
-      const now =
-        new Date().toISOString()
-
-      const { error: updateError } =
-        await supabase
-          .from('complaints')
-          .update({
-            status: 'RESOLVED',
-            work_done_at: now,
-            updated_at: now
-          })
-          .eq('id', complaint.id)
-
-      if (updateError) {
-        throw updateError
-      }
-
-      const message =
-        buildHindiResolvedMessage(
-          complaint,
-          now
-        )
-
-      openWhatsApp(
-        complaint,
-        message,
-        whatsappWindow
-      )
-
+      await runComplaintAction(complaint, 'resolve')
       await loadComplaints()
-
     } catch (err) {
       console.error(err)
-
-      if (whatsappWindow) {
-        whatsappWindow.close()
-      }
-
-      setError(
-        err.message ||
-          'Unable to resolve complaint.'
-      )
+      setError(err.message || 'Unable to resolve complaint.')
     } finally {
       setResolvingId(null)
     }
