@@ -26,6 +26,18 @@ export default {
       return new Response('RWA Pocket-A Complaint Bot', { status: 200 })
     }
 
+    if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/complaints/')) {
+      return apiResponse({ ok: true }, 200)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/complaints/acknowledge') {
+      return handleSupervisorAction(request, env, 'ACKNOWLEDGED')
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/complaints/resolve') {
+      return handleSupervisorAction(request, env, 'RESOLVED')
+    }
+
     if (request.method === 'POST') {
       try {
         const body = await request.json()
@@ -81,6 +93,100 @@ export default {
 
     return new Response('RWA Pocket-A Complaint Bot', { status: 200 })
   }
+}
+
+function apiResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    }
+  })
+}
+
+async function handleSupervisorAction(request, env, targetStatus) {
+  try {
+    const body = await request.json()
+    const complaintId = Number(body?.complaint_id)
+    if (!Number.isInteger(complaintId) || complaintId <= 0) {
+      return apiResponse({ ok: false, error: 'Invalid complaint id.' }, 400)
+    }
+
+    const rows = await supabaseRequest(
+      env,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,preferred_language,category_id,created_at`,
+      { method: 'GET' }
+    )
+    if (!Array.isArray(rows) || !rows.length) {
+      return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
+    }
+
+    const complaint = rows[0]
+    const current = String(complaint.status || '').toUpperCase()
+    const allowed = targetStatus === 'ACKNOWLEDGED'
+      ? ['OPEN', 'REOPENED'].includes(current)
+      : current === 'ACKNOWLEDGED'
+
+    if (!allowed) {
+      return apiResponse({ ok: false, error: `Complaint is currently ${current || 'UNKNOWN'}.` }, 409)
+    }
+
+    const now = new Date().toISOString()
+    const update = targetStatus === 'RESOLVED'
+      ? { status: 'RESOLVED', work_done_at: now, updated_at: now }
+      : { status: 'ACKNOWLEDGED', updated_at: now }
+
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(update)
+    })
+
+    const message = targetStatus === 'RESOLVED'
+      ? supervisorResolvedMessage(complaint, now)
+      : supervisorAcknowledgementMessage(complaint)
+
+    try {
+      await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
+    } catch (sendError) {
+      console.error('Supervisor WhatsApp notification failed:', sendError)
+      return apiResponse({ ok: true, status: targetStatus, whatsapp_sent: false, warning: 'Status updated but WhatsApp notification failed.' }, 200)
+    }
+
+    return apiResponse({ ok: true, status: targetStatus, whatsapp_sent: true }, 200)
+  } catch (error) {
+    console.error('Supervisor action error:', error)
+    return apiResponse({ ok: false, error: 'Unable to process complaint action.' }, 500)
+  }
+}
+
+function hindiWorkerName(categoryId) {
+  if (categoryId === 1) return 'प्लंबर'
+  if (categoryId === 2 || categoryId === 6) return 'इलेक्ट्रीशियन'
+  if (categoryId === 3) return 'सीवरेज कर्मचारी'
+  if (categoryId === 4) return 'सुरक्षा टीम'
+  if (categoryId === 5) return 'माली'
+  if (categoryId === 7) return 'हाउसकीपिंग कर्मचारी'
+  return 'संबंधित कर्मचारी'
+}
+
+function supervisorAcknowledgementMessage(complaint) {
+  const lang = complaint.preferred_language || 'EN'
+  if (lang === 'HI') {
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅\n\nहमारा *${hindiWorkerName(Number(complaint.category_id))}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nआपके धैर्य एवं सहयोग के लिए धन्यवाद।\n\n*— RWA Pocket-A*`
+  }
+  return `*Dear Sir/Madam,*\n\nYour complaint *${complaint.complaint_no}* has been acknowledged. ✅\n\nOur team will attend to your complaint shortly.\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you for your patience and cooperation.\n\n*— RWA Pocket-A*`
+}
+
+function supervisorResolvedMessage(complaint, resolvedAt) {
+  const lang = complaint.preferred_language || 'EN'
+  if (lang === 'HI') {
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत *${complaint.complaint_no}* का समाधान कर दिया गया है। ✅\n\nयदि समस्या अभी भी बनी हुई है, तो इस संदेश का उत्तर दें:\n*REOPEN ${complaint.complaint_no}*\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
+  }
+  return `*Dear Sir/Madam,*\n\nYour complaint *${complaint.complaint_no}* has been resolved. ✅\n\nIf the problem is still not resolved, reply:\n*REOPEN ${complaint.complaint_no}*\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you.\n\n*— RWA Pocket-A*`
 }
 
 async function reopenComplaint(env, mobile, complaintNo) {
