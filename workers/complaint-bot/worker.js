@@ -149,7 +149,7 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, locationQuestion(lang, getCategoryById(categoryId)))
       return
     }
-    const next = categoryId === 3 ? 'URGENT' : categoryId === 4 ? 'INCIDENT_DATETIME' : 'ISSUE_TYPE'
+    const next = categoryId === 3 ? 'URGENT' : categoryId === 4 ? 'INCIDENT_DATETIME' : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'ADD_NOTE'
     await updateSession(env, mobile, { location_text: location, step: next })
     if (next === 'URGENT') await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
     if (next === 'INCIDENT_DATETIME') await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
@@ -279,9 +279,9 @@ function languageMenu() {
 
 function categoryMenu(lang) {
   if (lang === 'HI') {
-    return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n\nकृपया केवल विकल्प संख्या भेजें।'
+    return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n*7.* 🧹 Housekeeping/Garbage\n*8.* 📋 Other\n\nकृपया केवल विकल्प संख्या भेजें।'
   }
-  return '*Please select the complaint category:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n\nPlease send only the option number.'
+  return '*Please select the complaint category:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n*7.* 🧹 Housekeeping/Garbage\n*8.* 📋 Other\n\nPlease send only the option number.'
 }
 
 const CATEGORIES = {
@@ -290,7 +290,9 @@ const CATEGORIES = {
   3: { id: 3, label: 'Sewerage Issue', hi: 'सीवरेज समस्या' },
   4: { id: 4, label: 'Camera Recording', hi: 'कैमरा रिकॉर्डिंग' },
   5: { id: 5, label: 'Horticulture', hi: 'हॉर्टिकल्चर' },
-  6: { id: 6, label: 'Street Light', hi: 'स्ट्रीट लाइट' }
+  6: { id: 6, label: 'Street Light', hi: 'स्ट्रीट लाइट' },
+  7: { id: 7, label: 'Housekeeping/Garbage', hi: 'हाउसकीपिंग/कचरा' },
+  8: { id: 8, label: 'Other', hi: 'अन्य' }
 }
 function getCategory(text) { return CATEGORIES[Number(text)] || null }
 function getCategoryById(id) { return CATEGORIES[id] || null }
@@ -364,6 +366,11 @@ function incidentDateTimeQuestion(lang) {
 }
 
 function issueTypeMenu(categoryId, lang) {
+  if (categoryId === 7) {
+    return lang === 'HI'
+      ? '*Housekeeping/Garbage समस्या चुनें:*\n\n*1.* Garbage Not Collected\n*2.* Common Area Cleaning\n*3.* Sweeping/Cleaning Issue\n*4.* Garbage Dumping\n*5.* Other'
+      : '*Select Housekeeping/Garbage issue:*\n\n*1.* Garbage Not Collected\n*2.* Common Area Cleaning\n*3.* Sweeping/Cleaning Issue\n*4.* Garbage Dumping\n*5.* Other'
+  }
   if (categoryId === 5) {
     return lang === 'HI'
       ? '*Horticulture समस्या चुनें:*\n\n*1.* Tree/Branch Cutting\n*2.* Grass/Plant Maintenance\n*3.* Watering Issue\n*4.* Fallen/Damaged Tree or Branch\n*5.* Other'
@@ -377,7 +384,9 @@ function issueTypeMenu(categoryId, lang) {
 function getIssueType(categoryId, text) {
   const values = categoryId === 5
     ? { '1': 'TREE_BRANCH_CUTTING', '2': 'GRASS_PLANT_MAINTENANCE', '3': 'WATERING_ISSUE', '4': 'FALLEN_DAMAGED_TREE_BRANCH', '5': 'OTHER' }
-    : { '1': 'LIGHT_NOT_WORKING', '2': 'LIGHT_FLICKERING', '3': 'LIGHT_ON_DAYTIME', '4': 'POLE_WIRING_ISSUE', '5': 'OTHER' }
+    : categoryId === 7
+      ? { '1': 'GARBAGE_NOT_COLLECTED', '2': 'COMMON_AREA_CLEANING', '3': 'SWEEPING_CLEANING_ISSUE', '4': 'GARBAGE_DUMPING', '5': 'OTHER' }
+      : { '1': 'LIGHT_NOT_WORKING', '2': 'LIGHT_FLICKERING', '3': 'LIGHT_ON_DAYTIME', '4': 'POLE_WIRING_ISSUE', '5': 'OTHER' }
   return values[text] || null
 }
 
