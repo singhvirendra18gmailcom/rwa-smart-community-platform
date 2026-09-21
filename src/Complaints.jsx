@@ -235,35 +235,18 @@ function Complaints({ onBack }) {
     return number
   }
 
-  const buildHindiAcknowledgementMessage = (
-    complaint,
-    complaintsAhead
-  ) => {
+  const buildHindiAcknowledgementMessage = complaint => {
     const category =
       getCategoryName(complaint)
-
-    const hindiCategory =
-      getHindiCategoryName(category)
 
     const worker =
       getHindiWorkerName(category)
 
-    let queueText
-
-    if (complaintsAhead > 0) {
-      queueText =
-        `वर्तमान में आपकी शिकायत से पहले *${hindiCategory} की ${complaintsAhead} शिकायतें* लंबित हैं। ` +
-        `हमारा ${worker} यथाशीघ्र आपकी शिकायत पर कार्यवाही करेगा।`
-    } else {
-      queueText =
-        `हमारा ${worker} यथाशीघ्र आपकी शिकायत पर कार्यवाही करेगा।`
-    }
-
     return `*आदरणीय महोदय/महोदया,*
 
-आपकी शिकायत प्राप्त हो गई है।
+आपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅
 
-${queueText}
+हमारा *${worker}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।
 
 *शिकायत संख्या:* ${complaint.complaint_no}
 *दिनांक एवं समय:* ${formatHindiDateTime(
@@ -338,20 +321,6 @@ ${queueText}
       whatsappWindow =
         window.open('', '_blank')
 
-      const {
-        data: complaintsAhead,
-        error: queueError
-      } = await supabase.rpc(
-        'get_complaints_ahead',
-        {
-          p_complaint_id: complaint.id
-        }
-      )
-
-      if (queueError) {
-        throw queueError
-      }
-
       const now =
         new Date().toISOString()
 
@@ -370,8 +339,7 @@ ${queueText}
 
       const message =
         buildHindiAcknowledgementMessage(
-          complaint,
-          Number(complaintsAhead || 0)
+          complaint
         )
 
       openWhatsApp(
