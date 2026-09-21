@@ -95,7 +95,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
       <main className="live-content">
         <div className="live-summary">
           <div><BellRing size={18}/><strong>{ordered.length}</strong><span>Waiting</span></div>
-          <button onClick={onOpenComplaints}>Open Full Dashboard</button>
+          <button onClick={onOpenComplaints}>Dashboard →</button>
         </div>
 
         {error && <div className="live-error">{error}</div>}
@@ -127,7 +127,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
                   </div>
                   <p>{c.description || c.issue_type?.replaceAll('_', ' ') || 'Complaint received'}</p>
                   <button disabled={workingId === c.id} onClick={() => acknowledge(c)}>
-                    <Check size={18}/>{workingId === c.id ? 'Acknowledging...' : 'OK · Acknowledge'}
+                    <Check size={18}/>{workingId === c.id ? 'Acknowledging...' : 'ACKNOWLEDGE'}
                   </button>
                 </article>
               )
