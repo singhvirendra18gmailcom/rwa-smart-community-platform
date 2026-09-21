@@ -19,6 +19,7 @@ import Attendance from './Attendance'
 import ManageStaff from './ManageStaff'
 import TowerInspection from './TowerInspection'
 import Complaints from './Complaints'
+import ComplaintLiveDisplay from './ComplaintLiveDisplay'
 
 import RwbotHome from './rwbot/RwbotHome'
 import RwbotChangePassword from './rwbot/RwbotChangePassword'
@@ -334,6 +335,15 @@ function App() {
     )
   }
 
+  if (screen === 'complaint-live') {
+    return (
+      <ComplaintLiveDisplay
+        onBack={() => setScreen('dashboard')}
+        onOpenComplaints={() => setScreen('complaints')}
+      />
+    )
+  }
+
   if (screen === 'complaints') {
     return (
       <Complaints
@@ -495,6 +505,22 @@ function App() {
 
           <ArrowRight size={20} />
 
+        </button>
+
+        <button
+          className="feature-card feature-patrol"
+          onClick={() =>
+            setScreen('complaint-live')
+          }
+        >
+          <div className="feature-icon feature-icon-purple">
+            <MessageSquareWarning size={27} strokeWidth={1.8} />
+          </div>
+          <div className="feature-text">
+            <h3>Live Complaint Display</h3>
+            <p>See new complaints live and acknowledge them quickly</p>
+          </div>
+          <ArrowRight size={20} />
         </button>
 
         <button
