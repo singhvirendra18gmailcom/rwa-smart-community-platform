@@ -117,7 +117,7 @@ async function handleSupervisorAction(request, env, targetStatus) {
 
     const rows = await supabaseRequest(
       env,
-      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,preferred_language,category_id,created_at`,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,preferred_language,category_id,flat_no,created_at`,
       { method: 'GET' }
     )
     if (!Array.isArray(rows) || !rows.length) {
@@ -145,6 +145,8 @@ async function handleSupervisorAction(request, env, targetStatus) {
       body: JSON.stringify(update)
     })
 
+    complaint.resident_name = await getResidentNameByFlat(env, complaint.flat_no)
+
     const message = targetStatus === 'RESOLVED'
       ? supervisorResolvedMessage(complaint, now)
       : supervisorAcknowledgementMessage(complaint)
@@ -163,6 +165,23 @@ async function handleSupervisorAction(request, env, targetStatus) {
   }
 }
 
+async function getResidentNameByFlat(env, flatNo) {
+  const flat = String(flatNo || '').trim()
+  if (!flat) return ''
+
+  try {
+    const rows = await supabaseRequest(
+      env,
+      `/rest/v1/residents?flat_no=eq.${encodeURIComponent(flat)}&active=eq.true&order=id.asc&limit=1&select=name`,
+      { method: 'GET' }
+    )
+    return Array.isArray(rows) && rows.length ? String(rows[0].name || '').trim() : ''
+  } catch (error) {
+    console.error('Resident master lookup failed:', error)
+    return ''
+  }
+}
+
 function hindiWorkerName(categoryId) {
   if (categoryId === 1) return 'प्लंबर'
   if (categoryId === 2 || categoryId === 6) return 'इलेक्ट्रीशियन'
@@ -173,20 +192,28 @@ function hindiWorkerName(categoryId) {
   return 'संबंधित कर्मचारी'
 }
 
+function residentGreeting(complaint, lang) {
+  const name = String(complaint.resident_name || '').trim()
+  if (name) return lang === 'HI' ? `*आदरणीय ${name},*` : `*Dear ${name},*`
+  return lang === 'HI' ? '*आदरणीय महोदय/महोदया,*' : '*Dear Sir/Madam,*'
+}
+
 function supervisorAcknowledgementMessage(complaint) {
   const lang = complaint.preferred_language || 'EN'
+  const greeting = residentGreeting(complaint, lang)
   if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅\n\nहमारा *${hindiWorkerName(Number(complaint.category_id))}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nआपके धैर्य एवं सहयोग के लिए धन्यवाद।\n\n*— RWA Pocket-A*`
+    return `${greeting}\n\nआपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅\n\nहमारा *${hindiWorkerName(Number(complaint.category_id))}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nआपके धैर्य एवं सहयोग के लिए धन्यवाद।\n\n*— RWA Pocket-A*`
   }
-  return `*Dear Sir/Madam,*\n\nYour complaint *${complaint.complaint_no}* has been acknowledged. ✅\n\nOur team will attend to your complaint shortly.\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you for your patience and cooperation.\n\n*— RWA Pocket-A*`
+  return `${greeting}\n\nYour complaint *${complaint.complaint_no}* has been acknowledged. ✅\n\nOur team will attend to your complaint shortly.\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you for your patience and cooperation.\n\n*— RWA Pocket-A*`
 }
 
 function supervisorResolvedMessage(complaint, resolvedAt) {
   const lang = complaint.preferred_language || 'EN'
+  const greeting = residentGreeting(complaint, lang)
   if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत *${complaint.complaint_no}* का समाधान कर दिया गया है। ✅\n\nयदि समस्या अभी भी बनी हुई है, तो इस संदेश का उत्तर दें:\n*REOPEN ${complaint.complaint_no}*\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
+    return `${greeting}\n\nआपकी शिकायत *${complaint.complaint_no}* का समाधान कर दिया गया है। ✅\n\nयदि समस्या अभी भी बनी हुई है, तो इस संदेश का उत्तर दें:\n*REOPEN ${complaint.complaint_no}*\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
   }
-  return `*Dear Sir/Madam,*\n\nYour complaint *${complaint.complaint_no}* has been resolved. ✅\n\nIf the problem is still not resolved, reply:\n*REOPEN ${complaint.complaint_no}*\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you.\n\n*— RWA Pocket-A*`
+  return `${greeting}\n\nYour complaint *${complaint.complaint_no}* has been resolved. ✅\n\nIf the problem is still not resolved, reply:\n*REOPEN ${complaint.complaint_no}*\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you.\n\n*— RWA Pocket-A*`
 }
 
 async function reopenComplaint(env, mobile, complaintNo) {
