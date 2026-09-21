@@ -271,7 +271,10 @@ function Complaints({ onBack }) {
 
 आपकी शिकायत *${complaint.complaint_no}* का समाधान कर दिया गया है।
 
-यदि समस्या अभी भी बनी हुई है, तो कृपया हमें सूचित करें।
+यदि समस्या अभी भी बनी हुई है, तो इस संदेश का उत्तर दें:
+*REOPEN ${complaint.complaint_no}*
+
+आपकी शिकायत दोबारा खोल दी जाएगी और Supervisor को सूचित किया जाएगा।
 
 *शिकायत संख्या:* ${complaint.complaint_no}
 *दिनांक एवं समय:* ${formatHindiDateTime(resolvedAt)}
