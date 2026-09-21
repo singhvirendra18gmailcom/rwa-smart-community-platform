@@ -55,3 +55,13 @@
  .live-card>button{padding:7px 3px;font-size:10px;border-radius:8px}
  .live-card>button svg{width:15px;height:15px}
 }
+
+/* Flat/location is the primary supervisor attention target */
+.live-flat{text-align:center;font-size:38px;line-height:1;font-weight:900;margin:9px 0 5px}
+.live-badges{justify-content:center}
+.live-card p{text-align:center}
+@media(max-width:420px){
+ .live-flat{font-size:36px;line-height:1;margin:7px 0 4px}
+ .live-badges{justify-content:center}
+ .live-card p{text-align:center}
+}
