@@ -262,17 +262,31 @@ async function handleStreetLightWhatsapp(request, env) {
 
       const categoryRows = await supabaseRequest(
       env,
-      '/rest/v1/society_service_categories?service_type=eq.STREET_LIGHT&select=supervisor_name,supervisor_mobile,rwa_name,rwa_mobile',
+      '/rest/v1/society_service_categories?service_type=eq.STREET_LIGHT&select=rwa_name,rwa_mobile',
       { method: 'GET' }
     )
-    const settings = Array.isArray(categoryRows) && categoryRows.length
-      ? {
-          supervisor_contact_name: categoryRows[0].supervisor_name,
-          supervisor_contact_mobile: categoryRows[0].supervisor_mobile,
-          rwa_contact_name: categoryRows[0].rwa_name,
-          rwa_contact_mobile: categoryRows[0].rwa_mobile
-        }
+
+    const globalContactRows = await supabaseRequest(
+      env,
+      '/rest/v1/society_inspection_settings?id=eq.1&select=supervisor_contact_name,supervisor_contact_mobile',
+      { method: 'GET' }
+    )
+
+    const categoryContact = Array.isArray(categoryRows) && categoryRows.length
+      ? categoryRows[0]
       : {}
+
+    const globalContact =
+      Array.isArray(globalContactRows) && globalContactRows.length
+        ? globalContactRows[0]
+        : {}
+
+    const settings = {
+      supervisor_contact_name: globalContact.supervisor_contact_name,
+      supervisor_contact_mobile: globalContact.supervisor_contact_mobile,
+      rwa_contact_name: categoryContact.rwa_name,
+      rwa_contact_mobile: categoryContact.rwa_mobile
+    }
 
     const message = streetLightComplaintMessage(
       agency,
