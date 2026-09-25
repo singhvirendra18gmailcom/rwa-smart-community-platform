@@ -6,6 +6,10 @@ export const DEFAULT_INSPECTION_CONFIG = {
   module_name: 'Society Pulse',
   theme_key: 'blue',
   report_title: 'DAILY SOCIETY INSPECTION SUMMARY',
+  supervisor_contact_name: '',
+  supervisor_contact_mobile: '',
+  rwa_contact_name: '',
+  rwa_contact_mobile: '',
 }
 
 export const INSPECTION_THEMES = {
@@ -52,7 +56,7 @@ export function useInspectionConfig() {
   const loadConfig = useCallback(async () => {
     const { data, error } = await supabase
       .from('society_inspection_settings')
-      .select('id,module_name,theme_key,report_title')
+      .select('id,module_name,theme_key,report_title,supervisor_contact_name,supervisor_contact_mobile,rwa_contact_name,rwa_contact_mobile')
       .eq('id', 1)
       .maybeSingle()
 
