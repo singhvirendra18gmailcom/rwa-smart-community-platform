@@ -3,7 +3,6 @@ import TowerInspection from './TowerInspection'
 import StreetLightInspection from './StreetLightInspection'
 import SocietyInspectionSettings from './SocietyInspectionSettings'
 import ServiceAgencies from './ServiceAgencies'
-import EscalationContacts from './EscalationContacts'
 import { getInspectionTheme, useInspectionConfig } from './inspectionConfig'
 import './SocietyInspection.css'
 
@@ -43,14 +42,6 @@ export default function SocietyInspection({ onBack }) {
         <ServiceAgencies
           onBack={() => setScreen('home')}
         />
-      </div>
-    )
-  }
-
-  if (screen === 'escalation-contacts') {
-    return (
-      <div style={themeStyle}>
-        <EscalationContacts onBack={() => setScreen('home')} />
       </div>
     )
   }
@@ -124,24 +115,12 @@ export default function SocietyInspection({ onBack }) {
         >
           <span className="society-hub-icon">🏢</span>
           <span>
-            <strong>Service Agencies</strong>
-            <small>Manage vendors, departments, contacts and responsibilities</small>
+            <strong>Service Agencies & Contacts</strong>
+            <small>Manage service providers, Supervisor and RWA Executive contacts</small>
           </span>
           <b>›</b>
         </button>
 
-        <button
-          type="button"
-          className="society-hub-card"
-          onClick={() => setScreen('escalation-contacts')}
-        >
-          <span className="society-hub-icon">📞</span>
-          <span>
-            <strong>Service Contacts</strong>
-            <small>Common Supervisor and category-wise RWA Executive contacts</small>
-          </span>
-          <b>›</b>
-        </button>
 
         <button
           type="button"
