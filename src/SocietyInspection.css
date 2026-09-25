@@ -442,3 +442,25 @@
   background: #fff0f0;
   color: #a42424;
 }
+
+
+.society-settings-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.fault-open-days {
+  display: block;
+  margin-top: 6px;
+  color: #a35a00;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+@media (min-width: 680px) {
+  .society-settings-contact-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
