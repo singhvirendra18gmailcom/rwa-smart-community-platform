@@ -93,10 +93,15 @@ function buildComplaintMessage(row, today, issues, escalation) {
       ? '1 स्ट्रीट लाइट खराब है'
       : `${row.faultyCount} स्ट्रीट लाइट खराब हैं`
 
+  const pendingText =
+    oldestDays > 1
+      ? ` और यह समस्या ${oldestDays} दिन से लंबित है`
+      : ''
+
   return `दिनांक: ${formatMessageDate(today)}
 सेवा में ${row.agency.agency_name},
 
-पॉकेट-A, सेक्टर-105 में ${lightText} और यह समस्या ${oldestDays} दिन से लंबित है। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
+पॉकेट-A, सेक्टर-105 में ${lightText}${pendingText}। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
 अधिक जानकारी के लिए संपर्क करें:
 RWA Staff / Supervisor: ${supervisor}
 RWA Executive: ${rwa}
