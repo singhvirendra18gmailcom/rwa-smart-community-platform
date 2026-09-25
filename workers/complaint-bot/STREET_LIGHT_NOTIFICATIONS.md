@@ -1,6 +1,6 @@
-# Street-light background notifications
+# Service fault background notifications
 
-Street-light complaint notifications are sent by the Complaint Bot Cloudflare Worker.
+The Complaint Bot Cloudflare Worker sends agency fault notifications in the background.
 
 ## WhatsApp
 
@@ -11,42 +11,17 @@ The Worker uses the same WhatsApp Business phone number configured for the Compl
 
 No WhatsApp composer is opened in the supervisor's browser.
 
-For reliable business-initiated messages outside the WhatsApp customer-service window, configure two approved Hindi templates:
+For business-initiated messages outside the WhatsApp customer-service window, use these two approved Hindi Utility templates. They are intentionally generic so the same templates can be reused for Street Lights, Camera AMC, LED AMC, and future service categories.
 
 ### First-day template
 
-Worker variable:
+Template name:
 
-`street_light_fault_first_day_hi` (default; override with `STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY` if ever needed)
+`service_fault_first_day_hi`
 
-Suggested template body:
+Optional Worker override:
 
-```
-दिनांक: {{1}}
-सेवा में {{2}},
-
-पॉकेट-A, सेक्टर-105 में {{3}} स्ट्रीट लाइट खराब हैं। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
-अधिक जानकारी के लिए संपर्क करें:
-RWA Staff / Supervisor: {{4}}
-RWA Executive: {{5}}
-
-धन्यवाद
-RWA Pocket-A
-```
-
-Parameters:
-
-1. Date
-2. Agency name
-3. Faulty street-light count
-4. Common Supervisor name/mobile
-5. Category RWA Executive name/mobile
-
-### Pending template
-
-Worker variable:
-
-`street_light_fault_pending_hi` (default; override with `STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING` if ever needed)
+`SERVICE_WHATSAPP_TEMPLATE_FIRST_DAY`
 
 Suggested template body:
 
@@ -54,7 +29,11 @@ Suggested template body:
 दिनांक: {{1}}
 सेवा में {{2}},
 
-पॉकेट-A, सेक्टर-105 में {{3}} स्ट्रीट लाइट खराब हैं और यह समस्या {{4}} दिन से लंबित है। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
+पॉकेट-A, सेक्टर-105 में निम्न समस्या पाई गई है:
+सेवा / उपकरण: {{3}}
+खराब संख्या: {{4}}
+
+कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
 अधिक जानकारी के लिए संपर्क करें:
 RWA Staff / Supervisor: {{5}}
 RWA Executive: {{6}}
@@ -67,22 +46,68 @@ Parameters:
 
 1. Date
 2. Agency name
-3. Faulty street-light count
-4. Pending days
+3. Service / equipment label, e.g. स्ट्रीट लाइट, कैमरा, LED स्क्रीन
+4. Faulty count
 5. Common Supervisor name/mobile
 6. Category RWA Executive name/mobile
 
+### Pending template
+
+Template name:
+
+`service_fault_pending_hi`
+
+Optional Worker override:
+
+`SERVICE_WHATSAPP_TEMPLATE_PENDING`
+
+Suggested template body:
+
+```
+दिनांक: {{1}}
+सेवा में {{2}},
+
+पॉकेट-A, सेक्टर-105 में निम्न समस्या पाई गई है:
+सेवा / उपकरण: {{3}}
+खराब संख्या: {{4}}
+यह समस्या {{5}} दिन से लंबित है।
+
+कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
+अधिक जानकारी के लिए संपर्क करें:
+RWA Staff / Supervisor: {{6}}
+RWA Executive: {{7}}
+
+धन्यवाद
+RWA Pocket-A
+```
+
+Parameters:
+
+1. Date
+2. Agency name
+3. Service / equipment label
+4. Faulty count
+5. Pending days
+6. Common Supervisor name/mobile
+7. Category RWA Executive name/mobile
+
 Optional language override:
 
-`STREET_LIGHT_WHATSAPP_TEMPLATE_LANGUAGE=hi`
+`SERVICE_WHATSAPP_TEMPLATE_LANGUAGE=hi`
 
-The Worker now always uses an approved template for Street Light complaints. There is no free-form fallback, so this flow does not depend on the 24-hour customer-service window.
+The Worker always uses an approved template for service-fault notifications. There is no free-form fallback, so this flow does not depend on the 24-hour customer-service window.
+
+Current automatic Hindi service labels:
+
+- `STREET_LIGHT` → `स्ट्रीट लाइट`
+- `CAMERA_AMC` → `कैमरा`
+- `LED_AMC` → `LED स्क्रीन`
+
+Other categories fall back to their configured service label.
 
 ## SMS
 
-The browser no longer opens the phone SMS composer. It calls:
-
-`POST /api/street-lights/notify-sms`
+The browser does not open the phone SMS composer. It calls the Worker background SMS endpoint.
 
 The Worker expects a server-side SMS gateway adapter configured with:
 
@@ -91,29 +116,8 @@ The Worker expects a server-side SMS gateway adapter configured with:
 - `SMS_SENDER_ID` (optional provider/adapter field)
 - `SMS_TEMPLATE_ID` (optional provider/adapter field)
 
-The gateway endpoint is expected to accept:
-
-```json
-{
-  "to": "91XXXXXXXXXX",
-  "message": "...",
-  "sender_id": "...",
-  "template_id": "..."
-}
-```
-
-and use Bearer authentication.
-
 For India, connect this adapter only after the RWA's required DLT sender/header/content-template setup is complete.
 
 ## Delivery audit
 
-Every attempt is written to `street_light_notifications` with:
-
-- channel: `WHATSAPP` or `SMS`
-- recipient
-- message
-- status: `SENT` or `FAILED`
-- provider reference/response where available
-- sender user
-- timestamp
+Every notification attempt is written to `street_light_notifications` with the provider reference and delivery state. WhatsApp delivery-status webhooks update the record after Meta reports delivery or failure.
