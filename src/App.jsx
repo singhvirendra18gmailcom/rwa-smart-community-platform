@@ -17,7 +17,8 @@ import { supabase } from './supabase'
 import Login from './Login'
 import Attendance from './Attendance'
 import ManageStaff from './ManageStaff'
-import TowerInspection from './TowerInspection'
+import SocietyInspection from './SocietyInspection'
+import { useInspectionConfig } from './inspectionConfig'
 import Complaints from './Complaints'
 import ComplaintLiveDisplay from './ComplaintLiveDisplay'
 
@@ -33,6 +34,7 @@ function App() {
   const [screen, setScreen] = useState('dashboard')
 
   const [rwbotProfile, setRwbotProfile] = useState(null)
+  const { config: inspectionConfig } = useInspectionConfig()
 
   const [
     profileCheckedForUser,
@@ -325,9 +327,9 @@ function App() {
     )
   }
 
-  if (screen === 'tower-inspection') {
+  if (screen === 'society-inspection') {
     return (
-      <TowerInspection
+      <SocietyInspection
         onBack={() =>
           setScreen('dashboard')
         }
@@ -478,7 +480,7 @@ function App() {
         <button
           className="feature-card feature-manage"
           onClick={() =>
-            setScreen('tower-inspection')
+            setScreen('society-inspection')
           }
         >
 
@@ -498,7 +500,7 @@ function App() {
             </h3>
 
             <p>
-              Scan tower QR, verify GPS and submit inspection
+              Inspect towers, parks and street lights across the society
             </p>
 
           </div>
