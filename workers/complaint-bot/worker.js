@@ -284,7 +284,7 @@ async function getStreetLightNotificationContext(request, env) {
 
   const agencies = await supabaseRequest(
     env,
-    `/rest/v1/society_service_agencies?id=eq.${inspection.agency_id}&select=id,agency_name,contact_name,mobile_no,whatsapp_no,sms_no`,
+    `/rest/v1/society_service_agencies?id=eq.${inspection.agency_id}&select=id,agency_name,contact_name,mobile_no,whatsapp_no,sms_no,service_type,service_label`,
     { method: 'GET' }
   )
 
@@ -464,8 +464,7 @@ async function handleStreetLightWhatsapp(request, env) {
         agency,
         inspection,
         oldestDays,
-        settings,
-        message
+        settings
       )
 
       const providerReference = providerResult?.messages?.[0]?.id || null
@@ -1206,25 +1205,37 @@ async function supabaseRequest(env, path, options = {}) {
   try { return JSON.parse(raw) } catch { return raw }
 }
 
+function getServiceItemLabel(agency) {
+  switch (String(agency?.service_type || '').toUpperCase()) {
+    case 'STREET_LIGHT':
+      return 'स्ट्रीट लाइट'
+    case 'CAMERA_AMC':
+      return 'कैमरा'
+    case 'LED_AMC':
+      return 'LED स्क्रीन'
+    default:
+      return agency?.service_label || agency?.service_type || 'सेवा / उपकरण'
+  }
+}
+
 async function sendStreetLightWhatsApp(
   env,
   to,
   agency,
   inspection,
   oldestDays,
-  settings,
-  fallbackMessage
+  settings
 ) {
   const firstDayTemplate =
-    env.STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY ||
-    'street_light_fault_first_day_hi'
+    env.SERVICE_WHATSAPP_TEMPLATE_FIRST_DAY ||
+    'service_fault_first_day_hi'
 
   const pendingTemplate =
-    env.STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING ||
-    'street_light_fault_pending_hi'
+    env.SERVICE_WHATSAPP_TEMPLATE_PENDING ||
+    'service_fault_pending_hi'
 
   const languageCode =
-    env.STREET_LIGHT_WHATSAPP_TEMPLATE_LANGUAGE || 'hi'
+    env.SERVICE_WHATSAPP_TEMPLATE_LANGUAGE || 'hi'
 
   const templateName =
     oldestDays > 1 ? pendingTemplate : firstDayTemplate
@@ -1239,10 +1250,13 @@ async function sendStreetLightWhatsApp(
     settings?.rwa_contact_mobile
   ].filter(Boolean).join(' - ') || '—'
 
+  const serviceItem = getServiceItemLabel(agency)
+
   const parameters = oldestDays > 1
     ? [
         formatStreetLightMessageDate(inspection.inspection_date),
         agency.agency_name,
+        serviceItem,
         String(inspection.faulty_count),
         String(oldestDays),
         supervisor,
@@ -1251,6 +1265,7 @@ async function sendStreetLightWhatsApp(
     : [
         formatStreetLightMessageDate(inspection.inspection_date),
         agency.agency_name,
+        serviceItem,
         String(inspection.faulty_count),
         supervisor,
         rwa
