@@ -564,3 +564,413 @@
     padding: 12px;
   }
 }
+
+
+/* =========================================================
+   INSPECTION WORKFLOW / ACTION SUMMARY
+   ========================================================= */
+
+.inspection-workflow-warning {
+  margin-bottom: 14px;
+  padding: 13px 14px;
+  border: 1px solid #f0c57b;
+  border-radius: 13px;
+  background: #fff8e8;
+  color: #80520a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.inspection-action-card {
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid #dce5ee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(40,70,100,.05);
+}
+
+.inspection-action-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.inspection-action-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--inspection-soft, #edf5ff);
+  font-size: 23px;
+}
+
+.inspection-action-title span {
+  color: var(--inspection-primary, #176cf0);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+.inspection-action-title h2 {
+  margin: 3px 0 0;
+  color: #26364f;
+  font-size: 19px;
+}
+
+.inspection-action-detail {
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.inspection-action-detail strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #56677f;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.inspection-action-detail p,
+.inspection-action-next p {
+  margin: 0;
+  color: #33445d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.inspection-complaint-status {
+  margin: 12px 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #f1f7ff;
+  color: #315a8a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.inspection-action-buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.inspection-mark-sent-button {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #9fd4ad;
+  border-radius: 11px;
+  background: #ecf8ef;
+  color: #15773a;
+  font-weight: 900;
+}
+
+.inspection-action-next {
+  border-color: #b9d6ff;
+  background: #f8fbff;
+}
+
+/* =========================================================
+   SIMPLIFIED STREET-LIGHT FAULT ENTRY
+   ========================================================= */
+
+.street-fault-counter-card {
+  margin-bottom: 14px;
+  padding: 15px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #dce5ee;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.street-fault-counter-card span {
+  display: block;
+  color: #718095;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .4px;
+}
+
+.street-fault-counter-card strong {
+  display: block;
+  margin-top: 2px;
+  color: #26364f;
+  font-size: 30px;
+}
+
+.street-fault-counter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.street-fault-counter-actions button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #cbd8e6;
+  border-radius: 12px;
+  background: #f6f9fc;
+  color: var(--inspection-primary, #176cf0);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.street-all-working-card {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid #a9deb9;
+  border-radius: 14px;
+  background: #e9f8ee;
+  color: #15773a;
+  font-weight: 900;
+  text-align: center;
+}
+
+.street-fault-list {
+  display: grid;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+
+.street-fault-card {
+  padding: 14px;
+  border: 1px solid #dce5ee;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.street-fault-card-title {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.street-fault-card-title strong {
+  color: #26364f;
+  font-size: 15px;
+}
+
+.street-fault-card-title span {
+  color: #a35a00;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.street-fault-card label {
+  display: block;
+  color: #56677f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.street-fault-card input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 13px;
+  border: 1px solid #ccd7e3;
+  border-radius: 11px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.street-agency-choice {
+  margin-top: 12px;
+}
+
+.street-agency-choice > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #56677f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.street-agency-choice > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.street-agency-choice button {
+  padding: 11px 12px;
+  border: 1px solid #cbd8e6;
+  border-radius: 11px;
+  background: #f6f9fc;
+  color: #44546b;
+  font-weight: 900;
+}
+
+.street-agency-choice button.selected {
+  border-color: var(--inspection-primary, #176cf0);
+  background: var(--inspection-soft, #edf5ff);
+  color: var(--inspection-primary, #176cf0);
+}
+
+.street-save-all-button {
+  width: 100%;
+}
+
+.street-complaint-summary {
+  margin-top: 16px;
+}
+
+.street-complaint-summary h2 {
+  margin: 0 0 10px;
+  color: #26364f;
+  font-size: 18px;
+}
+
+.street-agency-complaint-card {
+  margin-bottom: 11px;
+  padding: 14px;
+  border: 1px solid #dce5ee;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.street-agency-complaint-card > div:first-child strong,
+.street-agency-complaint-card > div:first-child span {
+  display: block;
+}
+
+.street-agency-complaint-card > div:first-child strong {
+  color: #26364f;
+}
+
+.street-agency-complaint-card > div:first-child span {
+  margin-top: 4px;
+  color: #718095;
+  font-size: 12px;
+}
+
+/* =========================================================
+   FINAL SOCIETY SUMMARY
+   ========================================================= */
+
+.final-summary-progress {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.final-summary-progress > div {
+  padding: 16px;
+  border: 1px solid #dce5ee;
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+}
+
+.final-summary-progress strong {
+  display: block;
+  color: var(--inspection-primary, #176cf0);
+  font-size: 25px;
+}
+
+.final-summary-progress span {
+  display: block;
+  margin-top: 3px;
+  color: #718095;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.final-summary-card {
+  margin-bottom: 14px;
+  padding: 15px;
+  border: 1px solid #dce5ee;
+  border-radius: 17px;
+  background: #fff;
+}
+
+.final-summary-card h2 {
+  margin: 0 0 12px;
+  color: #26364f;
+  font-size: 18px;
+}
+
+.final-summary-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  padding: 11px 0;
+  border-top: 1px solid #edf1f5;
+}
+
+.final-summary-row:first-of-type {
+  border-top: 0;
+}
+
+.final-summary-row span {
+  color: #56677f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.final-summary-row strong {
+  color: #26364f;
+  font-size: 13px;
+}
+
+.final-summary-row b {
+  color: var(--inspection-primary, #176cf0);
+  font-size: 12px;
+}
+
+.final-summary-line {
+  padding: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid #edf1f5;
+}
+
+.final-summary-line:first-of-type {
+  border-top: 0;
+}
+
+.final-summary-line span {
+  color: #56677f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.final-summary-line strong {
+  color: #26364f;
+  font-size: 12px;
+  text-align: right;
+}
+
+.final-summary-note {
+  margin-bottom: 14px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  background: #f7f9fc;
+  color: #66758a;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (min-width: 680px) {
+  .inspection-action-buttons {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .final-summary-row {
+    grid-template-columns: 180px 1fr 150px;
+    align-items: center;
+    gap: 12px;
+  }
+}
