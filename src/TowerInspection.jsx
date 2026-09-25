@@ -835,35 +835,13 @@ function InspectionLocationRow({
         )}
 
         {completed && (
-          <>
-            <button
-              type="button"
-              className="location-rescan-button"
-              onClick={() => onScan(location)}
-            >
-              📷 Scan Again
-            </button>
-
-            <button
-              type="button"
-              className="location-report-button"
-              onClick={() => onReport(location)}
-            >
-              📄 Report
-            </button>
-
-            {location.type === 'tower' && (
-              <button
-                type="button"
-                className="location-share-button"
-                onClick={() =>
-                  onShare(location, inspection)
-                }
-              >
-                📲 Share
-              </button>
-            )}
-          </>
+          <button
+            type="button"
+            className="location-rescan-button"
+            onClick={() => onScan(location)}
+          >
+            📷 Scan Again
+          </button>
         )}
 
       </div>
@@ -872,7 +850,7 @@ function InspectionLocationRow({
   )
 }
 
-function TowerInspection({ onBack }) {
+function TowerInspection({ onBack, onContinue }) {
   const today =
     useMemo(() => getIndiaDate(), [])
 
@@ -2766,12 +2744,6 @@ function TowerInspection({ onBack }) {
                       onScan={
                         startLocationScan
                       }
-                      onReport={
-                        openReport
-                      }
-                      onShare={
-                        shareTowerImage
-                      }
                     />
                   )
                 )}
@@ -2795,12 +2767,6 @@ function TowerInspection({ onBack }) {
                       onScan={
                         startLocationScan
                       }
-                      onReport={
-                        openReport
-                      }
-                      onShare={
-                        shareTowerImage
-                      }
                     />
                   )
                 )}
@@ -2808,27 +2774,13 @@ function TowerInspection({ onBack }) {
               </div>
 
               <div className="daily-summary-actions">
-
-                <button
-                  type="button"
-                  className="view-summary-button"
-                  onClick={
-                    openSummary
-                  }
-                >
-                  📋 View Daily Summary
-                </button>
-
                 <button
                   type="button"
                   className="share-summary-button"
-                  onClick={
-                    shareSummaryImage
-                  }
+                  onClick={onContinue}
                 >
-                  🖼️ Share Summary Image
+                  Continue to Action Summary →
                 </button>
-
               </div>
             </>
           )}
@@ -3430,28 +3382,6 @@ function TowerInspection({ onBack }) {
               Last saved:{' '}
               {formatTime(savedAt)}
             </div>
-          )}
-
-          {saved && !isPark && (
-            <button
-              type="button"
-              className="share-inspection-button"
-              onClick={() => {
-                const inspection =
-                  getInspection(
-                    selectedLocation
-                  )
-
-                if (inspection) {
-                  shareTowerImage(
-                    selectedLocation,
-                    inspection
-                  )
-                }
-              }}
-            >
-              🖼️ Share Tower Report Image
-            </button>
           )}
 
           <button
