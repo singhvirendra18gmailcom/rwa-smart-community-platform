@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import './SocietyInspection.css'
 
@@ -17,6 +17,7 @@ const SERVICE_OPTIONS = [
 
 function normalizeIndiaMobile(value) {
   const digits = String(value || '').replace(/\D/g, '')
+  if (!digits) return ''
   if (digits.length === 10) return `91${digits}`
   if (digits.length === 12 && digits.startsWith('91')) return digits
   return digits
@@ -34,11 +35,19 @@ function createAgencyCode(name) {
 
 export default function ServiceAgencies({ onBack }) {
   const [agencies, setAgencies] = useState([])
+  const [categories, setCategories] = useState([])
+  const [supervisor, setSupervisor] = useState({ name: '', mobile: '' })
+
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState(null)
+  const [savingType, setSavingType] = useState(null)
+  const [savingSupervisor, setSavingSupervisor] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [message, setMessage] = useState('')
   const [cardStatus, setCardStatus] = useState({})
+  const [categoryStatus, setCategoryStatus] = useState({})
+  const [supervisorStatus, setSupervisorStatus] = useState('')
+
   const [newAgency, setNewAgency] = useState({
     agency_name: '',
     service_type: 'OTHER',
@@ -48,20 +57,45 @@ export default function ServiceAgencies({ onBack }) {
   })
 
   useEffect(() => {
-    loadAgencies()
+    loadData()
   }, [])
 
-  const loadAgencies = async () => {
+  const activeAgencies = useMemo(
+    () => agencies.filter((agency) => agency.active !== false),
+    [agencies]
+  )
+
+  const loadData = async () => {
     setLoading(true)
     setMessage('')
 
-    const { data, error } = await supabase
-      .from('society_service_agencies')
-      .select(
-        'id,agency_code,agency_name,service_type,service_label,contact_name,mobile_no,whatsapp_no,sms_no,display_order,active,notes'
-      )
-      .order('display_order')
-      .order('agency_name')
+    const [agencyResult, categoryResult, settingsResult] = await Promise.all([
+      supabase
+        .from('society_service_agencies')
+        .select(
+          'id,agency_code,agency_name,service_type,service_label,contact_name,mobile_no,whatsapp_no,sms_no,display_order,active,notes'
+        )
+        .order('display_order')
+        .order('agency_name'),
+      supabase
+        .from('society_service_categories')
+        .select(
+          'service_type,service_label,rwa_name,rwa_mobile,display_order,active'
+        )
+        .eq('active', true)
+        .order('display_order')
+        .order('service_label'),
+      supabase
+        .from('society_inspection_settings')
+        .select('supervisor_contact_name,supervisor_contact_mobile')
+        .eq('id', 1)
+        .maybeSingle(),
+    ])
+
+    const error =
+      agencyResult.error ||
+      categoryResult.error ||
+      settingsResult.error
 
     if (error) {
       setMessage(error.message)
@@ -69,7 +103,13 @@ export default function ServiceAgencies({ onBack }) {
       return
     }
 
-    setAgencies(data || [])
+    setAgencies(agencyResult.data || [])
+    setCategories(categoryResult.data || [])
+    setSupervisor({
+      name: settingsResult.data?.supervisor_contact_name || '',
+      mobile: settingsResult.data?.supervisor_contact_mobile || '',
+    })
+
     setLoading(false)
   }
 
@@ -83,11 +123,115 @@ export default function ServiceAgencies({ onBack }) {
     )
   }
 
+  const updateCategory = (serviceType, field, value) => {
+    setCategories((current) =>
+      current.map((category) =>
+        category.service_type === serviceType
+          ? { ...category, [field]: value }
+          : category
+      )
+    )
+  }
+
+  const saveSupervisor = async () => {
+    const mobile = normalizeIndiaMobile(supervisor.mobile)
+
+    if (mobile && (mobile.length !== 12 || !mobile.startsWith('91'))) {
+      setSupervisorStatus('Please enter a valid Supervisor mobile number.')
+      return
+    }
+
+    setSavingSupervisor(true)
+    setSupervisorStatus('Saving…')
+    setMessage('')
+
+    const { data, error } = await supabase
+      .from('society_inspection_settings')
+      .update({
+        supervisor_contact_name:
+          String(supervisor.name || '').trim() || null,
+        supervisor_contact_mobile: mobile || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', 1)
+      .select('supervisor_contact_name,supervisor_contact_mobile')
+      .single()
+
+    setSavingSupervisor(false)
+
+    if (error) {
+      setSupervisorStatus(error.message)
+      return
+    }
+
+    setSupervisor({
+      name: data.supervisor_contact_name || '',
+      mobile: data.supervisor_contact_mobile || '',
+    })
+    setSupervisorStatus('✓ Supervisor saved')
+  }
+
+  const saveCategory = async (category) => {
+    const mobile = normalizeIndiaMobile(category.rwa_mobile)
+
+    if (mobile && (mobile.length !== 12 || !mobile.startsWith('91'))) {
+      setCategoryStatus((current) => ({
+        ...current,
+        [category.service_type]: {
+          text: 'Please enter a valid RWA Executive mobile number.',
+          type: 'error',
+        },
+      }))
+      return
+    }
+
+    setSavingType(category.service_type)
+    setMessage('')
+    setCategoryStatus((current) => ({
+      ...current,
+      [category.service_type]: { text: 'Saving…', type: 'info' },
+    }))
+
+    const { data, error } = await supabase
+      .from('society_service_categories')
+      .update({
+        rwa_name: String(category.rwa_name || '').trim() || null,
+        rwa_mobile: mobile || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('service_type', category.service_type)
+      .select(
+        'service_type,service_label,rwa_name,rwa_mobile,display_order,active'
+      )
+      .single()
+
+    setSavingType(null)
+
+    if (error) {
+      setCategoryStatus((current) => ({
+        ...current,
+        [category.service_type]: { text: error.message, type: 'error' },
+      }))
+      return
+    }
+
+    setCategories((current) =>
+      current.map((item) =>
+        item.service_type === data.service_type ? data : item
+      )
+    )
+    setCategoryStatus((current) => ({
+      ...current,
+      [category.service_type]: {
+        text: '✓ RWA Executive saved',
+        type: 'success',
+      },
+    }))
+  }
+
   const saveAgency = async (agency) => {
     const name = String(agency.agency_name || '').trim()
-    const mobile = agency.mobile_no
-      ? normalizeIndiaMobile(agency.mobile_no)
-      : ''
+    const mobile = normalizeIndiaMobile(agency.mobile_no)
 
     const setAgencyStatus = (text, type = 'info') => {
       setCardStatus((current) => ({
@@ -102,10 +246,7 @@ export default function ServiceAgencies({ onBack }) {
     }
 
     if (mobile && (mobile.length !== 12 || !mobile.startsWith('91'))) {
-      setAgencyStatus(
-        `Please enter a valid 10-digit mobile number for ${name}.`,
-        'error'
-      )
+      setAgencyStatus('Please enter a valid 10-digit mobile number.', 'error')
       return
     }
 
@@ -132,26 +273,17 @@ export default function ServiceAgencies({ onBack }) {
         .select(
           'id,agency_code,agency_name,service_type,service_label,contact_name,mobile_no,whatsapp_no,sms_no,display_order,active,notes'
         )
-        .maybeSingle()
+        .single()
 
-      if (error) {
-        throw error
-      }
-
-      if (!data) {
-        throw new Error('Agency was not updated. Please refresh and try again.')
-      }
+      if (error) throw error
 
       setAgencies((current) =>
         current.map((item) =>
-          item.id === agency.id
-            ? data
-            : item
+          item.id === agency.id ? data : item
         )
       )
 
-      setAgencyStatus('✓ Saved successfully', 'success')
-      setMessage(`${data.agency_name} saved successfully.`)
+      setAgencyStatus('✓ Agency saved', 'success')
     } catch (error) {
       console.error('Save agency failed:', error)
       setAgencyStatus(
@@ -165,9 +297,7 @@ export default function ServiceAgencies({ onBack }) {
 
   const addAgency = async () => {
     const name = newAgency.agency_name.trim()
-    const mobile = newAgency.mobile_no
-      ? normalizeIndiaMobile(newAgency.mobile_no)
-      : ''
+    const mobile = normalizeIndiaMobile(newAgency.mobile_no)
 
     if (!name) {
       setMessage('Please enter the agency name.')
@@ -219,13 +349,13 @@ export default function ServiceAgencies({ onBack }) {
     })
     setShowAdd(false)
     setMessage(`${name} added successfully.`)
-    await loadAgencies()
+    await loadData()
   }
 
   if (loading) {
     return (
       <div className="street-light-page">
-        <div className="society-loading">Loading service agencies…</div>
+        <div className="society-loading">Loading service setup…</div>
       </div>
     )
   }
@@ -236,17 +366,75 @@ export default function ServiceAgencies({ onBack }) {
         <button type="button" onClick={onBack}>←</button>
         <div>
           <span>RWA POCKET-A</span>
-          <h1>Service Agencies</h1>
-          <p>Contacts and responsibility mapping</p>
+          <h1>Service Agencies & Contacts</h1>
+          <p>Manage service providers and RWA contact mapping in one place</p>
         </div>
       </header>
 
       <main className="street-light-content">
+        <section className="service-agency-card service-agency-supervisor-card">
+          <div className="service-agency-card-title">
+            <div>
+              <span>COMMON FOR ALL SERVICES</span>
+              <h2>RWA Staff / Supervisor</h2>
+            </div>
+          </div>
+
+          <div className="service-agency-form-grid">
+            <label>
+              Supervisor Name
+              <input
+                value={supervisor.name}
+                onChange={(event) =>
+                  setSupervisor((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Supervisor name"
+              />
+            </label>
+
+            <label>
+              Supervisor Mobile
+              <input
+                type="tel"
+                inputMode="tel"
+                value={supervisor.mobile}
+                onChange={(event) =>
+                  setSupervisor((current) => ({
+                    ...current,
+                    mobile: event.target.value,
+                  }))
+                }
+                placeholder="10-digit mobile"
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            className="agency-contact-save"
+            disabled={savingSupervisor}
+            onClick={saveSupervisor}
+          >
+            {savingSupervisor ? 'Saving…' : 'Save Supervisor'}
+          </button>
+
+          {supervisorStatus && (
+            <div className="service-agency-save-status success">
+              {supervisorStatus}
+            </div>
+          )}
+        </section>
+
         <div className="service-agency-toolbar">
           <div>
-            <strong>{agencies.filter((agency) => agency.active).length} Active Agencies</strong>
+            <strong>
+              {categories.length} Service Categories • {activeAgencies.length} Active Agencies
+            </strong>
             <small>
-              Used to route inspection issues and complaints to the concerned stakeholder.
+              Each category has one RWA Executive contact and can have one or more service agencies.
             </small>
           </div>
 
@@ -353,105 +541,222 @@ export default function ServiceAgencies({ onBack }) {
           </section>
         )}
 
-        <div className="service-agency-list">
-          {agencies.map((agency) => (
-            <section className="service-agency-card" key={agency.id}>
-              <div className="service-agency-card-title">
-                <div>
-                  <span>{agency.service_label || agency.service_type}</span>
-                  <h2>{agency.agency_name}</h2>
-                </div>
+        <div className="service-category-list">
+          {categories.map((category) => {
+            const categoryAgencies = agencies.filter(
+              (agency) => agency.service_type === category.service_type
+            )
 
-                <label className="service-agency-active">
-                  <input
-                    type="checkbox"
-                    checked={agency.active !== false}
-                    onChange={(event) =>
-                      updateAgency(agency.id, 'active', event.target.checked)
-                    }
-                  />
-                  Active
-                </label>
-              </div>
-
-              <div className="service-agency-form-grid">
-                <label>
-                  Agency Name
-                  <input
-                    value={agency.agency_name || ''}
-                    onChange={(event) =>
-                      updateAgency(agency.id, 'agency_name', event.target.value)
-                    }
-                  />
-                </label>
-
-                <label>
-                  Service
-                  <select
-                    value={agency.service_type || 'OTHER'}
-                    onChange={(event) =>
-                      updateAgency(agency.id, 'service_type', event.target.value)
-                    }
-                  >
-                    {SERVICE_OPTIONS.map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Service Label
-                  <input
-                    value={agency.service_label || ''}
-                    onChange={(event) =>
-                      updateAgency(agency.id, 'service_label', event.target.value)
-                    }
-                  />
-                </label>
-
-                <label>
-                  Contact Person
-                  <input
-                    value={agency.contact_name || ''}
-                    onChange={(event) =>
-                      updateAgency(agency.id, 'contact_name', event.target.value)
-                    }
-                    placeholder="Person name"
-                  />
-                </label>
-
-                <label>
-                  Mobile Number
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    value={agency.mobile_no || ''}
-                    onChange={(event) =>
-                      updateAgency(agency.id, 'mobile_no', event.target.value)
-                    }
-                    placeholder="10-digit mobile number"
-                  />
-                </label>
-              </div>
-
-              <button
-                type="button"
-                className="agency-contact-save"
-                disabled={savingId === agency.id}
-                onClick={() => saveAgency(agency)}
+            return (
+              <section
+                className="service-category-group"
+                key={category.service_type}
               >
-                {savingId === agency.id ? 'Saving…' : 'Save Agency'}
-              </button>
-
-              {cardStatus[agency.id]?.text && (
-                <div
-                  className={`service-agency-save-status ${cardStatus[agency.id].type || 'info'}`}
-                >
-                  {cardStatus[agency.id].text}
+                <div className="service-category-heading">
+                  <div>
+                    <span>SERVICE CATEGORY</span>
+                    <h2>{category.service_label}</h2>
+                    <small>
+                      {categoryAgencies.length === 1
+                        ? '1 agency configured'
+                        : `${categoryAgencies.length} agencies configured`}
+                    </small>
+                  </div>
                 </div>
-              )}
-            </section>
-          ))}
+
+                <div className="service-category-rwa-card">
+                  <div className="service-category-rwa-title">
+                    <strong>RWA Executive</strong>
+                    <small>Concerned RWA contact for this service</small>
+                  </div>
+
+                  <div className="service-agency-form-grid">
+                    <label>
+                      Executive Name
+                      <input
+                        value={category.rwa_name || ''}
+                        onChange={(event) =>
+                          updateCategory(
+                            category.service_type,
+                            'rwa_name',
+                            event.target.value
+                          )
+                        }
+                        placeholder="RWA Executive name"
+                      />
+                    </label>
+
+                    <label>
+                      Executive Mobile
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={category.rwa_mobile || ''}
+                        onChange={(event) =>
+                          updateCategory(
+                            category.service_type,
+                            'rwa_mobile',
+                            event.target.value
+                          )
+                        }
+                        placeholder="10-digit mobile"
+                      />
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="agency-contact-save"
+                    disabled={savingType === category.service_type}
+                    onClick={() => saveCategory(category)}
+                  >
+                    {savingType === category.service_type
+                      ? 'Saving…'
+                      : 'Save RWA Executive'}
+                  </button>
+
+                  {categoryStatus[category.service_type]?.text && (
+                    <div
+                      className={`service-agency-save-status ${categoryStatus[category.service_type].type || 'info'}`}
+                    >
+                      {categoryStatus[category.service_type].text}
+                    </div>
+                  )}
+                </div>
+
+                <div className="service-category-agencies">
+                  {categoryAgencies.length === 0 && (
+                    <div className="service-category-empty">
+                      No agency configured for this category yet.
+                    </div>
+                  )}
+
+                  {categoryAgencies.map((agency) => (
+                    <section className="service-agency-card" key={agency.id}>
+                      <div className="service-agency-card-title">
+                        <div>
+                          <span>SERVICE AGENCY</span>
+                          <h2>{agency.agency_name}</h2>
+                        </div>
+
+                        <label className="service-agency-active">
+                          <input
+                            type="checkbox"
+                            checked={agency.active !== false}
+                            onChange={(event) =>
+                              updateAgency(
+                                agency.id,
+                                'active',
+                                event.target.checked
+                              )
+                            }
+                          />
+                          Active
+                        </label>
+                      </div>
+
+                      <div className="service-agency-form-grid">
+                        <label>
+                          Agency Name
+                          <input
+                            value={agency.agency_name || ''}
+                            onChange={(event) =>
+                              updateAgency(
+                                agency.id,
+                                'agency_name',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          Service
+                          <select
+                            value={agency.service_type || 'OTHER'}
+                            onChange={(event) =>
+                              updateAgency(
+                                agency.id,
+                                'service_type',
+                                event.target.value
+                              )
+                            }
+                          >
+                            {SERVICE_OPTIONS.map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label>
+                          Service Label
+                          <input
+                            value={agency.service_label || ''}
+                            onChange={(event) =>
+                              updateAgency(
+                                agency.id,
+                                'service_label',
+                                event.target.value
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label>
+                          Contact Person
+                          <input
+                            value={agency.contact_name || ''}
+                            onChange={(event) =>
+                              updateAgency(
+                                agency.id,
+                                'contact_name',
+                                event.target.value
+                              )
+                            }
+                            placeholder="Person name"
+                          />
+                        </label>
+
+                        <label>
+                          Mobile Number
+                          <input
+                            type="tel"
+                            inputMode="tel"
+                            value={agency.mobile_no || ''}
+                            onChange={(event) =>
+                              updateAgency(
+                                agency.id,
+                                'mobile_no',
+                                event.target.value
+                              )
+                            }
+                            placeholder="10-digit mobile number"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="agency-contact-save"
+                        disabled={savingId === agency.id}
+                        onClick={() => saveAgency(agency)}
+                      >
+                        {savingId === agency.id ? 'Saving…' : 'Save Agency'}
+                      </button>
+
+                      {cardStatus[agency.id]?.text && (
+                        <div
+                          className={`service-agency-save-status ${cardStatus[agency.id].type || 'info'}`}
+                        >
+                          {cardStatus[agency.id].text}
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </div>
 
         {message && <div className="street-light-message">{message}</div>}
