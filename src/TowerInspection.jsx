@@ -6,28 +6,6 @@ import './TowerInspection.css'
 const MAX_GPS_ACCURACY_M = 50
 const INSPECTION_VALIDITY_MINUTES = 10
 
-const DEFAULT_STREET_LIGHTS = [
-  true,
-  true,
-  true,
-  true,
-  true,
-  true,
-  true,
-  true,
-]
-
-const STREET_LIGHT_POSITIONS = [
-  'Top Left',
-  'Top Right',
-  'Right Upper',
-  'Right Lower',
-  'Bottom Right',
-  'Bottom Left',
-  'Left Lower',
-  'Left Upper',
-]
-
 const REPORT_FOOTER =
   'Powered by the RWA Pocket-A in-house App — a step towards smarter, transparent & technology-driven RWA management.'
 
@@ -118,24 +96,6 @@ function extractQrToken(decodedText) {
   }
 
   return value
-}
-
-function normaliseStreetLights(value) {
-  if (Array.isArray(value) && value.length === 8) {
-    return value.map((item) => item !== false)
-  }
-
-  return [...DEFAULT_STREET_LIGHTS]
-}
-
-function getStreetLightFailures(status) {
-  return normaliseStreetLights(status)
-    .map((working, index) => ({
-      working,
-      index,
-      label: STREET_LIGHT_POSITIONS[index],
-    }))
-    .filter((light) => !light.working)
 }
 
 function inspectionHasIssue(type, inspection) {
@@ -808,76 +768,6 @@ function InspectionToggle({
   )
 }
 
-function StreetLightMap({
-  locationName,
-  status,
-  readOnly = false,
-  onToggle,
-}) {
-  const lights = normaliseStreetLights(status)
-
-  const failedCount =
-    lights.filter((working) => !working).length
-
-  return (
-    <div className="street-light-section">
-
-      <div className="street-light-heading">
-
-        <div>
-          <strong>💡 Nearby Street Lights</strong>
-          <p>Approximate positions</p>
-        </div>
-
-        <span
-          className={`street-light-count ${
-            failedCount > 0
-              ? 'street-light-count-bad'
-              : 'street-light-count-good'
-          }`}
-        >
-          {failedCount === 0
-            ? '✅ All OK'
-            : `⚠ ${failedCount} not working`}
-        </span>
-
-      </div>
-
-      {!readOnly && (
-        <div className="street-light-help">
-          Tap the approximate position where a light is not working.
-        </div>
-      )}
-
-      <div className="street-light-map">
-
-        {lights.map((working, index) => (
-          <button
-            key={index}
-            type="button"
-            disabled={readOnly}
-            className={`street-light-dot street-light-dot-${
-              index + 1
-            } ${
-              working
-                ? 'working'
-                : 'not-working'
-            }`}
-            onClick={() => onToggle?.(index)}
-          />
-        ))}
-
-        <div className="street-light-tower">
-          <span>🏢</span>
-          <strong>{locationName}</strong>
-        </div>
-
-      </div>
-
-    </div>
-  )
-}
-
 function InspectionLocationRow({
   location,
   inspection,
@@ -1104,12 +994,6 @@ function TowerInspection({ onBack }) {
     setWaterLeakage,
   ] = useState(null)
 
-  const [
-    streetLightStatus,
-    setStreetLightStatus,
-  ] = useState([
-    ...DEFAULT_STREET_LIGHTS,
-  ])
 
   const [
     grassProperlyCut,
@@ -1131,15 +1015,6 @@ function TowerInspection({ onBack }) {
     setWateringNeeded,
   ] = useState(null)
 
-  const [
-    parkStreetLightsAllLit,
-    setParkStreetLightsAllLit,
-  ] = useState(null)
-
-  const [
-    parkStreetLightsNotLitCount,
-    setParkStreetLightsNotLitCount,
-  ] = useState(0)
 
   const [
     otherIssue,
@@ -1441,17 +1316,12 @@ function TowerInspection({ onBack }) {
     setLightsWorkingCount(null)
     setWaterLeakage(null)
 
-    setStreetLightStatus([
-      ...DEFAULT_STREET_LIGHTS,
-    ])
 
     setGrassProperlyCut(null)
     setBenchesWellPlaced(null)
     setSwingsNotBroken(null)
     setWateringNeeded(null)
 
-    setParkStreetLightsAllLit(null)
-    setParkStreetLightsNotLitCount(0)
 
     setOtherIssue(false)
     setOtherIssueDetails('')
@@ -1849,20 +1719,6 @@ function TowerInspection({ onBack }) {
     setInfoMessage('')
   }
 
-  function toggleStreetLight(index) {
-    markChanged()
-
-    setStreetLightStatus(
-      (current) =>
-        current.map(
-          (working, currentIndex) =>
-            currentIndex === index
-              ? !working
-              : working
-        )
-    )
-  }
-
   function decreaseLights() {
     markChanged()
 
@@ -1897,25 +1753,6 @@ function TowerInspection({ onBack }) {
     )
   }
 
-  function decreaseParkStreetLights() {
-    markChanged()
-
-    setParkStreetLightsNotLitCount(
-      (current) =>
-        Math.max(
-          1,
-          current - 1
-        )
-    )
-  }
-
-  function increaseParkStreetLights() {
-    markChanged()
-
-    setParkStreetLightsNotLitCount(
-      (current) => current + 1
-    )
-  }
 
   async function saveSocietyGarbage() {
     if (
