@@ -147,19 +147,37 @@ export default function StreetLightInspection({ config, onBack }) {
     setLoading(true)
     setMessage('')
 
-    const { data: escalationData, error: escalationError } = await supabase
-      .from('society_service_categories')
-      .select('service_type,service_label,supervisor_name,supervisor_mobile,rwa_name,rwa_mobile')
-      .eq('service_type', 'STREET_LIGHT')
-      .maybeSingle()
+    const [categoryResult, settingsResult] = await Promise.all([
+      supabase
+        .from('society_service_categories')
+        .select('service_type,service_label,rwa_name,rwa_mobile')
+        .eq('service_type', 'STREET_LIGHT')
+        .maybeSingle(),
+      supabase
+        .from('society_inspection_settings')
+        .select('supervisor_contact_name,supervisor_contact_mobile')
+        .eq('id', 1)
+        .maybeSingle(),
+    ])
 
-    if (escalationError) {
-      setMessage(escalationError.message)
+    if (categoryResult.error) {
+      setMessage(categoryResult.error.message)
       setLoading(false)
       return
     }
 
-    setEscalation(escalationData || null)
+    if (settingsResult.error) {
+      setMessage(settingsResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    setEscalation({
+      supervisor_name: settingsResult.data?.supervisor_contact_name || null,
+      supervisor_mobile: settingsResult.data?.supervisor_contact_mobile || null,
+      rwa_name: categoryResult.data?.rwa_name || null,
+      rwa_mobile: categoryResult.data?.rwa_mobile || null,
+    })
 
     const { data: agencies, error: agencyError } = await supabase
       .from('society_service_agencies')
