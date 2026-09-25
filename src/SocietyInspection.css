@@ -1,0 +1,166 @@
+.society-inspection-hub,
+.society-settings-page,
+.street-light-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--inspection-soft, #edf5ff) 0%, #f8fafc 42%, #f3f6fa 100%);
+  color: #172033;
+}
+
+.society-inspection-hub *,
+.society-settings-page *,
+.street-light-page * { box-sizing: border-box; }
+
+.society-inspection-hub-header,
+.society-subpage-header {
+  width: calc(100% - 24px);
+  max-width: 760px;
+  margin: 14px auto 0;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #dce5ee;
+  border-radius: 20px;
+  box-shadow: 0 7px 20px rgba(40,70,100,.07);
+}
+
+.society-inspection-hub-header h1,
+.society-subpage-header h1 { margin: 2px 0; font-size: 24px; color: var(--inspection-dark, #173f67); }
+
+.society-inspection-hub-header p,
+.society-subpage-header p { margin: 3px 0 0; color: #69788d; font-size: 12px; font-weight: 700; }
+
+.society-hub-brand,
+.society-subpage-header span { color: var(--inspection-primary, #176cf0); font-size: 12px; font-weight: 900; letter-spacing: .5px; }
+
+.society-hub-back,
+.society-hub-settings,
+.society-subpage-header > button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--inspection-soft, #edf5ff);
+  color: var(--inspection-primary, #176cf0);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.society-hub-settings { margin-left: auto; }
+
+.society-inspection-hub-content,
+.society-settings-content,
+.street-light-content {
+  width: calc(100% - 24px);
+  max-width: 760px;
+  margin: 16px auto 0;
+  padding-bottom: 34px;
+}
+
+.society-hub-card {
+  width: 100%;
+  min-height: 94px;
+  margin-bottom: 12px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 52px 1fr 24px;
+  gap: 14px;
+  align-items: center;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #dce5ee;
+  border-radius: 18px;
+  box-shadow: 0 7px 18px rgba(40,70,100,.06);
+}
+
+.society-hub-card strong { display: block; font-size: 17px; color: #172033; }
+.society-hub-card small { display: block; margin-top: 5px; color: #69788d; line-height: 1.35; }
+.society-hub-card b { font-size: 28px; color: var(--inspection-primary, #176cf0); }
+.society-hub-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: var(--inspection-soft, #edf5ff); font-size: 24px; }
+.society-hub-card-muted { background: #fbfcfe; }
+
+.society-settings-card,
+.agency-card {
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #dce5ee;
+  border-radius: 20px;
+  box-shadow: 0 7px 18px rgba(40,70,100,.06);
+}
+
+.society-settings-card label,
+.agency-remarks {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #344054;
+}
+
+.society-settings-card input,
+.fault-location-field input,
+.agency-remarks textarea {
+  width: 100%;
+  margin-top: 7px;
+  padding: 13px 14px;
+  border: 1px solid #ccd7e3;
+  border-radius: 12px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.society-theme-label { margin: 2px 0 8px; font-size: 13px; font-weight: 800; color: #344054; }
+.society-theme-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin-bottom: 16px; }
+
+.society-theme-option {
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #dce5ee;
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 800;
+}
+.society-theme-option.selected { border: 2px solid var(--inspection-primary, #176cf0); }
+.society-theme-dot { width: 17px; height: 17px; border-radius: 50%; }
+
+.society-theme-preview { margin-bottom: 16px; padding: 14px; display: flex; justify-content: space-between; gap: 12px; border: 1px solid; border-radius: 14px; }
+.society-settings-message,
+.street-light-message { margin: 12px 0; padding: 11px 13px; border-radius: 12px; background: #f1f7ff; color: #315a8a; font-weight: 700; }
+
+.society-primary-button {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--inspection-primary, #176cf0);
+  color: #fff;
+  font-weight: 900;
+}
+
+.society-primary-button:disabled { opacity: .55; }
+
+.street-light-intro { margin-bottom: 14px; padding: 13px 15px; border-radius: 14px; background: var(--inspection-soft, #edf5ff); color: var(--inspection-dark, #173f67); font-weight: 700; line-height: 1.4; }
+.agency-card { margin-bottom: 16px; }
+.agency-card-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
+.agency-card-heading span { color: #718095; font-size: 11px; font-weight: 900; letter-spacing: .5px; }
+.agency-card-heading h2 { margin: 3px 0 0; color: var(--inspection-dark, #173f67); font-size: 24px; }
+.agency-save-status { padding: 7px 9px; border-radius: 999px; background: #fff4e8; color: #a35a00 !important; }
+.agency-save-status.saved { background: #e9f8ee; color: #15773a !important; }
+.fault-counter-label { text-align: center; color: #56677f; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.fault-counter { max-width: 250px; margin: 9px auto 12px; display: grid; grid-template-columns: 58px 1fr 58px; align-items: center; overflow: hidden; border: 1px solid #ccd7e3; border-radius: 14px; }
+.fault-counter button { height: 54px; border: 0; background: var(--inspection-soft, #edf5ff); color: var(--inspection-primary, #176cf0); font-size: 27px; font-weight: 900; }
+.fault-counter strong { text-align: center; font-size: 26px; }
+.all-working-button { width: 100%; margin-bottom: 15px; padding: 12px; border: 1px solid #a9deb9; border-radius: 12px; background: #e9f8ee; color: #15773a; font-weight: 900; }
+.fault-location-list { margin: 14px 0; padding: 14px; background: #f8fafc; border: 1px solid #dce5ee; border-radius: 14px; }
+.fault-location-list h3 { margin: 0 0 10px; color: #26364f; font-size: 15px; }
+.fault-location-field { display: block; margin-bottom: 10px; }
+.fault-location-field span { display: block; color: #56677f; font-size: 12px; font-weight: 800; }
+.society-loading { width: calc(100% - 24px); max-width: 760px; margin: 30px auto; padding: 20px; background: #fff; border-radius: 16px; text-align: center; }
+
+@media (min-width: 680px) {
+  .society-theme-grid { grid-template-columns: repeat(5, minmax(0,1fr)); }
+}
