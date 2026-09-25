@@ -21,18 +21,6 @@ export default function SocietyInspectionSettings({
   const [themeKey, setThemeKey] = useState(
     config?.theme_key || DEFAULT_INSPECTION_CONFIG.theme_key
   )
-  const [supervisorName, setSupervisorName] = useState(
-    config?.supervisor_contact_name || ''
-  )
-  const [supervisorMobile, setSupervisorMobile] = useState(
-    config?.supervisor_contact_mobile || ''
-  )
-  const [rwaName, setRwaName] = useState(
-    config?.rwa_contact_name || ''
-  )
-  const [rwaMobile, setRwaMobile] = useState(
-    config?.rwa_contact_mobile || ''
-  )
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -55,10 +43,6 @@ export default function SocietyInspectionSettings({
       module_name: cleanName,
       report_title: cleanReportTitle,
       theme_key: themeKey,
-      supervisor_contact_name: supervisorName.trim() || null,
-      supervisor_contact_mobile: supervisorMobile.trim() || null,
-      rwa_contact_name: rwaName.trim() || null,
-      rwa_contact_mobile: rwaMobile.trim() || null,
       updated_by: userData?.user?.id || null,
       updated_at: new Date().toISOString(),
     }
@@ -66,7 +50,7 @@ export default function SocietyInspectionSettings({
     const { data, error } = await supabase
       .from('society_inspection_settings')
       .upsert(payload)
-      .select('id,module_name,theme_key,report_title,supervisor_contact_name,supervisor_contact_mobile,rwa_contact_name,rwa_contact_mobile')
+      .select('id,module_name,theme_key,report_title')
       .single()
 
     setSaving(false)
@@ -111,48 +95,6 @@ export default function SocietyInspectionSettings({
               placeholder="DAILY SOCIETY INSPECTION SUMMARY"
             />
           </label>
-
-          <div className="society-theme-label">Escalation Contacts</div>
-
-          <div className="society-settings-contact-grid">
-            <label>
-              Supervisor Name
-              <input
-                value={supervisorName}
-                onChange={(event) => setSupervisorName(event.target.value)}
-                placeholder="Supervisor name"
-              />
-            </label>
-
-            <label>
-              Supervisor Mobile
-              <input
-                type="tel"
-                value={supervisorMobile}
-                onChange={(event) => setSupervisorMobile(event.target.value)}
-                placeholder="Mobile number"
-              />
-            </label>
-
-            <label>
-              RWA Contact Name
-              <input
-                value={rwaName}
-                onChange={(event) => setRwaName(event.target.value)}
-                placeholder="RWA contact name"
-              />
-            </label>
-
-            <label>
-              RWA Mobile
-              <input
-                type="tel"
-                value={rwaMobile}
-                onChange={(event) => setRwaMobile(event.target.value)}
-                placeholder="Mobile number"
-              />
-            </label>
-          </div>
 
           <div className="society-theme-label">Color Theme</div>
 
