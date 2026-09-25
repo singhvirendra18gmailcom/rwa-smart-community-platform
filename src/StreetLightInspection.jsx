@@ -414,10 +414,18 @@ export default function StreetLightInspection({ config, onBack }) {
         }
       )
 
-      const result = await response.json()
+      let result = null
 
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || 'Unable to send WhatsApp complaint.')
+      try {
+        result = await response.json()
+      } catch {
+        result = null
+      }
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(
+          result?.error || `WhatsApp service returned ${response.status}.`
+        )
       }
 
       setRows((current) =>
@@ -432,7 +440,34 @@ export default function StreetLightInspection({ config, onBack }) {
         `WhatsApp complaint sent to ${row.agency.contact_name} (${mobile}).`
       )
     } catch (error) {
-      setMessage(error.message || 'Unable to send WhatsApp complaint.')
+      const complaintText = buildComplaintMessage(row, today)
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      await supabase
+        .from('street_light_notifications')
+        .insert({
+          inspection_id: row.inspectionId,
+          agency_id: row.agency.id,
+          channel: 'WHATSAPP',
+          recipient_name: row.agency.contact_name.trim(),
+          recipient_mobile: mobile,
+          message_text: complaintText,
+          delivery_status: 'COMPOSER_OPENED',
+          provider_response: String(error?.message || error),
+          sent_by: user?.id || null,
+        })
+
+      const whatsappUrl =
+        `https://wa.me/${mobile}?text=${encodeURIComponent(complaintText)}`
+
+      window.location.href = whatsappUrl
+
+      setMessage(
+        'Background WhatsApp service is not available yet. WhatsApp opened with the complaint pre-filled.'
+      )
     } finally {
       setSendingAgencyId(null)
     }
