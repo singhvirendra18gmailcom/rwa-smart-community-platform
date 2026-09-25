@@ -3,6 +3,8 @@ import TowerInspection from './TowerInspection'
 import StreetLightInspection from './StreetLightInspection'
 import SocietyInspectionSettings from './SocietyInspectionSettings'
 import ServiceAgencies from './ServiceAgencies'
+import InspectionActionSummary from './InspectionActionSummary'
+import SocietyInspectionSummary from './SocietyInspectionSummary'
 import { getInspectionTheme, useInspectionConfig } from './inspectionConfig'
 import './SocietyInspection.css'
 
@@ -20,7 +22,10 @@ export default function SocietyInspection({ onBack }) {
   if (screen === 'tower-park') {
     return (
       <div style={themeStyle}>
-        <TowerInspection onBack={() => setScreen('home')} />
+        <TowerInspection
+          onBack={() => setScreen('home')}
+          onContinue={() => setScreen('actions')}
+        />
       </div>
     )
   }
@@ -30,7 +35,30 @@ export default function SocietyInspection({ onBack }) {
       <div style={themeStyle}>
         <StreetLightInspection
           config={config}
-          onBack={() => setScreen('home')}
+          onBack={() => setScreen('actions')}
+          onContinue={() => setScreen('final-summary')}
+        />
+      </div>
+    )
+  }
+
+  if (screen === 'actions') {
+    return (
+      <div style={themeStyle}>
+        <InspectionActionSummary
+          onBack={() => setScreen('tower-park')}
+          onStreetLights={() => setScreen('street-lights')}
+          onFinalSummary={() => setScreen('final-summary')}
+        />
+      </div>
+    )
+  }
+
+  if (screen === 'final-summary') {
+    return (
+      <div style={themeStyle}>
+        <SocietyInspectionSummary
+          onBack={() => setScreen('actions')}
         />
       </div>
     )
@@ -89,8 +117,21 @@ export default function SocietyInspection({ onBack }) {
         >
           <span className="society-hub-icon">🏢</span>
           <span>
-            <strong>Towers & Parks</strong>
-            <small>QR + GPS verified daily inspection</small>
+            <strong>1. Towers & Parks</strong>
+            <small>QR + GPS verified field inspection • no tower-wise report</small>
+          </span>
+          <b>›</b>
+        </button>
+
+        <button
+          type="button"
+          className="society-hub-card"
+          onClick={() => setScreen('actions')}
+        >
+          <span className="society-hub-icon">📋</span>
+          <span>
+            <strong>2. Action Summary</strong>
+            <small>Review Camera/LED issues and send AMC complaints</small>
           </span>
           <b>›</b>
         </button>
@@ -102,8 +143,21 @@ export default function SocietyInspection({ onBack }) {
         >
           <span className="society-hub-icon">💡</span>
           <span>
-            <strong>Street Lights</strong>
-            <small>UPPCL & TATA fault inspection with locations</small>
+            <strong>3. Street Lights</strong>
+            <small>Fault count + lane/park location + UPPCL/TATA</small>
+          </span>
+          <b>›</b>
+        </button>
+
+        <button
+          type="button"
+          className="society-hub-card"
+          onClick={() => setScreen('final-summary')}
+        >
+          <span className="society-hub-icon">📊</span>
+          <span>
+            <strong>4. Final Summary Report</strong>
+            <small>Inspection status + complaint status in one report</small>
           </span>
           <b>›</b>
         </button>
