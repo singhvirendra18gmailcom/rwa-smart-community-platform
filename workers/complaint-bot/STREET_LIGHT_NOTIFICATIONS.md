@@ -1,123 +1,48 @@
-# Service fault background notifications
+# Service fault WhatsApp notifications
 
-The Complaint Bot Cloudflare Worker sends agency fault notifications in the background.
+The RWA notification flow is intentionally designed to stay zero-cost.
 
-## WhatsApp
+## Zero-cost WhatsApp strategy
 
-The Worker uses the same WhatsApp Business phone number configured for the Complaint System:
+The Complaint Bot Worker uses the same WhatsApp Business number already configured for the complaint system:
 
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_ACCESS_TOKEN`
 
-No WhatsApp composer is opened in the supervisor's browser.
+For service-fault notifications such as Street Lights, Camera AMC and LED AMC:
 
-For business-initiated messages outside the WhatsApp customer-service window, use these two approved Hindi Utility templates. They are intentionally generic so the same templates can be reused for Street Lights, Camera AMC, LED AMC, and future service categories.
+1. The app first attempts a normal background WhatsApp text through the existing Cloud API.
+2. If the recipient has interacted with the RWA WhatsApp number within the permitted customer-service window, Meta can deliver the message automatically.
+3. If Meta rejects the background message because the customer-service window is closed, the app opens WhatsApp for the supervisor with the complaint text and recipient pre-filled.
+4. The supervisor only needs to press **Send**.
 
-### First-day template
+This avoids paid business-initiated template messaging and keeps the workflow zero-cost.
 
-Template name:
+## Message content
 
-`service_fault_first_day_hi`
+The complaint contains:
 
-Optional Worker override:
+- inspection date
+- agency/service provider
+- faulty count
+- pending age when applicable
+- common RWA Staff / Supervisor contact
+- category-specific RWA Executive contact
 
-`SERVICE_WHATSAPP_TEMPLATE_FIRST_DAY`
-
-Suggested template body:
-
-```
-दिनांक: {{1}}
-सेवा में {{2}},
-
-पॉकेट-A, सेक्टर-105 में निम्न समस्या पाई गई है:
-सेवा / उपकरण: {{3}}
-खराब संख्या: {{4}}
-
-कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
-अधिक जानकारी के लिए संपर्क करें:
-RWA Staff / Supervisor: {{5}}
-RWA Executive: {{6}}
-
-धन्यवाद
-RWA Pocket-A
-```
-
-Parameters:
-
-1. Date
-2. Agency name
-3. Service / equipment label, e.g. स्ट्रीट लाइट, कैमरा, LED स्क्रीन
-4. Faulty count
-5. Common Supervisor name/mobile
-6. Category RWA Executive name/mobile
-
-### Pending template
-
-Template name:
-
-`service_fault_pending_hi`
-
-Optional Worker override:
-
-`SERVICE_WHATSAPP_TEMPLATE_PENDING`
-
-Suggested template body:
-
-```
-दिनांक: {{1}}
-सेवा में {{2}},
-
-पॉकेट-A, सेक्टर-105 में निम्न समस्या पाई गई है:
-सेवा / उपकरण: {{3}}
-खराब संख्या: {{4}}
-यह समस्या {{5}} दिन से लंबित है।
-
-कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
-अधिक जानकारी के लिए संपर्क करें:
-RWA Staff / Supervisor: {{6}}
-RWA Executive: {{7}}
-
-धन्यवाद
-RWA Pocket-A
-```
-
-Parameters:
-
-1. Date
-2. Agency name
-3. Service / equipment label
-4. Faulty count
-5. Pending days
-6. Common Supervisor name/mobile
-7. Category RWA Executive name/mobile
-
-Optional language override:
-
-`SERVICE_WHATSAPP_TEMPLATE_LANGUAGE=hi`
-
-The Worker always uses an approved template for service-fault notifications. There is no free-form fallback, so this flow does not depend on the 24-hour customer-service window.
-
-Current automatic Hindi service labels:
-
-- `STREET_LIGHT` → `स्ट्रीट लाइट`
-- `CAMERA_AMC` → `कैमरा`
-- `LED_AMC` → `LED स्क्रीन`
-
-Other categories fall back to their configured service label.
-
-## SMS
-
-The browser does not open the phone SMS composer. It calls the Worker background SMS endpoint.
-
-The Worker expects a server-side SMS gateway adapter configured with:
-
-- `SMS_GATEWAY_URL`
-- `SMS_GATEWAY_TOKEN`
-- `SMS_SENDER_ID` (optional provider/adapter field)
-- `SMS_TEMPLATE_ID` (optional provider/adapter field)
-
-For India, connect this adapter only after the RWA's required DLT sender/header/content-template setup is complete.
+Street-light fault locations remain internal to the inspection record and are not included in the outbound agency message.
 
 ## Delivery audit
 
-Every notification attempt is written to `street_light_notifications` with the provider reference and delivery state. WhatsApp delivery-status webhooks update the record after Meta reports delivery or failure.
+Every background Cloud API attempt is recorded in `street_light_notifications`.
+
+WhatsApp delivery-status webhooks update the corresponding notification to:
+
+- `PENDING` after Meta accepts the API request
+- `SENT` after a delivered/read status
+- `FAILED` if Meta rejects delivery
+
+When a background delivery fails, the frontend switches to the manual WhatsApp fallback.
+
+## SMS
+
+Background SMS remains disabled until an India DLT-compliant SMS gateway is configured. A physical SIM alone is not used by the cloud application for automated SMS.

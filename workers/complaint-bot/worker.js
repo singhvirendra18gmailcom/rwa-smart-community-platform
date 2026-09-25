@@ -458,13 +458,10 @@ async function handleStreetLightWhatsapp(request, env) {
         })
       )
 
-      const providerResult = await sendStreetLightWhatsApp(
+      const providerResult = await sendWhatsAppMessage(
         env,
         recipient,
-        agency,
-        inspection,
-        oldestDays,
-        settings
+        message
       )
 
       const providerReference = providerResult?.messages?.[0]?.id || null

@@ -132,6 +132,7 @@ function blankAgency(agency) {
     whatsappSent: false,
     whatsappPending: false,
     whatsappFailed: false,
+    whatsappManualOpened: false,
     issueAges: {},
   }
 }
@@ -295,6 +296,7 @@ export default function StreetLightInspection({ config, onBack }) {
           notifications.find(
             (item) => item.inspection_id === inspection.id
           )?.delivery_status === 'FAILED',
+        whatsappManualOpened: false,
         issueAges: Object.fromEntries(
           openIssues
             .filter((issue) => issue.agency_id === agency.id)
@@ -320,6 +322,7 @@ export default function StreetLightInspection({ config, onBack }) {
               whatsappSent: false,
               whatsappPending: false,
               whatsappFailed: false,
+              whatsappManualOpened: false,
             }
           : row
       )
@@ -571,6 +574,7 @@ export default function StreetLightInspection({ config, onBack }) {
               whatsappSent: false,
               whatsappPending: false,
               whatsappFailed: false,
+              whatsappManualOpened: false,
               issueAges: Object.fromEntries(
                 currentLocations.map((location) => {
                   const existing = openIssues.find(
@@ -613,7 +617,48 @@ export default function StreetLightInspection({ config, onBack }) {
     }
   }
 
-  const pollWhatsAppDeliveryStatus = async (agencyId, inspectionId) => {
+  const openManualWhatsApp = async (row, mobile) => {
+    try {
+      const openIssues = await getOpenIssues(row.agency.id)
+      const complaintMessage = buildComplaintMessage(
+        row,
+        today,
+        openIssues,
+        escalation
+      )
+
+      const whatsappUrl =
+        `https://wa.me/${mobile}?text=${encodeURIComponent(complaintMessage)}`
+
+      setRows((current) =>
+        current.map((item) =>
+          item.agency.id === row.agency.id
+            ? {
+                ...item,
+                whatsappSent: false,
+                whatsappPending: false,
+                whatsappFailed: false,
+                whatsappManualOpened: true,
+              }
+            : item
+        )
+      )
+
+      setMessage(
+        'Background WhatsApp is unavailable outside the 24-hour window. WhatsApp is opening with the complaint ready to send manually.'
+      )
+
+      window.location.href = whatsappUrl
+    } catch (error) {
+      console.error('Unable to open manual WhatsApp fallback:', error)
+      setMessage(
+        error?.message ||
+          'Unable to prepare the WhatsApp complaint for manual sending.'
+      )
+    }
+  }
+
+  const pollWhatsAppDeliveryStatus = async (row, mobile) => {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       if (attempt > 0) {
         await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -622,7 +667,7 @@ export default function StreetLightInspection({ config, onBack }) {
       const { data, error } = await supabase
         .from('street_light_notifications')
         .select('delivery_status,provider_response,created_at')
-        .eq('inspection_id', inspectionId)
+        .eq('inspection_id', row.inspectionId)
         .eq('channel', 'WHATSAPP')
         .order('created_at', { ascending: false })
         .limit(1)
@@ -638,7 +683,7 @@ export default function StreetLightInspection({ config, onBack }) {
       if (data.delivery_status === 'SENT') {
         setRows((current) =>
           current.map((item) =>
-            item.agency.id === agencyId
+            item.agency.id === row.agency.id
               ? {
                   ...item,
                   whatsappSent: true,
@@ -657,17 +702,20 @@ export default function StreetLightInspection({ config, onBack }) {
 
         setRows((current) =>
           current.map((item) =>
-            item.agency.id === agencyId
+            item.agency.id === row.agency.id
               ? {
                   ...item,
                   whatsappSent: false,
                   whatsappPending: false,
                   whatsappFailed: true,
+                  whatsappManualOpened: false,
                 }
               : item
           )
         )
-        setMessage(`WhatsApp delivery failed: ${reason}`)
+
+        console.warn('Background WhatsApp delivery failed:', reason)
+        await openManualWhatsApp(row, mobile)
         return
       }
     }
@@ -747,6 +795,7 @@ export default function StreetLightInspection({ config, onBack }) {
                 whatsappSent: false,
                 whatsappPending: true,
                 whatsappFailed: false,
+                whatsappManualOpened: false,
               }
             : item
         )
@@ -756,16 +805,10 @@ export default function StreetLightInspection({ config, onBack }) {
         `WhatsApp submitted to Meta for ${row.agency.contact_name} (${mobile}). Delivery confirmation is pending.`
       )
 
-      await pollWhatsAppDeliveryStatus(
-        row.agency.id,
-        row.inspectionId
-      )
+      await pollWhatsAppDeliveryStatus(row, mobile)
     } catch (error) {
       console.error('Background WhatsApp send failed:', error)
-      setMessage(
-        error?.message ||
-          'Unable to send WhatsApp complaint in background.'
-      )
+      await openManualWhatsApp(row, mobile)
     } finally {
       setSendingAgencyId(null)
     }
@@ -1035,8 +1078,10 @@ export default function StreetLightInspection({ config, onBack }) {
                       ? '✓ WhatsApp Delivered'
                       : row.whatsappPending
                       ? '⏳ WhatsApp Submitted'
+                      : row.whatsappManualOpened
+                      ? '↗ WhatsApp Opened'
                       : row.whatsappFailed
-                      ? '⚠️ Retry WhatsApp'
+                      ? '↗ Open WhatsApp Manually'
                       : '💬 Send WhatsApp'}
                   </button>
 
