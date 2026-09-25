@@ -187,7 +187,7 @@ async function handleStreetLightWhatsapp(request, env) {
 
     const agencies = await supabaseRequest(
       env,
-      `/rest/v1/street_light_agencies?id=eq.${inspection.agency_id}&select=id,agency_name,contact_name,mobile_no,whatsapp_no`,
+      `/rest/v1/society_service_agencies?id=eq.${inspection.agency_id}&select=id,agency_name,contact_name,mobile_no,whatsapp_no`,
       { method: 'GET' }
     )
 
