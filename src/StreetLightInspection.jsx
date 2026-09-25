@@ -593,6 +593,90 @@ export default function StreetLightInspection({ config, onBack }) {
     setSavingAgencyId(null)
   }
 
+  const parseWhatsAppFailureReason = (providerResponse) => {
+    if (!providerResponse) return 'WhatsApp delivery failed.'
+
+    try {
+      const payload =
+        typeof providerResponse === 'string'
+          ? JSON.parse(providerResponse)
+          : providerResponse
+
+      return (
+        payload?.errors?.[0]?.error_data?.details ||
+        payload?.errors?.[0]?.message ||
+        payload?.errors?.[0]?.title ||
+        'WhatsApp delivery failed.'
+      )
+    } catch {
+      return 'WhatsApp delivery failed.'
+    }
+  }
+
+  const pollWhatsAppDeliveryStatus = async (agencyId, inspectionId) => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
+
+      const { data, error } = await supabase
+        .from('street_light_notifications')
+        .select('delivery_status,provider_response,created_at')
+        .eq('inspection_id', inspectionId)
+        .eq('channel', 'WHATSAPP')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Unable to refresh WhatsApp delivery status:', error)
+        return
+      }
+
+      if (!data) continue
+
+      if (data.delivery_status === 'SENT') {
+        setRows((current) =>
+          current.map((item) =>
+            item.agency.id === agencyId
+              ? {
+                  ...item,
+                  whatsappSent: true,
+                  whatsappPending: false,
+                  whatsappFailed: false,
+                }
+              : item
+          )
+        )
+        setMessage('WhatsApp delivered successfully.')
+        return
+      }
+
+      if (data.delivery_status === 'FAILED') {
+        const reason = parseWhatsAppFailureReason(data.provider_response)
+
+        setRows((current) =>
+          current.map((item) =>
+            item.agency.id === agencyId
+              ? {
+                  ...item,
+                  whatsappSent: false,
+                  whatsappPending: false,
+                  whatsappFailed: true,
+                }
+              : item
+          )
+        )
+        setMessage(`WhatsApp delivery failed: ${reason}`)
+        return
+      }
+    }
+
+    setMessage(
+      'WhatsApp submitted to Meta. Delivery confirmation is still pending.'
+    )
+  }
+
   const sendWhatsAppComplaint = async (row) => {
     if (!row.saved || !row.inspectionId) {
       setMessage('Please save the street-light inspection before sending the complaint.')
@@ -670,6 +754,11 @@ export default function StreetLightInspection({ config, onBack }) {
 
       setMessage(
         `WhatsApp submitted to Meta for ${row.agency.contact_name} (${mobile}). Delivery confirmation is pending.`
+      )
+
+      await pollWhatsAppDeliveryStatus(
+        row.agency.id,
+        row.inspectionId
       )
     } catch (error) {
       console.error('Background WhatsApp send failed:', error)
