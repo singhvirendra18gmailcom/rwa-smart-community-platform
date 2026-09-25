@@ -130,6 +130,8 @@ function blankAgency(agency) {
     remarks: '',
     saved: false,
     whatsappSent: false,
+    whatsappPending: false,
+    whatsappFailed: false,
     issueAges: {},
   }
 }
@@ -243,10 +245,9 @@ export default function StreetLightInspection({ config, onBack }) {
           .order('sequence_no'),
         supabase
           .from('street_light_notifications')
-          .select('inspection_id,channel,delivery_status,created_at')
+          .select('inspection_id,channel,delivery_status,created_at,provider_response')
           .in('inspection_id', inspectionIds)
           .eq('channel', 'WHATSAPP')
-          .eq('delivery_status', 'SENT')
           .order('created_at', { ascending: false }),
       ])
 
@@ -282,9 +283,18 @@ export default function StreetLightInspection({ config, onBack }) {
           .map((item) => item.location_text),
         remarks: inspection.remarks || '',
         saved: true,
-        whatsappSent: notifications.some(
-          (item) => item.inspection_id === inspection.id
-        ),
+        whatsappSent:
+          notifications.find(
+            (item) => item.inspection_id === inspection.id
+          )?.delivery_status === 'SENT',
+        whatsappPending:
+          notifications.find(
+            (item) => item.inspection_id === inspection.id
+          )?.delivery_status === 'PENDING',
+        whatsappFailed:
+          notifications.find(
+            (item) => item.inspection_id === inspection.id
+          )?.delivery_status === 'FAILED',
         issueAges: Object.fromEntries(
           openIssues
             .filter((issue) => issue.agency_id === agency.id)
@@ -304,7 +314,13 @@ export default function StreetLightInspection({ config, onBack }) {
     setRows((current) =>
       current.map((row) =>
         row.agency.id === agencyId
-          ? { ...updater(row), saved: false, whatsappSent: false }
+          ? {
+              ...updater(row),
+              saved: false,
+              whatsappSent: false,
+              whatsappPending: false,
+              whatsappFailed: false,
+            }
           : row
       )
     )
@@ -553,6 +569,8 @@ export default function StreetLightInspection({ config, onBack }) {
               inspectionId: inspection.id,
               saved: true,
               whatsappSent: false,
+              whatsappPending: false,
+              whatsappFailed: false,
               issueAges: Object.fromEntries(
                 currentLocations.map((location) => {
                   const existing = openIssues.find(
@@ -640,13 +658,18 @@ export default function StreetLightInspection({ config, onBack }) {
       setRows((current) =>
         current.map((item) =>
           item.agency.id === row.agency.id
-            ? { ...item, whatsappSent: true }
+            ? {
+                ...item,
+                whatsappSent: false,
+                whatsappPending: true,
+                whatsappFailed: false,
+              }
             : item
         )
       )
 
       setMessage(
-        `WhatsApp complaint sent to ${row.agency.contact_name} (${mobile}).`
+        `WhatsApp submitted to Meta for ${row.agency.contact_name} (${mobile}). Delivery confirmation is pending.`
       )
     } catch (error) {
       console.error('Background WhatsApp send failed:', error)
@@ -920,7 +943,11 @@ export default function StreetLightInspection({ config, onBack }) {
                     {sendingAgencyId === row.agency.id
                       ? 'Sending…'
                       : row.whatsappSent
-                      ? '✓ WhatsApp Sent'
+                      ? '✓ WhatsApp Delivered'
+                      : row.whatsappPending
+                      ? '⏳ WhatsApp Submitted'
+                      : row.whatsappFailed
+                      ? '⚠️ Retry WhatsApp'
                       : '💬 Send WhatsApp'}
                   </button>
 
