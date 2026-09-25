@@ -17,7 +17,7 @@ For reliable business-initiated messages outside the WhatsApp customer-service w
 
 Worker variable:
 
-`STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY`
+`street_light_fault_first_day_hi` (default; override with `STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY` if ever needed)
 
 Suggested template body:
 
@@ -46,7 +46,7 @@ Parameters:
 
 Worker variable:
 
-`STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING`
+`street_light_fault_pending_hi` (default; override with `STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING` if ever needed)
 
 Suggested template body:
 
@@ -76,7 +76,7 @@ Optional language override:
 
 `STREET_LIGHT_WHATSAPP_TEMPLATE_LANGUAGE=hi`
 
-Until the template variables are configured, the Worker falls back to the existing background text-message API. That can work only where WhatsApp permits a free-form outbound text.
+The Worker now always uses an approved template for Street Light complaints. There is no free-form fallback, so this flow does not depend on the 24-hour customer-service window.
 
 ## SMS
 
