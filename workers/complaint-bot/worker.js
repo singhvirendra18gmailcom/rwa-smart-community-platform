@@ -260,13 +260,18 @@ async function handleStreetLightWhatsapp(request, env) {
       )
     }
 
-    const settingsRows = await supabaseRequest(
+      const categoryRows = await supabaseRequest(
       env,
-      '/rest/v1/society_inspection_settings?id=eq.1&select=supervisor_contact_name,supervisor_contact_mobile,rwa_contact_name,rwa_contact_mobile',
+      '/rest/v1/society_service_categories?service_type=eq.STREET_LIGHT&select=supervisor_name,supervisor_mobile,rwa_name,rwa_mobile',
       { method: 'GET' }
     )
-    const settings = Array.isArray(settingsRows) && settingsRows.length
-      ? settingsRows[0]
+    const settings = Array.isArray(categoryRows) && categoryRows.length
+      ? {
+          supervisor_contact_name: categoryRows[0].supervisor_name,
+          supervisor_contact_mobile: categoryRows[0].supervisor_mobile,
+          rwa_contact_name: categoryRows[0].rwa_name,
+          rwa_contact_mobile: categoryRows[0].rwa_mobile
+        }
       : {}
 
     const message = streetLightComplaintMessage(
