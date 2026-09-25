@@ -38,6 +38,7 @@ export default function ServiceAgencies({ onBack }) {
   const [savingId, setSavingId] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [message, setMessage] = useState('')
+  const [cardStatus, setCardStatus] = useState({})
   const [newAgency, setNewAgency] = useState({
     agency_name: '',
     service_type: 'OTHER',
@@ -83,52 +84,83 @@ export default function ServiceAgencies({ onBack }) {
   }
 
   const saveAgency = async (agency) => {
-    const name = agency.agency_name.trim()
+    const name = String(agency.agency_name || '').trim()
     const mobile = agency.mobile_no
       ? normalizeIndiaMobile(agency.mobile_no)
       : ''
 
+    const setAgencyStatus = (text, type = 'info') => {
+      setCardStatus((current) => ({
+        ...current,
+        [agency.id]: { text, type },
+      }))
+    }
+
     if (!name) {
-      setMessage('Agency name is required.')
+      setAgencyStatus('Agency name is required.', 'error')
       return
     }
 
     if (mobile && (mobile.length !== 12 || !mobile.startsWith('91'))) {
-      setMessage(`Please enter a valid 10-digit mobile number for ${name}.`)
+      setAgencyStatus(
+        `Please enter a valid 10-digit mobile number for ${name}.`,
+        'error'
+      )
       return
     }
 
     setSavingId(agency.id)
     setMessage('')
+    setAgencyStatus('Saving…')
 
-    const { error } = await supabase
-      .from('society_service_agencies')
-      .update({
-        agency_name: name,
-        service_type: agency.service_type,
-        service_label: agency.service_label?.trim() || null,
-        contact_name: agency.contact_name?.trim() || null,
-        mobile_no: mobile || null,
-        whatsapp_no: mobile || null,
-        sms_no: mobile || null,
-        active: agency.active !== false,
-        notes: agency.notes?.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', agency.id)
+    try {
+      const { data, error } = await supabase
+        .from('society_service_agencies')
+        .update({
+          agency_name: name,
+          service_type: agency.service_type || 'OTHER',
+          service_label: String(agency.service_label || '').trim() || null,
+          contact_name: String(agency.contact_name || '').trim() || null,
+          mobile_no: mobile || null,
+          whatsapp_no: mobile || null,
+          sms_no: mobile || null,
+          active: agency.active !== false,
+          notes: String(agency.notes || '').trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', agency.id)
+        .select(
+          'id,agency_code,agency_name,service_type,service_label,contact_name,mobile_no,whatsapp_no,sms_no,display_order,active,notes'
+        )
+        .maybeSingle()
 
-    setSavingId(null)
+      if (error) {
+        throw error
+      }
 
-    if (error) {
-      setMessage(error.message)
-      return
+      if (!data) {
+        throw new Error('Agency was not updated. Please refresh and try again.')
+      }
+
+      setAgencies((current) =>
+        current.map((item) =>
+          item.id === agency.id
+            ? data
+            : item
+        )
+      )
+
+      setAgencyStatus('✓ Saved successfully', 'success')
+      setMessage(`${data.agency_name} saved successfully.`)
+    } catch (error) {
+      console.error('Save agency failed:', error)
+      setAgencyStatus(
+        error?.message || 'Unable to save agency.',
+        'error'
+      )
+    } finally {
+      setSavingId(null)
     }
-
-    if (mobile) {
-      updateAgency(agency.id, 'mobile_no', mobile)
-    }
-
-    setMessage(`${name} saved successfully.`)
   }
 
   const addAgency = async () => {
@@ -410,6 +442,14 @@ export default function ServiceAgencies({ onBack }) {
               >
                 {savingId === agency.id ? 'Saving…' : 'Save Agency'}
               </button>
+
+              {cardStatus[agency.id]?.text && (
+                <div
+                  className={`service-agency-save-status ${cardStatus[agency.id].type || 'info'}`}
+                >
+                  {cardStatus[agency.id].text}
+                </div>
+              )}
             </section>
           ))}
         </div>
