@@ -1215,16 +1215,19 @@ async function sendStreetLightWhatsApp(
   settings,
   fallbackMessage
 ) {
-  const firstDayTemplate = env.STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY
-  const pendingTemplate = env.STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING
-  const languageCode = env.STREET_LIGHT_WHATSAPP_TEMPLATE_LANGUAGE || 'hi'
+  const firstDayTemplate =
+    env.STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY ||
+    'street_light_fault_first_day_hi'
+
+  const pendingTemplate =
+    env.STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING ||
+    'street_light_fault_pending_hi'
+
+  const languageCode =
+    env.STREET_LIGHT_WHATSAPP_TEMPLATE_LANGUAGE || 'hi'
 
   const templateName =
     oldestDays > 1 ? pendingTemplate : firstDayTemplate
-
-  if (!templateName) {
-    return sendWhatsAppMessage(env, to, fallbackMessage)
-  }
 
   const supervisor = [
     settings?.supervisor_contact_name,
