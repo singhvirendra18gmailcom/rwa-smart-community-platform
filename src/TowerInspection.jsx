@@ -148,7 +148,6 @@ function inspectionHasIssue(type, inspection) {
       inspection.benches_well_placed === false ||
       inspection.swings_not_broken === false ||
       inspection.watering_needed === true ||
-      inspection.street_lights_all_lit === false ||
       inspection.other_issue === true
     )
   }
@@ -161,17 +160,12 @@ function inspectionHasIssue(type, inspection) {
     inspection.led_screen_working ??
     inspection.camera_led_working
 
-  const streetFailureCount =
-    getStreetLightFailures(
-      inspection.street_light_status
-    ).length
 
   return (
     inspection.sweeping_done === false ||
     camera === false ||
     led === false ||
     inspection.water_leakage === true ||
-    streetFailureCount > 0 ||
     inspection.other_issue === true ||
     (
       inspection.lights_working_count !== null &&
@@ -291,7 +285,6 @@ function createSummaryReportCanvas({
   date,
   cameraIssues,
   ledIssues,
-  streetLightIssues,
   garbageText,
   sweepingIssues,
   moppingIssues,
@@ -308,10 +301,6 @@ function createSummaryReportCanvas({
   const issueTableHeight = (count) =>
     count > 0 ? 64 + count * 56 : 58
 
-  const streetTableHeight =
-    streetLightIssues.length > 0
-      ? 64 + streetLightIssues.length * 56
-      : 58
 
   const sweepingHeight = sweepingIssues.length > 0 ? 104 : 58
   const moppingHeight = moppingIssues.length > 0 ? 104 : 58
@@ -321,8 +310,6 @@ function createSummaryReportCanvas({
     issueTableHeight(cameraIssues.length) +
     18 +
     issueTableHeight(ledIssues.length) +
-    18 +
-    streetTableHeight +
     18 +
     58 +
     18 +
@@ -1627,11 +1614,6 @@ function TowerInspection({ onBack }) {
         inspection.water_leakage ?? false
       )
 
-      setStreetLightStatus(
-        normaliseStreetLights(
-          inspection.street_light_status
-        )
-      )
     } else {
       setGrassProperlyCut(
         inspection.grass_properly_cut
@@ -1649,14 +1631,6 @@ function TowerInspection({ onBack }) {
         inspection.watering_needed
       )
 
-      setParkStreetLightsAllLit(
-        inspection.street_lights_all_lit
-      )
-
-      setParkStreetLightsNotLitCount(
-        inspection.street_lights_not_lit_count ||
-          0
-      )
     }
 
     setOtherIssue(
@@ -1931,22 +1905,13 @@ function TowerInspection({ onBack }) {
     grassProperlyCut !== null &&
     benchesWellPlaced !== null &&
     swingsNotBroken !== null &&
-    wateringNeeded !== null &&
-    parkStreetLightsAllLit !== null &&
-    (
-      parkStreetLightsAllLit === true ||
-      parkStreetLightsNotLitCount > 0
-    )
+    wateringNeeded !== null
 
   const checklistComplete =
     isPark
       ? parkChecklistComplete
       : towerChecklistComplete
 
-  const towerStreetFailures =
-    getStreetLightFailures(
-      streetLightStatus
-    )
 
   const hasIssue =
     isPark
@@ -1956,7 +1921,6 @@ function TowerInspection({ onBack }) {
           benchesWellPlaced === false ||
           swingsNotBroken === false ||
           wateringNeeded === true ||
-          parkStreetLightsAllLit === false ||
           otherIssue === true
         )
       : (
@@ -1964,7 +1928,6 @@ function TowerInspection({ onBack }) {
           cameraWorking === false ||
           ledScreenWorking === false ||
           waterLeakage === true ||
-          towerStreetFailures.length > 0 ||
           otherIssue === true ||
           (
             lightsWorkingCount !== null &&
@@ -2213,13 +2176,6 @@ function TowerInspection({ onBack }) {
               watering_needed:
                 wateringNeeded,
 
-              street_lights_all_lit:
-                parkStreetLightsAllLit,
-
-              street_lights_not_lit_count:
-                parkStreetLightsAllLit
-                  ? 0
-                  : parkStreetLightsNotLitCount,
 
               distance_from_park_m:
                 distanceFromLocation,
@@ -2274,8 +2230,6 @@ function TowerInspection({ onBack }) {
               water_leakage:
                 waterLeakage,
 
-              street_light_status:
-                streetLightStatus,
 
               distance_from_tower_m:
                 distanceFromLocation,
@@ -2369,16 +2323,6 @@ function TowerInspection({ onBack }) {
         )
       }
 
-      if (
-        inspection.street_lights_all_lit === false
-      ) {
-        lines.push(
-          `${
-            inspection.street_lights_not_lit_count ||
-            0
-          } street light(s) not lit`
-        )
-      }
     } else {
       const camera =
         inspection.camera_working ??
@@ -2408,16 +2352,6 @@ function TowerInspection({ onBack }) {
         )
       }
 
-      const streetIssues =
-        getStreetLightFailures(
-          inspection.street_light_status
-        )
-
-      if (streetIssues.length > 0) {
-        lines.push(
-          `${streetIssues.length} street light(s) not working`
-        )
-      }
 
       if (
         inspection.lights_working_count !== null &&
@@ -2494,10 +2428,6 @@ function TowerInspection({ onBack }) {
         inspection.led_screen_working ??
         inspection.camera_led_working
 
-      const streetFailures =
-        getStreetLightFailures(
-          inspection.street_light_status
-        )
 
       const rows = [
         {
@@ -2543,19 +2473,6 @@ function TowerInspection({ onBack }) {
             : 'No',
           issue:
             inspection.water_leakage === true,
-        },
-        {
-          label: 'Street Lights (Near Tower)',
-          value:
-            streetFailures.length === 0
-              ? 'All Working'
-              : `${streetFailures.length} Not Working`,
-          subValue:
-            streetFailures.length === 0
-              ? null
-              : 'Rest All Working',
-          issue:
-            streetFailures.length > 0,
         },
       ]
 
@@ -2696,7 +2613,6 @@ function TowerInspection({ onBack }) {
   function buildSummaryData() {
     const cameraIssues = []
     const ledIssues = []
-    const streetLightIssues = []
     const sweepingIssues = []
     const moppingIssues = []
 
@@ -2733,47 +2649,13 @@ function TowerInspection({ onBack }) {
           moppingIssues.push(location.name)
         }
 
-        const failures =
-          getStreetLightFailures(
-            inspection.street_light_status
-          )
-
-        if (failures.length > 0) {
-          streetLightIssues.push({
-            location: location.name,
-            count: failures.length,
-          })
-        }
       }
     )
 
-    parkLocations.forEach(
-      (location) => {
-        const inspection =
-          getInspection(location)
-
-        if (!inspection?.saved_at) {
-          return
-        }
-
-        if (
-          inspection.street_lights_all_lit ===
-          false
-        ) {
-          streetLightIssues.push({
-            location: location.name,
-            count:
-              inspection.street_lights_not_lit_count ||
-              0,
-          })
-        }
-      }
-    )
 
     return {
       cameraIssues,
       ledIssues,
-      streetLightIssues,
       sweepingIssues,
       moppingIssues,
     }
@@ -2916,8 +2798,6 @@ function TowerInspection({ onBack }) {
             summary.cameraIssues,
           ledIssues:
             summary.ledIssues,
-          streetLightIssues:
-            summary.streetLightIssues,
           garbageText:
             getGarbageSummaryText(),
           sweepingIssues:
@@ -2986,7 +2866,7 @@ function TowerInspection({ onBack }) {
             </div>
 
             <h1>
-              Tower Inspection
+              Towers & Parks
             </h1>
 
             <p>
@@ -2998,6 +2878,10 @@ function TowerInspection({ onBack }) {
         </header>
 
         <main className="inspection-list-content">
+
+          <div className="inspection-info-box">
+            💡 Street lights are now inspected separately by maintenance agency (UPPCL / TATA).
+          </div>
 
           <div className="inspection-summary">
 
@@ -3595,17 +3479,6 @@ function TowerInspection({ onBack }) {
                 }}
               />
 
-              <StreetLightMap
-                locationName={
-                  selectedLocation?.name
-                }
-                status={
-                  streetLightStatus
-                }
-                onToggle={
-                  toggleStreetLight
-                }
-              />
             </>
           )}
 
@@ -3669,86 +3542,6 @@ function TowerInspection({ onBack }) {
                 }}
               />
 
-              <InspectionToggle
-                icon="💡"
-                label="Street Lights"
-                positiveText="All Lit"
-                negativeText="Some Not Lit"
-                value={
-                  parkStreetLightsAllLit
-                }
-                onChange={(value) => {
-                  markChanged()
-
-                  setParkStreetLightsAllLit(
-                    value
-                  )
-
-                  if (value) {
-                    setParkStreetLightsNotLitCount(
-                      0
-                    )
-                  } else {
-                    setParkStreetLightsNotLitCount(
-                      (current) =>
-                        current > 0
-                          ? current
-                          : 1
-                    )
-                  }
-                }}
-              />
-
-              {parkStreetLightsAllLit ===
-                false && (
-                <div className="inspection-item">
-
-                  <div className="inspection-item-heading">
-                    <span className="inspection-item-icon">
-                      💡
-                    </span>
-
-                    <strong>
-                      Street Lights Not Lit
-                    </strong>
-                  </div>
-
-                  <div className="lights-counter">
-
-                    <button
-                      type="button"
-                      onClick={
-                        decreaseParkStreetLights
-                      }
-                    >
-                      −
-                    </button>
-
-                    <div>
-                      <strong>
-                        {
-                          parkStreetLightsNotLitCount
-                        }
-                      </strong>
-
-                      <span>
-                        Not Lit
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={
-                        increaseParkStreetLights
-                      }
-                    >
-                      +
-                    </button>
-
-                  </div>
-
-                </div>
-              )}
             </>
           )}
 
@@ -3950,12 +3743,6 @@ function TowerInspection({ onBack }) {
           )
         : []
 
-    const streetFailures =
-      !isPark && inspection
-        ? getStreetLightFailures(
-            inspection.street_light_status
-          )
-        : []
 
     const reportCamera =
       inspection?.camera_working ??
@@ -4093,17 +3880,6 @@ function TowerInspection({ onBack }) {
                   </strong>
                 </div>
 
-                <div className="compact-report-row">
-                  <span>
-                    Street Lights
-                  </span>
-
-                  <strong>
-                    {streetFailures.length === 0
-                      ? 'All Working'
-                      : `${streetFailures.length} Not Working`}
-                  </strong>
-                </div>
               </>
             )}
 
@@ -4157,20 +3933,6 @@ function TowerInspection({ onBack }) {
                   </strong>
                 </div>
 
-                <div className="compact-report-row">
-                  <span>
-                    Street Lights
-                  </span>
-
-                  <strong>
-                    {inspection?.street_lights_all_lit
-                      ? 'All Lit'
-                      : `${
-                          inspection?.street_lights_not_lit_count ||
-                          0
-                        } Not Lit`}
-                  </strong>
-                </div>
               </>
             )}
 
@@ -4248,7 +4010,6 @@ function TowerInspection({ onBack }) {
     const criticalAttention =
       summary.cameraIssues.length > 0 ||
       summary.ledIssues.length > 0 ||
-      summary.streetLightIssues.length > 0 ||
       societyGarbageDisposed === false
 
     return (
@@ -4320,26 +4081,6 @@ function TowerInspection({ onBack }) {
               </span>
             </div>
 
-            <div className="summary-attention-section">
-              <strong>
-                Street Lights
-              </strong>
-
-              {summary.streetLightIssues.length > 0 ? (
-                summary.streetLightIssues.map(
-                  (item, index) => (
-                    <span key={index}>
-                      {item.location} - {item.count}{' '}
-                      Street Light{item.count === 1 ? '' : 's'}
-                    </span>
-                  )
-                )
-              ) : (
-                <span>
-                  All Working
-                </span>
-              )}
-            </div>
 
             <div className="summary-attention-section">
               <strong>
