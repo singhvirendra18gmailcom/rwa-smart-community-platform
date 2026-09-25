@@ -26,7 +26,13 @@ export default {
       return new Response('RWA Pocket-A Complaint Bot', { status: 200 })
     }
 
-    if (request.method === 'OPTIONS' && url.pathname.startsWith('/api/complaints/')) {
+    if (
+      request.method === 'OPTIONS' &&
+      (
+        url.pathname.startsWith('/api/complaints/') ||
+        url.pathname.startsWith('/api/street-lights/')
+      )
+    ) {
       return apiResponse({ ok: true }, 200)
     }
 
@@ -36,6 +42,14 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/api/complaints/resolve') {
       return handleSupervisorAction(request, env, 'RESOLVED')
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/street-lights/notify-whatsapp') {
+      return handleStreetLightWhatsapp(request, env)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/street-lights/notify-sms') {
+      return handleStreetLightSms(request, env)
     }
 
     if (request.method === 'POST') {
@@ -101,10 +115,444 @@ function apiResponse(payload, status = 200) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'POST, OPTIONS'
     }
   })
+}
+
+
+async function getAuthenticatedUser(request, env) {
+  const authorization = request.headers.get('Authorization') || ''
+  if (!authorization.startsWith('Bearer ')) return null
+
+  const response = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: authorization
+    }
+  })
+
+  if (!response.ok) return null
+  return response.json()
+}
+
+function calculateStreetLightIssueDays(firstReportedDate, today) {
+  const start = new Date(`${firstReportedDate}T00:00:00Z`)
+  const end = new Date(`${today}T00:00:00Z`)
+  const diff = Math.floor((end - start) / 86400000)
+  return Math.max(1, diff + 1)
+}
+
+function formatStreetLightMessageDate(value) {
+  const [year, month, day] = String(value || '').split('-')
+  return year && month && day ? `${day}-${month}-${year}` : value
+}
+
+function streetLightComplaintMessage(agency, inspection, locations, issues, settings) {
+  const issueById = new Map(
+    (issues || []).map((issue) => [Number(issue.id), issue])
+  )
+
+  const issueDays = locations.map((item) => {
+    const issue = issueById.get(Number(item.issue_id))
+    return issue
+      ? calculateStreetLightIssueDays(
+          issue.first_reported_date,
+          inspection.inspection_date
+        )
+      : 1
+  })
+
+  const oldestDays = Math.max(1, ...issueDays)
+
+  const supervisor = [
+    settings?.supervisor_contact_name,
+    settings?.supervisor_contact_mobile
+  ].filter(Boolean).join(' - ') || '—'
+
+  const rwa = [
+    settings?.rwa_contact_name,
+    settings?.rwa_contact_mobile
+  ].filter(Boolean).join(' - ') || '—'
+
+  const lightText = inspection.faulty_count === 1
+    ? '1 स्ट्रीट लाइट खराब है'
+    : `${inspection.faulty_count} स्ट्रीट लाइट खराब हैं`
+
+  const pendingText = oldestDays > 1
+    ? ` और यह समस्या ${oldestDays} दिन से लंबित है`
+    : ''
+
+  return `दिनांक: ${formatStreetLightMessageDate(inspection.inspection_date)}
+सेवा में ${agency.agency_name},
+
+पॉकेट-A, सेक्टर-105 में ${lightText}${pendingText}। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
+अधिक जानकारी के लिए संपर्क करें:
+RWA Staff / Supervisor: ${supervisor}
+RWA Executive: ${rwa}
+
+धन्यवाद
+RWA Pocket-A`
+}
+
+async function getStreetLightNotificationContext(request, env) {
+  const user = await getAuthenticatedUser(request, env)
+  if (!user?.id) {
+    return {
+      response: apiResponse({ ok: false, error: 'Authentication required.' }, 401)
+    }
+  }
+
+  const body = await request.json()
+  const inspectionId = Number(body?.inspection_id)
+
+  if (!Number.isInteger(inspectionId) || inspectionId <= 0) {
+    return {
+      response: apiResponse(
+        { ok: false, error: 'Invalid street-light inspection id.' },
+        400
+      )
+    }
+  }
+
+  const inspections = await supabaseRequest(
+    env,
+    `/rest/v1/street_light_agency_daily_inspections?id=eq.${inspectionId}&select=id,inspection_date,agency_id,faulty_count,remarks`,
+    { method: 'GET' }
+  )
+
+  if (!Array.isArray(inspections) || !inspections.length) {
+    return {
+      response: apiResponse(
+        { ok: false, error: 'Street-light inspection not found.' },
+        404
+      )
+    }
+  }
+
+  const inspection = inspections[0]
+
+  if (!inspection.faulty_count || inspection.faulty_count <= 0) {
+    return {
+      response: apiResponse(
+        { ok: false, error: 'There are no faulty street lights to report.' },
+        409
+      )
+    }
+  }
+
+  const agencies = await supabaseRequest(
+    env,
+    `/rest/v1/society_service_agencies?id=eq.${inspection.agency_id}&select=id,agency_name,contact_name,mobile_no,whatsapp_no,sms_no`,
+    { method: 'GET' }
+  )
+
+  if (!Array.isArray(agencies) || !agencies.length) {
+    return {
+      response: apiResponse(
+        { ok: false, error: 'Street-light agency not found.' },
+        404
+      )
+    }
+  }
+
+  const agency = agencies[0]
+  let recipient = normalizeMobile(
+    agency.mobile_no || agency.whatsapp_no || agency.sms_no
+  )
+  if (recipient.length === 10) recipient = `91${recipient}`
+
+  if (!recipient) {
+    return {
+      response: apiResponse(
+        { ok: false, error: 'Please configure the agency mobile number first.' },
+        400
+      )
+    }
+  }
+
+  const locations = await supabaseRequest(
+    env,
+    `/rest/v1/street_light_fault_locations?inspection_id=eq.${inspection.id}&select=id,sequence_no,location_text,status,issue_id&order=sequence_no.asc`,
+    { method: 'GET' }
+  )
+
+  if (!Array.isArray(locations) || locations.length !== inspection.faulty_count) {
+    return {
+      response: apiResponse(
+        { ok: false, error: 'Please save all fault locations before sending the complaint.' },
+        409
+      )
+    }
+  }
+
+  const issueIds = locations
+    .map((item) => Number(item.issue_id))
+    .filter((id) => Number.isInteger(id) && id > 0)
+
+  let issues = []
+
+  if (issueIds.length > 0) {
+    issues = await supabaseRequest(
+      env,
+      `/rest/v1/street_light_issues?id=in.(${issueIds.join(',')})&select=id,first_reported_date,last_seen_date,status`,
+      { method: 'GET' }
+    )
+  }
+
+  const categoryRows = await supabaseRequest(
+    env,
+    '/rest/v1/society_service_categories?service_type=eq.STREET_LIGHT&select=rwa_name,rwa_mobile',
+    { method: 'GET' }
+  )
+
+  const globalContactRows = await supabaseRequest(
+    env,
+    '/rest/v1/society_inspection_settings?id=eq.1&select=supervisor_contact_name,supervisor_contact_mobile',
+    { method: 'GET' }
+  )
+
+  const categoryContact =
+    Array.isArray(categoryRows) && categoryRows.length
+      ? categoryRows[0]
+      : {}
+
+  const globalContact =
+    Array.isArray(globalContactRows) && globalContactRows.length
+      ? globalContactRows[0]
+      : {}
+
+  const settings = {
+    supervisor_contact_name: globalContact.supervisor_contact_name,
+    supervisor_contact_mobile: globalContact.supervisor_contact_mobile,
+    rwa_contact_name: categoryContact.rwa_name,
+    rwa_contact_mobile: categoryContact.rwa_mobile
+  }
+
+  const message = streetLightComplaintMessage(
+    agency,
+    inspection,
+    locations,
+    issues,
+    settings
+  )
+
+  return {
+    user,
+    inspection,
+    agency,
+    recipient,
+    locations,
+    issues,
+    settings,
+    message
+  }
+}
+
+async function logStreetLightNotification(
+  env,
+  {
+    inspection,
+    agency,
+    channel,
+    recipient,
+    message,
+    status,
+    providerReference = null,
+    providerResponse = null,
+    userId,
+    sentAt = null
+  }
+) {
+  await supabaseRequest(env, '/rest/v1/street_light_notifications', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      inspection_id: inspection.id,
+      agency_id: inspection.agency_id,
+      channel,
+      recipient_name: agency.contact_name || null,
+      recipient_mobile: recipient,
+      message_text: message,
+      delivery_status: status,
+      provider_reference: providerReference,
+      provider_response: providerResponse,
+      sent_by: userId,
+      sent_at: sentAt
+    })
+  })
+}
+
+async function handleStreetLightWhatsapp(request, env) {
+  try {
+    const context = await getStreetLightNotificationContext(request, env)
+    if (context.response) return context.response
+
+    const {
+      user,
+      inspection,
+      agency,
+      recipient,
+      locations,
+      issues,
+      settings,
+      message
+    } = context
+
+    const now = new Date().toISOString()
+
+    try {
+      const oldestDays = Math.max(
+        1,
+        ...locations.map((item) => {
+          const issue = (issues || []).find(
+            (candidate) => Number(candidate.id) === Number(item.issue_id)
+          )
+          return issue
+            ? calculateStreetLightIssueDays(
+                issue.first_reported_date,
+                inspection.inspection_date
+              )
+            : 1
+        })
+      )
+
+      const providerResult = await sendStreetLightWhatsApp(
+        env,
+        recipient,
+        agency,
+        inspection,
+        oldestDays,
+        settings,
+        message
+      )
+
+      const providerReference = providerResult?.messages?.[0]?.id || null
+
+      await logStreetLightNotification(env, {
+        inspection,
+        agency,
+        channel: 'WHATSAPP',
+        recipient,
+        message,
+        status: 'SENT',
+        providerReference,
+        providerResponse: JSON.stringify(providerResult || {}),
+        userId: user.id,
+        sentAt: now
+      })
+
+      return apiResponse({
+        ok: true,
+        whatsapp_sent: true,
+        message,
+        recipient_mobile: recipient
+      }, 200)
+    } catch (sendError) {
+      console.error('Street-light WhatsApp notification failed:', sendError)
+
+      await logStreetLightNotification(env, {
+        inspection,
+        agency,
+        channel: 'WHATSAPP',
+        recipient,
+        message,
+        status: 'FAILED',
+        providerResponse: String(sendError?.message || sendError),
+        userId: user.id
+      })
+
+      return apiResponse({
+        ok: false,
+        whatsapp_sent: false,
+        error: String(
+          sendError?.message ||
+            'Unable to send WhatsApp complaint in background.'
+        )
+      }, 502)
+    }
+  } catch (error) {
+    console.error('Street-light WhatsApp action error:', error)
+    return apiResponse(
+      { ok: false, error: 'Unable to process street-light complaint.' },
+      500
+    )
+  }
+}
+
+async function handleStreetLightSms(request, env) {
+  try {
+    const context = await getStreetLightNotificationContext(request, env)
+    if (context.response) return context.response
+
+    const {
+      user,
+      inspection,
+      agency,
+      recipient,
+      message
+    } = context
+
+    const now = new Date().toISOString()
+
+    try {
+      const providerResult = await sendSmsMessage(env, recipient, message)
+      const providerReference =
+        providerResult?.id ||
+        providerResult?.message_id ||
+        providerResult?.reference ||
+        null
+
+      await logStreetLightNotification(env, {
+        inspection,
+        agency,
+        channel: 'SMS',
+        recipient,
+        message,
+        status: 'SENT',
+        providerReference,
+        providerResponse: JSON.stringify(providerResult || {}),
+        userId: user.id,
+        sentAt: now
+      })
+
+      return apiResponse({
+        ok: true,
+        sms_sent: true,
+        message,
+        recipient_mobile: recipient
+      }, 200)
+    } catch (sendError) {
+      console.error('Street-light SMS notification failed:', sendError)
+
+      await logStreetLightNotification(env, {
+        inspection,
+        agency,
+        channel: 'SMS',
+        recipient,
+        message,
+        status: 'FAILED',
+        providerResponse: String(sendError?.message || sendError),
+        userId: user.id
+      })
+
+      return apiResponse({
+        ok: false,
+        sms_sent: false,
+        error: String(
+          sendError?.message ||
+            'Unable to send SMS complaint in background.'
+        )
+      }, 503)
+    }
+  } catch (error) {
+    console.error('Street-light SMS action error:', error)
+    return apiResponse(
+      { ok: false, error: 'Unable to process street-light SMS complaint.' },
+      500
+    )
+  }
 }
 
 async function handleSupervisorAction(request, env, targetStatus) {
@@ -718,6 +1166,151 @@ async function supabaseRequest(env, path, options = {}) {
   try { return JSON.parse(raw) } catch { return raw }
 }
 
+async function sendStreetLightWhatsApp(
+  env,
+  to,
+  agency,
+  inspection,
+  oldestDays,
+  settings,
+  fallbackMessage
+) {
+  const firstDayTemplate = env.STREET_LIGHT_WHATSAPP_TEMPLATE_FIRST_DAY
+  const pendingTemplate = env.STREET_LIGHT_WHATSAPP_TEMPLATE_PENDING
+  const languageCode = env.STREET_LIGHT_WHATSAPP_TEMPLATE_LANGUAGE || 'hi'
+
+  const templateName =
+    oldestDays > 1 ? pendingTemplate : firstDayTemplate
+
+  if (!templateName) {
+    return sendWhatsAppMessage(env, to, fallbackMessage)
+  }
+
+  const supervisor = [
+    settings?.supervisor_contact_name,
+    settings?.supervisor_contact_mobile
+  ].filter(Boolean).join(' - ') || '—'
+
+  const rwa = [
+    settings?.rwa_contact_name,
+    settings?.rwa_contact_mobile
+  ].filter(Boolean).join(' - ') || '—'
+
+  const parameters = oldestDays > 1
+    ? [
+        formatStreetLightMessageDate(inspection.inspection_date),
+        agency.agency_name,
+        String(inspection.faulty_count),
+        String(oldestDays),
+        supervisor,
+        rwa
+      ]
+    : [
+        formatStreetLightMessageDate(inspection.inspection_date),
+        agency.agency_name,
+        String(inspection.faulty_count),
+        supervisor,
+        rwa
+      ]
+
+  return sendWhatsAppTemplateMessage(
+    env,
+    to,
+    templateName,
+    languageCode,
+    parameters
+  )
+}
+
+async function sendWhatsAppTemplateMessage(
+  env,
+  to,
+  templateName,
+  languageCode,
+  parameters
+) {
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
+    throw new Error('WhatsApp Worker secrets are not configured.')
+  }
+
+  const response = await fetch(
+    `https://graph.facebook.com/${GRAPH_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: [
+            {
+              type: 'body',
+              parameters: parameters.map((value) => ({
+                type: 'text',
+                text: String(value)
+              }))
+            }
+          ]
+        }
+      })
+    }
+  )
+
+  const resultText = await response.text()
+  console.log('WhatsApp template send result:', resultText)
+
+  if (!response.ok) {
+    throw new Error(`WhatsApp API error: ${resultText}`)
+  }
+
+  try {
+    return JSON.parse(resultText)
+  } catch {
+    return { raw: resultText }
+  }
+}
+
+async function sendSmsMessage(env, to, message) {
+  if (!env.SMS_GATEWAY_URL || !env.SMS_GATEWAY_TOKEN) {
+    throw new Error(
+      'Background SMS service is not configured yet. Configure an India DLT-compliant SMS gateway first.'
+    )
+  }
+
+  const response = await fetch(env.SMS_GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.SMS_GATEWAY_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      to,
+      message,
+      sender_id: env.SMS_SENDER_ID || null,
+      template_id: env.SMS_TEMPLATE_ID || null
+    })
+  })
+
+  const resultText = await response.text()
+
+  if (!response.ok) {
+    throw new Error(`SMS gateway error: ${resultText}`)
+  }
+
+  try {
+    return JSON.parse(resultText)
+  } catch {
+    return { raw: resultText }
+  }
+}
+
 async function sendWhatsAppMessage(env, to, message) {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error('WhatsApp Worker secrets are not configured.')
@@ -738,9 +1331,15 @@ async function sendWhatsAppMessage(env, to, message) {
         text: { preview_url: false, body: message }
       })
     })
-  const result = await response.text()
-  console.log('WhatsApp send result:', result)
-  if (!response.ok) throw new Error(`WhatsApp API error: ${result}`)
+  const resultText = await response.text()
+  console.log('WhatsApp send result:', resultText)
+  if (!response.ok) throw new Error(`WhatsApp API error: ${resultText}`)
+
+  try {
+    return JSON.parse(resultText)
+  } catch {
+    return { raw: resultText }
+  }
 }
 
 function invalidChoice(lang) {
