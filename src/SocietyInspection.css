@@ -164,3 +164,127 @@
 @media (min-width: 680px) {
   .society-theme-grid { grid-template-columns: repeat(5, minmax(0,1fr)); }
 }
+
+
+/* =========================================================
+   STREET-LIGHT AGENCY CONTACT + COMPLAINT ACTIONS
+   ========================================================= */
+
+.agency-contact-card {
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid #dce5ee;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.agency-contact-title,
+.agency-notify-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.agency-contact-title strong,
+.agency-notify-heading strong {
+  color: #26364f;
+  font-size: 14px;
+}
+
+.agency-contact-title small,
+.agency-notify-heading small {
+  color: #718095;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.agency-contact-card label {
+  display: block;
+  margin-bottom: 11px;
+  color: #56677f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agency-contact-card input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 13px;
+  border: 1px solid #ccd7e3;
+  border-radius: 11px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.agency-contact-save {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--inspection-primary, #176cf0);
+  border-radius: 11px;
+  background: var(--inspection-soft, #edf5ff);
+  color: var(--inspection-primary, #176cf0);
+  font-weight: 900;
+}
+
+.agency-contact-save:disabled {
+  opacity: .55;
+}
+
+.agency-notify-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e1e8ef;
+}
+
+.agency-notify-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.whatsapp-complaint-button,
+.sms-complaint-button {
+  min-height: 47px;
+  padding: 11px 10px;
+  border-radius: 12px;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.whatsapp-complaint-button {
+  border: 1px solid #a9deb9;
+  background: #e9f8ee;
+  color: #15773a;
+}
+
+.sms-complaint-button {
+  border: 1px solid var(--inspection-primary, #176cf0);
+  background: var(--inspection-soft, #edf5ff);
+  color: var(--inspection-primary, #176cf0);
+}
+
+.whatsapp-complaint-button:disabled,
+.sms-complaint-button:disabled {
+  opacity: .5;
+}
+
+@media (max-width: 430px) {
+  .agency-notify-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .agency-contact-title,
+  .agency-notify-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .agency-contact-title small,
+  .agency-notify-heading small {
+    text-align: left;
+  }
+}
