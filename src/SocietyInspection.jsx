@@ -2,6 +2,7 @@ import { useState } from 'react'
 import TowerInspection from './TowerInspection'
 import StreetLightInspection from './StreetLightInspection'
 import SocietyInspectionSettings from './SocietyInspectionSettings'
+import ServiceAgencies from './ServiceAgencies'
 import { getInspectionTheme, useInspectionConfig } from './inspectionConfig'
 import './SocietyInspection.css'
 
@@ -29,6 +30,16 @@ export default function SocietyInspection({ onBack }) {
       <div style={themeStyle}>
         <StreetLightInspection
           config={config}
+          onBack={() => setScreen('home')}
+        />
+      </div>
+    )
+  }
+
+  if (screen === 'agencies') {
+    return (
+      <div style={themeStyle}>
+        <ServiceAgencies
           onBack={() => setScreen('home')}
         />
       </div>
@@ -93,6 +104,19 @@ export default function SocietyInspection({ onBack }) {
           <span>
             <strong>Street Lights</strong>
             <small>UPPCL & TATA fault inspection with locations</small>
+          </span>
+          <b>›</b>
+        </button>
+
+        <button
+          type="button"
+          className="society-hub-card"
+          onClick={() => setScreen('agencies')}
+        >
+          <span className="society-hub-icon">🏢</span>
+          <span>
+            <strong>Service Agencies</strong>
+            <small>Manage vendors, departments, contacts and responsibilities</small>
           </span>
           <b>›</b>
         </button>
