@@ -42,26 +42,94 @@ function normalizeIndiaMobile(value) {
   return digits
 }
 
-function buildComplaintMessage(row, today) {
-  const contactName = String(row.agency.contact_name || '').trim()
-  const greeting = contactName ? `Dear ${contactName},` : 'Dear Sir/Madam,'
-  const locations = row.locations
-    .map((location, index) => `${index + 1}. ${location.trim()}`)
+function normalizeLocationKey(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
+function calculateIssueDays(firstReportedDate, today) {
+  const start = new Date(`${firstReportedDate}T00:00:00Z`)
+  const end = new Date(`${today}T00:00:00Z`)
+  const diff = Math.floor((end - start) / 86400000)
+  return Math.max(1, diff + 1)
+}
+
+function formatMessageDate(value) {
+  const [year, month, day] = String(value || '').split('-')
+  return year && month && day ? `${day}-${month}-${year}` : value
+}
+
+function buildComplaintMessage(row, today, issues, config) {
+  const issueByLocation = new Map(
+    (issues || []).map((issue) => [
+      issue.location_key,
+      issue,
+    ])
+  )
+
+  const issueDetails = row.locations.map((location) => {
+    const issue = issueByLocation.get(normalizeLocationKey(location))
+    const days = issue
+      ? calculateIssueDays(issue.first_reported_date, today)
+      : 1
+
+    return {
+      location: location.trim(),
+      days,
+    }
+  })
+
+  const oldestDays = Math.max(
+    1,
+    ...issueDetails.map((item) => item.days)
+  )
+
+  const locations = issueDetails
+    .map(
+      (item, index) =>
+        `${index + 1}. ${item.location} — ${item.days} दिन से खराब`
+    )
     .join('\n')
 
-  return `${greeting}
+  const supervisor = [
+    config?.supervisor_contact_name,
+    config?.supervisor_contact_mobile,
+  ].filter(Boolean).join(' - ') || '—'
 
-During today's RWA Pocket-A inspection, ${row.faultyCount} street light${row.faultyCount === 1 ? '' : 's'} maintained by ${row.agency.agency_name} ${row.faultyCount === 1 ? 'was' : 'were'} found not working.
+  const rwa = [
+    config?.rwa_contact_name,
+    config?.rwa_contact_mobile,
+  ].filter(Boolean).join(' - ') || '—'
 
-Fault location${row.faultyCount === 1 ? '' : 's'}:
+  return `दिनांक: ${formatMessageDate(today)}
+
+सेवा में,
+${row.agency.agency_name}
+
+Pocket-A, Sector-105 में निम्न स्ट्रीट लाइट पिछले ${oldestDays} दिन से खराब हैं। कृपया इन्हें जल्द से जल्द ठीक करवाने की कृपा करें।
+
+खराब स्ट्रीट लाइट:
 ${locations}
 
-Kindly arrange the necessary repair at the earliest.
+अधिक जानकारी के लिए संपर्क करें:
+Supervisor: ${supervisor}
+RWA: ${rwa}
 
-Inspection Date: ${today}
-
-Regards,
+धन्यवाद
 RWA Pocket-A`
+}
+
+async function getOpenIssues(agencyId) {
+  const { data, error } = await supabase
+    .from('street_light_issues')
+    .select('id,agency_id,location_key,location_text,first_reported_date,last_seen_date,status')
+    .eq('agency_id', agencyId)
+    .eq('status', 'OPEN')
+
+  if (error) throw error
+  return data || []
 }
 
 function blankAgency(agency) {
@@ -331,14 +399,90 @@ export default function StreetLightInspection({ config, onBack }) {
       return
     }
 
+    const openIssues = await getOpenIssues(row.agency.id)
+    const currentLocations = row.locations.map((location) => ({
+      location_text: location.trim(),
+      location_key: normalizeLocationKey(location),
+    }))
+    const currentKeys = new Set(
+      currentLocations.map((item) => item.location_key)
+    )
+    const issueIdByLocation = new Map()
+
+    for (const issue of openIssues) {
+      if (currentKeys.has(issue.location_key)) {
+        const currentLocation = currentLocations.find(
+          (item) => item.location_key === issue.location_key
+        )
+
+        const { error: issueUpdateError } = await supabase
+          .from('street_light_issues')
+          .update({
+            location_text: currentLocation?.location_text || issue.location_text,
+            last_seen_date: today,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', issue.id)
+
+        if (issueUpdateError) {
+          setMessage(issueUpdateError.message)
+          setSavingAgencyId(null)
+          return
+        }
+
+        issueIdByLocation.set(issue.location_key, issue.id)
+      } else {
+        const { error: resolveError } = await supabase
+          .from('street_light_issues')
+          .update({
+            status: 'RESOLVED',
+            resolved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', issue.id)
+
+        if (resolveError) {
+          setMessage(resolveError.message)
+          setSavingAgencyId(null)
+          return
+        }
+      }
+    }
+
+    for (const location of currentLocations) {
+      if (issueIdByLocation.has(location.location_key)) continue
+
+      const { data: newIssue, error: newIssueError } = await supabase
+        .from('street_light_issues')
+        .insert({
+          agency_id: row.agency.id,
+          location_key: location.location_key,
+          location_text: location.location_text,
+          first_reported_date: today,
+          last_seen_date: today,
+          status: 'OPEN',
+        })
+        .select('id')
+        .single()
+
+      if (newIssueError) {
+        setMessage(newIssueError.message)
+        setSavingAgencyId(null)
+        return
+      }
+
+      issueIdByLocation.set(location.location_key, newIssue.id)
+    }
+
     if (row.faultyCount > 0) {
       const { error: locationError } = await supabase
         .from('street_light_fault_locations')
         .insert(
-          row.locations.map((location, index) => ({
+          currentLocations.map((location, index) => ({
             inspection_id: inspection.id,
             sequence_no: index + 1,
-            location_text: location.trim(),
+            location_text: location.location_text,
+            issue_id: issueIdByLocation.get(location.location_key) || null,
             status: 'OPEN',
           }))
         )
@@ -441,7 +585,13 @@ export default function StreetLightInspection({ config, onBack }) {
         `WhatsApp complaint sent to ${row.agency.contact_name} (${mobile}).`
       )
     } catch (error) {
-      const complaintText = buildComplaintMessage(row, today)
+      const openIssues = await getOpenIssues(row.agency.id)
+      const complaintText = buildComplaintMessage(
+        row,
+        today,
+        openIssues,
+        config
+      )
 
       const {
         data: { user },
@@ -494,7 +644,13 @@ export default function StreetLightInspection({ config, onBack }) {
     })
     if (!contactSaved) return
 
-    const complaintText = buildComplaintMessage(row, today)
+    const openIssues = await getOpenIssues(row.agency.id)
+    const complaintText = buildComplaintMessage(
+      row,
+      today,
+      openIssues,
+      config
+    )
 
     const {
       data: { user },
