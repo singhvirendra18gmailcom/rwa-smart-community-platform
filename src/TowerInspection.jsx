@@ -1341,9 +1341,6 @@ function TowerInspection({ onBack }) {
     setLightsWorkingCount(9)
     setWaterLeakage(false)
 
-    setStreetLightStatus([
-      ...DEFAULT_STREET_LIGHTS,
-    ])
 
     setOtherIssue(false)
     setOtherIssueDetails('')
