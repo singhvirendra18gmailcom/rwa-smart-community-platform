@@ -23,17 +23,26 @@ alter table public.society_service_complaints enable row level security;
 grant select, insert, update on table public.society_service_complaints to authenticated;
 grant usage, select on sequence public.society_service_complaints_id_seq to authenticated;
 
+drop policy if exists "Authenticated users can read society service complaints"
+  on public.society_service_complaints;
+
 create policy "Authenticated users can read society service complaints"
   on public.society_service_complaints
   for select
   to authenticated
   using (true);
 
+drop policy if exists "Authenticated users can insert society service complaints"
+  on public.society_service_complaints;
+
 create policy "Authenticated users can insert society service complaints"
   on public.society_service_complaints
   for insert
   to authenticated
   with check (true);
+
+drop policy if exists "Authenticated users can update society service complaints"
+  on public.society_service_complaints;
 
 create policy "Authenticated users can update society service complaints"
   on public.society_service_complaints
