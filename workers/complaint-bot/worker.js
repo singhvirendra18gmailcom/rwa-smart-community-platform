@@ -177,12 +177,9 @@ function streetLightComplaintMessage(agency, inspection, locations, issues, sett
     : `${inspection.faulty_count} स्ट्रीट लाइट खराब हैं`
 
   return `दिनांक: ${formatStreetLightMessageDate(inspection.inspection_date)}
-
-सेवा में,
-${agency.agency_name}
+सेवा में ${agency.agency_name},
 
 पॉकेट-A, सेक्टर-105 में ${lightText} और यह समस्या ${oldestDays} दिन से लंबित है। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
-
 अधिक जानकारी के लिए संपर्क करें:
 Supervisor: ${supervisor}
 RWA: ${rwa}
