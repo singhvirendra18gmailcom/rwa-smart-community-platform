@@ -61,7 +61,7 @@ function formatMessageDate(value) {
   return year && month && day ? `${day}-${month}-${year}` : value
 }
 
-function buildComplaintMessage(row, today, issues, config) {
+function buildComplaintMessage(row, today, issues, escalation) {
   const issueByLocation = new Map(
     (issues || []).map((issue) => [
       issue.location_key,
@@ -79,13 +79,13 @@ function buildComplaintMessage(row, today, issues, config) {
   const oldestDays = Math.max(1, ...issueDays)
 
   const supervisor = [
-    config?.supervisor_contact_name,
-    config?.supervisor_contact_mobile,
+    escalation?.supervisor_name,
+    escalation?.supervisor_mobile,
   ].filter(Boolean).join(' - ') || '—'
 
   const rwa = [
-    config?.rwa_contact_name,
-    config?.rwa_contact_mobile,
+    escalation?.rwa_name,
+    escalation?.rwa_mobile,
   ].filter(Boolean).join(' - ') || '—'
 
   const lightText =
@@ -137,6 +137,7 @@ export default function StreetLightInspection({ config, onBack }) {
   const [savingContactId, setSavingContactId] = useState(null)
   const [sendingAgencyId, setSendingAgencyId] = useState(null)
   const [message, setMessage] = useState('')
+  const [escalation, setEscalation] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -145,6 +146,20 @@ export default function StreetLightInspection({ config, onBack }) {
   const loadData = async () => {
     setLoading(true)
     setMessage('')
+
+    const { data: escalationData, error: escalationError } = await supabase
+      .from('society_service_categories')
+      .select('service_type,service_label,supervisor_name,supervisor_mobile,rwa_name,rwa_mobile')
+      .eq('service_type', 'STREET_LIGHT')
+      .maybeSingle()
+
+    if (escalationError) {
+      setMessage(escalationError.message)
+      setLoading(false)
+      return
+    }
+
+    setEscalation(escalationData || null)
 
     const { data: agencies, error: agencyError } = await supabase
       .from('society_service_agencies')
@@ -615,7 +630,7 @@ export default function StreetLightInspection({ config, onBack }) {
         row,
         today,
         openIssues,
-        config
+        escalation
       )
 
       const {
@@ -674,7 +689,7 @@ export default function StreetLightInspection({ config, onBack }) {
       row,
       today,
       openIssues,
-      config
+      escalation
     )
 
     const {
