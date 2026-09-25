@@ -496,7 +496,7 @@ function App() {
           <div className="feature-text">
 
             <h3>
-              Tower Inspection
+              {inspectionConfig.module_name}
             </h3>
 
             <p>
