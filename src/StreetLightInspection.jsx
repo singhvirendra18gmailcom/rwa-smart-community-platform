@@ -2,23 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import './SocietyInspection.css'
 
-const COMPLAINT_WORKER_URL =
-  'https://rwa-complaint-bot.singh-virendra18.workers.dev'
-
 const LOCATION_SUGGESTIONS = [
-  'In front of Tower 1', 'Backside of Tower 1',
-  'In front of Tower 2', 'Backside of Tower 2',
-  'In front of Tower 3', 'Backside of Tower 3',
-  'In front of Tower 4', 'Backside of Tower 4',
-  'In front of Tower 5', 'Backside of Tower 5',
-  'In front of Tower 6', 'Backside of Tower 6',
-  'In front of Tower 7', 'Backside of Tower 7',
-  'In front of Tower 8', 'Backside of Tower 8',
-  'In front of Tower 9', 'Backside of Tower 9',
-  'In front of Tower 10', 'Backside of Tower 10',
-  'In front of Tower 11', 'Backside of Tower 11',
-  'In front of Tower 12', 'Backside of Tower 12',
-  'Inside Park 1', 'Inside Park 2', 'Gate 1', 'Gate 2',
+  'Lane 1',
+  'Lane 2',
+  'Lane 3',
+  'Lane 4',
+  'Lane 5',
+  'Lane 6',
+  'Park 1',
+  'Park 2',
+  'Gate 1',
+  'Gate 2',
 ]
 
 function getIndiaDate() {
@@ -33,12 +27,15 @@ function getIndiaDate() {
   return `${value('year')}-${value('month')}-${value('day')}`
 }
 
-function normalizeIndiaMobile(value) {
-  const digits = String(value || '').replace(/\D/g, '')
+function formatDate(value) {
+  const [year, month, day] = String(value || '').split('-')
+  return year && month && day ? `${day}-${month}-${year}` : value
+}
 
+function normalizeMobile(value) {
+  const digits = String(value || '').replace(/\D/g, '')
   if (digits.length === 10) return `91${digits}`
   if (digits.length === 12 && digits.startsWith('91')) return digits
-
   return digits
 }
 
@@ -56,97 +53,39 @@ function calculateIssueDays(firstReportedDate, today) {
   return Math.max(1, diff + 1)
 }
 
-function formatMessageDate(value) {
-  const [year, month, day] = String(value || '').split('-')
-  return year && month && day ? `${day}-${month}-${year}` : value
-}
-
-function buildComplaintMessage(row, today, issues, escalation) {
-  const issueByLocation = new Map(
-    (issues || []).map((issue) => [
-      issue.location_key,
-      issue,
-    ])
-  )
-
-  const issueDays = row.locations.map((location) => {
-    const issue = issueByLocation.get(normalizeLocationKey(location))
-    return issue
-      ? calculateIssueDays(issue.first_reported_date, today)
-      : 1
-  })
-
-  const oldestDays = Math.max(1, ...issueDays)
-
-  const supervisor = [
-    escalation?.supervisor_name,
-    escalation?.supervisor_mobile,
-  ].filter(Boolean).join(' - ') || '—'
-
-  const rwa = [
-    escalation?.rwa_name,
-    escalation?.rwa_mobile,
-  ].filter(Boolean).join(' - ') || '—'
-
-  const lightText =
-    row.faultyCount === 1
-      ? '1 स्ट्रीट लाइट खराब है'
-      : `${row.faultyCount} स्ट्रीट लाइट खराब हैं`
-
-  const pendingText =
-    oldestDays > 1
-      ? ` और यह समस्या ${oldestDays} दिन से लंबित है`
-      : ''
-
-  return `दिनांक: ${formatMessageDate(today)}
-सेवा में ${row.agency.agency_name},
-
-पॉकेट-A, सेक्टर-105 में ${lightText}${pendingText}। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
-अधिक जानकारी के लिए संपर्क करें:
-RWA Staff / Supervisor: ${supervisor}
-RWA Executive: ${rwa}
-
-धन्यवाद
-RWA Pocket-A`
-}
-
-async function getOpenIssues(agencyId) {
-  const { data, error } = await supabase
-    .from('street_light_issues')
-    .select('id,agency_id,location_key,location_text,first_reported_date,last_seen_date,status')
-    .eq('agency_id', agencyId)
-    .eq('status', 'OPEN')
-
-  if (error) throw error
-  return data || []
-}
-
-function blankAgency(agency) {
+function createFault(agencyId = '') {
   return {
-    agency,
-    inspectionId: null,
-    faultyCount: 0,
-    locations: [],
-    remarks: '',
-    saved: false,
-    whatsappSent: false,
-    whatsappPending: false,
-    whatsappFailed: false,
-    whatsappManualOpened: false,
-    issueAges: {},
+    key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    location: '',
+    agencyId: agencyId ? String(agencyId) : '',
+    issueDays: 1,
   }
 }
 
-export default function StreetLightInspection({ config, onBack }) {
+function notificationLabel(status) {
+  if (status === 'SENT') return '✅ Marked Sent'
+  if (status === 'COMPOSER_OPENED') return '↗ WhatsApp Opened'
+  if (status === 'FAILED') return '⚠️ Failed'
+  return '⏳ Complaint Pending'
+}
+
+export default function StreetLightInspection({
+  config,
+  onBack,
+  onContinue,
+}) {
   const today = useMemo(() => getIndiaDate(), [])
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [savingAgencyId, setSavingAgencyId] = useState(null)
-  const [savingContactId, setSavingContactId] = useState(null)
-  const [sendingAgencyId, setSendingAgencyId] = useState(null)
-  const [sendingSmsAgencyId, setSendingSmsAgencyId] = useState(null)
-  const [message, setMessage] = useState('')
+  const [agencies, setAgencies] = useState([])
+  const [faults, setFaults] = useState([])
+  const [inspectionByAgency, setInspectionByAgency] = useState({})
+  const [notificationByAgency, setNotificationByAgency] = useState({})
   const [escalation, setEscalation] = useState(null)
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [sendingAgencyId, setSendingAgencyId] = useState(null)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     loadData()
@@ -156,10 +95,19 @@ export default function StreetLightInspection({ config, onBack }) {
     setLoading(true)
     setMessage('')
 
-    const [categoryResult, settingsResult] = await Promise.all([
+    const [agencyResult, categoryResult, settingsResult] = await Promise.all([
+      supabase
+        .from('society_service_agencies')
+        .select(
+          'id,agency_name,agency_code,contact_name,mobile_no,display_order,active'
+        )
+        .eq('service_type', 'STREET_LIGHT')
+        .eq('active', true)
+        .order('display_order')
+        .order('agency_name'),
       supabase
         .from('society_service_categories')
-        .select('service_type,service_label,rwa_name,rwa_mobile')
+        .select('rwa_name,rwa_mobile')
         .eq('service_type', 'STREET_LIGHT')
         .maybeSingle(),
       supabase
@@ -169,18 +117,19 @@ export default function StreetLightInspection({ config, onBack }) {
         .maybeSingle(),
     ])
 
-    if (categoryResult.error) {
-      setMessage(categoryResult.error.message)
+    const baseError =
+      agencyResult.error ||
+      categoryResult.error ||
+      settingsResult.error
+
+    if (baseError) {
+      setMessage(baseError.message)
       setLoading(false)
       return
     }
 
-    if (settingsResult.error) {
-      setMessage(settingsResult.error.message)
-      setLoading(false)
-      return
-    }
-
+    const agencyData = agencyResult.data || []
+    setAgencies(agencyData)
     setEscalation({
       supervisor_name: settingsResult.data?.supervisor_contact_name || null,
       supervisor_mobile: settingsResult.data?.supervisor_contact_mobile || null,
@@ -188,17 +137,10 @@ export default function StreetLightInspection({ config, onBack }) {
       rwa_mobile: categoryResult.data?.rwa_mobile || null,
     })
 
-    const { data: agencies, error: agencyError } = await supabase
-      .from('society_service_agencies')
-      .select(
-        'id,agency_code,agency_name,service_type,service_label,display_order,contact_name,mobile_no,whatsapp_no,sms_no'
-      )
-      .eq('active', true)
-      .eq('service_type', 'STREET_LIGHT')
-      .order('display_order')
+    const agencyIds = agencyData.map((agency) => agency.id)
 
-    if (agencyError) {
-      setMessage(agencyError.message)
+    if (agencyIds.length === 0) {
+      setFaults([])
       setLoading(false)
       return
     }
@@ -207,6 +149,7 @@ export default function StreetLightInspection({ config, onBack }) {
       .from('street_light_agency_daily_inspections')
       .select('id,agency_id,faulty_count,remarks,saved_at')
       .eq('inspection_date', today)
+      .in('agency_id', agencyIds)
 
     if (inspectionError) {
       setMessage(inspectionError.message)
@@ -214,686 +157,433 @@ export default function StreetLightInspection({ config, onBack }) {
       return
     }
 
+    const inspectionMap = Object.fromEntries(
+      (inspections || []).map((item) => [String(item.agency_id), item])
+    )
+    setInspectionByAgency(inspectionMap)
+
     const inspectionIds = (inspections || []).map((item) => item.id)
-    let locations = []
-    let notifications = []
-    let openIssues = []
-
-    const agencyIds = (agencies || []).map((agency) => agency.id)
-
-    if (agencyIds.length > 0) {
-      const { data: issueData, error: issueError } = await supabase
-        .from('street_light_issues')
-        .select('id,agency_id,location_key,location_text,first_reported_date,last_seen_date,status')
-        .in('agency_id', agencyIds)
-        .eq('status', 'OPEN')
-
-      if (issueError) {
-        setMessage(issueError.message)
-        setLoading(false)
-        return
-      }
-
-      openIssues = issueData || []
-    }
+    let locationRows = []
+    let notificationRows = []
 
     if (inspectionIds.length > 0) {
       const [locationResult, notificationResult] = await Promise.all([
         supabase
           .from('street_light_fault_locations')
-          .select('id,inspection_id,sequence_no,location_text,status,issue_id')
+          .select('inspection_id,sequence_no,location_text,issue_id')
           .in('inspection_id', inspectionIds)
           .order('sequence_no'),
         supabase
           .from('street_light_notifications')
-          .select('inspection_id,channel,delivery_status,created_at,provider_response')
+          .select('id,inspection_id,agency_id,delivery_status,created_at')
           .in('inspection_id', inspectionIds)
           .eq('channel', 'WHATSAPP')
           .order('created_at', { ascending: false }),
       ])
 
-      if (locationResult.error) {
-        setMessage(locationResult.error.message)
+      if (locationResult.error || notificationResult.error) {
+        setMessage(
+          locationResult.error?.message || notificationResult.error?.message
+        )
         setLoading(false)
         return
       }
 
-      if (notificationResult.error) {
-        setMessage(notificationResult.error.message)
-        setLoading(false)
-        return
-      }
-
-      locations = locationResult.data || []
-      notifications = notificationResult.data || []
+      locationRows = locationResult.data || []
+      notificationRows = notificationResult.data || []
     }
 
-    const nextRows = (agencies || []).map((agency) => {
-      const inspection = (inspections || []).find(
-        (item) => item.agency_id === agency.id
+    const openIssueResult = await supabase
+      .from('street_light_issues')
+      .select(
+        'id,agency_id,location_key,location_text,first_reported_date,status'
       )
+      .in('agency_id', agencyIds)
+      .eq('status', 'OPEN')
 
-      if (!inspection) return blankAgency(agency)
+    if (openIssueResult.error) {
+      setMessage(openIssueResult.error.message)
+      setLoading(false)
+      return
+    }
 
-      return {
-        agency,
-        inspectionId: inspection.id,
-        faultyCount: inspection.faulty_count || 0,
-        locations: locations
-          .filter((item) => item.inspection_id === inspection.id)
-          .map((item) => item.location_text),
-        remarks: inspection.remarks || '',
-        saved: true,
-        whatsappSent:
-          notifications.find(
-            (item) => item.inspection_id === inspection.id
-          )?.delivery_status === 'SENT',
-        whatsappPending:
-          notifications.find(
-            (item) => item.inspection_id === inspection.id
-          )?.delivery_status === 'PENDING',
-        whatsappFailed:
-          notifications.find(
-            (item) => item.inspection_id === inspection.id
-          )?.delivery_status === 'FAILED',
-        whatsappManualOpened: false,
-        issueAges: Object.fromEntries(
-          openIssues
-            .filter((issue) => issue.agency_id === agency.id)
-            .map((issue) => [
-              issue.location_key,
-              calculateIssueDays(issue.first_reported_date, today),
-            ])
-        ),
-      }
+    const issueById = new Map(
+      (openIssueResult.data || []).map((issue) => [Number(issue.id), issue])
+    )
+
+    const existingFaults = []
+    ;(inspections || []).forEach((inspection) => {
+      locationRows
+        .filter((row) => row.inspection_id === inspection.id)
+        .forEach((row) => {
+          const issue = issueById.get(Number(row.issue_id))
+          existingFaults.push({
+            key: `existing-${inspection.id}-${row.sequence_no}`,
+            location: row.location_text,
+            agencyId: String(inspection.agency_id),
+            issueDays: issue
+              ? calculateIssueDays(issue.first_reported_date, today)
+              : 1,
+          })
+        })
     })
 
-    setRows(nextRows)
+    const latestNotification = {}
+    notificationRows.forEach((item) => {
+      const key = String(item.agency_id)
+      if (!latestNotification[key]) latestNotification[key] = item
+    })
+
+    setFaults(existingFaults)
+    setNotificationByAgency(latestNotification)
+    setSaved((inspections || []).length > 0)
     setLoading(false)
   }
 
-  const updateRow = (agencyId, updater) => {
-    setRows((current) =>
-      current.map((row) =>
-        row.agency.id === agencyId
-          ? {
-              ...updater(row),
-              saved: false,
-              whatsappSent: false,
-              whatsappPending: false,
-              whatsappFailed: false,
-              whatsappManualOpened: false,
-            }
-          : row
-      )
-    )
-  }
+  const updateFaultCount = (count) => {
+    const safeCount = Math.max(0, Math.min(100, Number(count) || 0))
+    const defaultAgencyId = agencies[0]?.id ? String(agencies[0].id) : ''
 
-  const updateAgencyContact = (agencyId, field, value) => {
-    setRows((current) =>
-      current.map((row) =>
-        row.agency.id === agencyId
-          ? {
-              ...row,
-              agency: {
-                ...row.agency,
-                [field]: value,
-              },
-            }
-          : row
-      )
-    )
-  }
+    setFaults((current) => {
+      if (safeCount === current.length) return current
 
-  const setFaultyCount = (agencyId, count) => {
-    const safeCount = Math.max(0, Math.min(200, count))
-
-    updateRow(agencyId, (row) => {
-      const locations = [...row.locations]
-
-      while (locations.length < safeCount) locations.push('')
-      while (locations.length > safeCount) locations.pop()
-
-      return {
-        ...row,
-        faultyCount: safeCount,
-        locations,
+      if (safeCount < current.length) {
+        return current.slice(0, safeCount)
       }
+
+      const additions = Array.from(
+        { length: safeCount - current.length },
+        () => createFault(defaultAgencyId)
+      )
+
+      return [...current, ...additions]
     })
+
+    setSaved(false)
   }
 
-  const updateLocation = (agencyId, index, value) => {
-    updateRow(agencyId, (row) => {
-      const locations = [...row.locations]
-      locations[index] = value
-      return { ...row, locations }
-    })
+  const updateFault = (key, field, value) => {
+    setFaults((current) =>
+      current.map((fault) =>
+        fault.key === key
+          ? {
+              ...fault,
+              [field]: value,
+              ...(field === 'location' ? { issueDays: 1 } : {}),
+            }
+          : fault
+      )
+    )
+    setSaved(false)
   }
 
-  const validateContact = (row) => {
-    const mobile = normalizeIndiaMobile(row.agency.mobile_no)
+  const groupedFaults = useMemo(() => {
+    const groups = {}
 
-    if (!row.agency.contact_name?.trim()) {
-      setMessage(`Please enter the contact person name for ${row.agency.agency_name}.`)
-      return null
+    agencies.forEach((agency) => {
+      groups[String(agency.id)] = faults.filter(
+        (fault) => String(fault.agencyId) === String(agency.id)
+      )
+    })
+
+    return groups
+  }, [agencies, faults])
+
+  const saveInspection = async () => {
+    const incomplete = faults.find(
+      (fault) =>
+        !String(fault.location || '').trim() ||
+        !String(fault.agencyId || '').trim()
+    )
+
+    if (incomplete) {
+      setMessage('Please enter location and select UPPCL/TATA for every fault.')
+      return
     }
 
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session?.user?.id) {
+      setMessage('Login session expired. Please sign in again.')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const nextInspectionMap = {}
+
+      for (const agency of agencies) {
+        const agencyId = String(agency.id)
+        const agencyFaults = groupedFaults[agencyId] || []
+        const now = new Date().toISOString()
+
+        const { data: inspection, error: inspectionError } = await supabase
+          .from('street_light_agency_daily_inspections')
+          .upsert(
+            {
+              inspection_date: today,
+              agency_id: agency.id,
+              faulty_count: agencyFaults.length,
+              remarks: null,
+              inspected_by: session.user.id,
+              saved_at: now,
+              updated_at: now,
+            },
+            { onConflict: 'inspection_date,agency_id' }
+          )
+          .select('id,agency_id,faulty_count,remarks,saved_at')
+          .single()
+
+        if (inspectionError) throw inspectionError
+
+        nextInspectionMap[agencyId] = inspection
+
+        const { error: deleteError } = await supabase
+          .from('street_light_fault_locations')
+          .delete()
+          .eq('inspection_id', inspection.id)
+
+        if (deleteError) throw deleteError
+
+        const { data: openIssues, error: issueLoadError } = await supabase
+          .from('street_light_issues')
+          .select(
+            'id,location_key,location_text,first_reported_date,last_seen_date,status'
+          )
+          .eq('agency_id', agency.id)
+          .eq('status', 'OPEN')
+
+        if (issueLoadError) throw issueLoadError
+
+        const currentByKey = new Map(
+          agencyFaults.map((fault) => [
+            normalizeLocationKey(fault.location),
+            fault,
+          ])
+        )
+
+        const issueIdByKey = new Map()
+
+        for (const issue of openIssues || []) {
+          if (currentByKey.has(issue.location_key)) {
+            const fault = currentByKey.get(issue.location_key)
+
+            const { error } = await supabase
+              .from('street_light_issues')
+              .update({
+                location_text: String(fault.location).trim(),
+                last_seen_date: today,
+                updated_at: now,
+              })
+              .eq('id', issue.id)
+
+            if (error) throw error
+            issueIdByKey.set(issue.location_key, issue.id)
+          } else {
+            const { error } = await supabase
+              .from('street_light_issues')
+              .update({
+                status: 'RESOLVED',
+                resolved_at: now,
+                updated_at: now,
+              })
+              .eq('id', issue.id)
+
+            if (error) throw error
+          }
+        }
+
+        for (const fault of agencyFaults) {
+          const key = normalizeLocationKey(fault.location)
+          if (issueIdByKey.has(key)) continue
+
+          const { data: newIssue, error } = await supabase
+            .from('street_light_issues')
+            .insert({
+              agency_id: agency.id,
+              location_key: key,
+              location_text: String(fault.location).trim(),
+              first_reported_date: today,
+              last_seen_date: today,
+              status: 'OPEN',
+              updated_at: now,
+            })
+            .select('id')
+            .single()
+
+          if (error) throw error
+          issueIdByKey.set(key, newIssue.id)
+        }
+
+        if (agencyFaults.length > 0) {
+          const { error: locationInsertError } = await supabase
+            .from('street_light_fault_locations')
+            .insert(
+              agencyFaults.map((fault, index) => {
+                const key = normalizeLocationKey(fault.location)
+                return {
+                  inspection_id: inspection.id,
+                  sequence_no: index + 1,
+                  location_text: String(fault.location).trim(),
+                  status: 'OPEN',
+                  issue_id: issueIdByKey.get(key) || null,
+                }
+              })
+            )
+
+          if (locationInsertError) throw locationInsertError
+        }
+      }
+
+      setInspectionByAgency(nextInspectionMap)
+      setSaved(true)
+      setMessage('Street-light faults saved successfully.')
+      await loadData()
+    } catch (error) {
+      console.error(error)
+      setMessage(error?.message || 'Unable to save street-light faults.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const buildComplaintMessage = (agency, agencyFaults) => {
+    const supervisor = [
+      escalation?.supervisor_name,
+      escalation?.supervisor_mobile,
+    ].filter(Boolean).join(' - ') || '—'
+
+    const rwa = [
+      escalation?.rwa_name,
+      escalation?.rwa_mobile,
+    ].filter(Boolean).join(' - ') || '—'
+
+    const locations = agencyFaults
+      .map((fault) => String(fault.location || '').trim())
+      .filter(Boolean)
+      .join(', ')
+
+    return `दिनांक: ${formatDate(today)}
+सेवा में ${agency.agency_name},
+
+पॉकेट-A, सेक्टर-105 में ${agencyFaults.length} स्ट्रीट लाइट खराब पाई गई हैं।
+
+स्थान: ${locations}
+
+कृपया आवश्यक जांच एवं मरम्मत जल्द से जल्द करवाने की कृपा करें।
+अधिक जानकारी के लिए संपर्क करें:
+RWA Staff / Supervisor: ${supervisor}
+RWA Executive: ${rwa}
+
+धन्यवाद
+RWA Pocket-A`
+  }
+
+  const openComplaint = async (agency) => {
+    const agencyId = String(agency.id)
+    const agencyFaults = groupedFaults[agencyId] || []
+    const inspection = inspectionByAgency[agencyId]
+
+    if (!saved || !inspection) {
+      setMessage('Please save the street-light faults before sending complaints.')
+      return
+    }
+
+    if (agencyFaults.length === 0) return
+
+    const mobile = normalizeMobile(agency.mobile_no)
     if (mobile.length !== 12 || !mobile.startsWith('91')) {
       setMessage(
-        `Please enter a valid 10-digit Indian mobile number for ${row.agency.agency_name}.`
+        `Please configure a valid mobile number for ${agency.agency_name}.`
       )
-      return null
-    }
-
-    return mobile
-  }
-
-  const saveContact = async (row) => {
-    const mobile = validateContact(row)
-    if (!mobile) return false
-
-    setSavingContactId(row.agency.id)
-    setMessage('')
-
-    const { error } = await supabase
-      .from('society_service_agencies')
-      .update({
-        contact_name: row.agency.contact_name.trim(),
-        mobile_no: mobile,
-        whatsapp_no: mobile,
-        sms_no: mobile,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', row.agency.id)
-
-    setSavingContactId(null)
-
-    if (error) {
-      setMessage(error.message)
-      return false
-    }
-
-    updateAgencyContact(row.agency.id, 'mobile_no', mobile)
-    updateAgencyContact(row.agency.id, 'whatsapp_no', mobile)
-    updateAgencyContact(row.agency.id, 'sms_no', mobile)
-    setMessage(`${row.agency.agency_name} contact saved.`)
-    return true
-  }
-
-  const saveAgency = async (row) => {
-    const incompleteLocation = row.locations.some(
-      (location) => !location.trim()
-    )
-
-    if (row.faultyCount > 0 && incompleteLocation) {
-      setMessage(`Please enter all ${row.agency.agency_name} fault locations.`)
       return
     }
 
-    setSavingAgencyId(row.agency.id)
+    const complaintMessage = buildComplaintMessage(agency, agencyFaults)
+
+    setSendingAgencyId(agency.id)
     setMessage('')
 
-    const { data: userData } = await supabase.auth.getUser()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
-    const { data: inspection, error } = await supabase
-      .from('street_light_agency_daily_inspections')
-      .upsert(
-        {
-          inspection_date: today,
-          agency_id: row.agency.id,
-          faulty_count: row.faultyCount,
-          remarks: row.remarks.trim() || null,
-          inspected_by: userData?.user?.id || null,
-          saved_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'inspection_date,agency_id' }
+    const { data, error } = await supabase
+      .from('street_light_notifications')
+      .insert({
+        inspection_id: inspection.id,
+        agency_id: agency.id,
+        channel: 'WHATSAPP',
+        recipient_name: agency.contact_name || agency.agency_name,
+        recipient_mobile: mobile,
+        message_text: complaintMessage,
+        delivery_status: 'COMPOSER_OPENED',
+        sent_by: session?.user?.id || null,
+      })
+      .select(
+        'id,inspection_id,agency_id,delivery_status,created_at'
       )
-      .select('id')
       .single()
 
+    setSendingAgencyId(null)
+
     if (error) {
       setMessage(error.message)
-      setSavingAgencyId(null)
       return
     }
 
-    const { error: deleteError } = await supabase
-      .from('street_light_fault_locations')
-      .delete()
-      .eq('inspection_id', inspection.id)
-
-    if (deleteError) {
-      setMessage(deleteError.message)
-      setSavingAgencyId(null)
-      return
-    }
-
-    const openIssues = await getOpenIssues(row.agency.id)
-    const currentLocations = row.locations.map((location) => ({
-      location_text: location.trim(),
-      location_key: normalizeLocationKey(location),
+    setNotificationByAgency((current) => ({
+      ...current,
+      [agencyId]: data,
     }))
-    const currentKeys = new Set(
-      currentLocations.map((item) => item.location_key)
-    )
-    const issueIdByLocation = new Map()
 
-    for (const issue of openIssues) {
-      if (currentKeys.has(issue.location_key)) {
-        const currentLocation = currentLocations.find(
-          (item) => item.location_key === issue.location_key
-        )
-
-        const { error: issueUpdateError } = await supabase
-          .from('street_light_issues')
-          .update({
-            location_text: currentLocation?.location_text || issue.location_text,
-            last_seen_date: today,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', issue.id)
-
-        if (issueUpdateError) {
-          setMessage(issueUpdateError.message)
-          setSavingAgencyId(null)
-          return
-        }
-
-        issueIdByLocation.set(issue.location_key, issue.id)
-      } else {
-        const { error: resolveError } = await supabase
-          .from('street_light_issues')
-          .update({
-            status: 'RESOLVED',
-            resolved_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', issue.id)
-
-        if (resolveError) {
-          setMessage(resolveError.message)
-          setSavingAgencyId(null)
-          return
-        }
-      }
-    }
-
-    for (const location of currentLocations) {
-      if (issueIdByLocation.has(location.location_key)) continue
-
-      const { data: newIssue, error: newIssueError } = await supabase
-        .from('street_light_issues')
-        .insert({
-          agency_id: row.agency.id,
-          location_key: location.location_key,
-          location_text: location.location_text,
-          first_reported_date: today,
-          last_seen_date: today,
-          status: 'OPEN',
-        })
-        .select('id')
-        .single()
-
-      if (newIssueError) {
-        setMessage(newIssueError.message)
-        setSavingAgencyId(null)
-        return
-      }
-
-      issueIdByLocation.set(location.location_key, newIssue.id)
-    }
-
-    if (row.faultyCount > 0) {
-      const { error: locationError } = await supabase
-        .from('street_light_fault_locations')
-        .insert(
-          currentLocations.map((location, index) => ({
-            inspection_id: inspection.id,
-            sequence_no: index + 1,
-            location_text: location.location_text,
-            issue_id: issueIdByLocation.get(location.location_key) || null,
-            status: 'OPEN',
-          }))
-        )
-
-      if (locationError) {
-        setMessage(locationError.message)
-        setSavingAgencyId(null)
-        return
-      }
-    }
-
-    setRows((current) =>
-      current.map((item) =>
-        item.agency.id === row.agency.id
-          ? {
-              ...item,
-              inspectionId: inspection.id,
-              saved: true,
-              whatsappSent: false,
-              whatsappPending: false,
-              whatsappFailed: false,
-              whatsappManualOpened: false,
-              issueAges: Object.fromEntries(
-                currentLocations.map((location) => {
-                  const existing = openIssues.find(
-                    (issue) => issue.location_key === location.location_key
-                  )
-                  return [
-                    location.location_key,
-                    existing
-                      ? calculateIssueDays(existing.first_reported_date, today)
-                      : 1,
-                  ]
-                })
-              ),
-            }
-          : item
-      )
-    )
-
-    setMessage(`${row.agency.agency_name} street-light inspection saved.`)
-    setSavingAgencyId(null)
+    window.location.href =
+      `https://wa.me/${mobile}?text=${encodeURIComponent(complaintMessage)}`
   }
 
-  const parseWhatsAppFailureReason = (providerResponse) => {
-    if (!providerResponse) return 'WhatsApp delivery failed.'
+  const markComplaintSent = async (agency) => {
+    const agencyId = String(agency.id)
+    const notification = notificationByAgency[agencyId]
 
-    try {
-      const payload =
-        typeof providerResponse === 'string'
-          ? JSON.parse(providerResponse)
-          : providerResponse
-
-      return (
-        payload?.errors?.[0]?.error_data?.details ||
-        payload?.errors?.[0]?.message ||
-        payload?.errors?.[0]?.title ||
-        'WhatsApp delivery failed.'
-      )
-    } catch {
-      return 'WhatsApp delivery failed.'
-    }
-  }
-
-  const openManualWhatsApp = async (row, mobile) => {
-    try {
-      const openIssues = await getOpenIssues(row.agency.id)
-      const complaintMessage = buildComplaintMessage(
-        row,
-        today,
-        openIssues,
-        escalation
-      )
-
-      const whatsappUrl =
-        `https://wa.me/${mobile}?text=${encodeURIComponent(complaintMessage)}`
-
-      setRows((current) =>
-        current.map((item) =>
-          item.agency.id === row.agency.id
-            ? {
-                ...item,
-                whatsappSent: false,
-                whatsappPending: false,
-                whatsappFailed: false,
-                whatsappManualOpened: true,
-              }
-            : item
-        )
-      )
-
-      setMessage(
-        'Background WhatsApp is unavailable outside the 24-hour window. WhatsApp is opening with the complaint ready to send manually.'
-      )
-
-      window.location.href = whatsappUrl
-    } catch (error) {
-      console.error('Unable to open manual WhatsApp fallback:', error)
-      setMessage(
-        error?.message ||
-          'Unable to prepare the WhatsApp complaint for manual sending.'
-      )
-    }
-  }
-
-  const pollWhatsAppDeliveryStatus = async (row, mobile) => {
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      if (attempt > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-      }
-
-      const { data, error } = await supabase
-        .from('street_light_notifications')
-        .select('delivery_status,provider_response,created_at')
-        .eq('inspection_id', row.inspectionId)
-        .eq('channel', 'WHATSAPP')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (error) {
-        console.error('Unable to refresh WhatsApp delivery status:', error)
-        return
-      }
-
-      if (!data) continue
-
-      if (data.delivery_status === 'SENT') {
-        setRows((current) =>
-          current.map((item) =>
-            item.agency.id === row.agency.id
-              ? {
-                  ...item,
-                  whatsappSent: true,
-                  whatsappPending: false,
-                  whatsappFailed: false,
-                }
-              : item
-          )
-        )
-        setMessage('WhatsApp delivered successfully.')
-        return
-      }
-
-      if (data.delivery_status === 'FAILED') {
-        const reason = parseWhatsAppFailureReason(data.provider_response)
-
-        setRows((current) =>
-          current.map((item) =>
-            item.agency.id === row.agency.id
-              ? {
-                  ...item,
-                  whatsappSent: false,
-                  whatsappPending: false,
-                  whatsappFailed: true,
-                  whatsappManualOpened: false,
-                }
-              : item
-          )
-        )
-
-        console.warn('Background WhatsApp delivery failed:', reason)
-        await openManualWhatsApp(row, mobile)
-        return
-      }
-    }
-
-    setMessage(
-      'WhatsApp submitted to Meta. Delivery confirmation is still pending.'
-    )
-  }
-
-  const sendWhatsAppComplaint = async (row) => {
-    if (!row.saved || !row.inspectionId) {
-      setMessage('Please save the street-light inspection before sending the complaint.')
+    if (!notification?.id) {
+      setMessage('Open the WhatsApp complaint first.')
       return
     }
 
-    if (row.faultyCount <= 0) {
-      setMessage('There are no faulty street lights to report.')
+    setSendingAgencyId(agency.id)
+
+    const { data, error } = await supabase
+      .from('street_light_notifications')
+      .update({
+        delivery_status: 'SENT',
+        sent_at: new Date().toISOString(),
+      })
+      .eq('id', notification.id)
+      .select('id,inspection_id,agency_id,delivery_status,created_at')
+      .single()
+
+    setSendingAgencyId(null)
+
+    if (error) {
+      setMessage(error.message)
       return
     }
 
-    const mobile = validateContact(row)
-    if (!mobile) return
-
-    const contactSaved = await saveContact({
-      ...row,
-      agency: { ...row.agency, mobile_no: mobile },
-    })
-    if (!contactSaved) return
-
-    setSendingAgencyId(row.agency.id)
-    setMessage('')
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session?.access_token) {
-      setSendingAgencyId(null)
-      setMessage('Login session expired. Please sign in again.')
-      return
-    }
-
-    try {
-      const response = await fetch(
-        `${COMPLAINT_WORKER_URL}/api/street-lights/notify-whatsapp`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            inspection_id: row.inspectionId,
-          }),
-        }
-      )
-
-      let result = null
-
-      try {
-        result = await response.json()
-      } catch {
-        result = null
-      }
-
-      if (!response.ok || !result?.ok) {
-        throw new Error(
-          result?.error || `WhatsApp service returned ${response.status}.`
-        )
-      }
-
-      setRows((current) =>
-        current.map((item) =>
-          item.agency.id === row.agency.id
-            ? {
-                ...item,
-                whatsappSent: false,
-                whatsappPending: true,
-                whatsappFailed: false,
-                whatsappManualOpened: false,
-              }
-            : item
-        )
-      )
-
-      setMessage(
-        `WhatsApp submitted to Meta for ${row.agency.contact_name} (${mobile}). Delivery confirmation is pending.`
-      )
-
-      await pollWhatsAppDeliveryStatus(row, mobile)
-    } catch (error) {
-      console.error('Background WhatsApp send failed:', error)
-      await openManualWhatsApp(row, mobile)
-    } finally {
-      setSendingAgencyId(null)
-    }
-  }
-
-  const sendSmsComplaint = async (row) => {
-    if (!row.saved || !row.inspectionId) {
-      setMessage('Please save the street-light inspection before sending the complaint.')
-      return
-    }
-
-    if (row.faultyCount <= 0) {
-      setMessage('There are no faulty street lights to report.')
-      return
-    }
-
-    const mobile = validateContact(row)
-    if (!mobile) return
-
-    const contactSaved = await saveContact({
-      ...row,
-      agency: { ...row.agency, mobile_no: mobile },
-    })
-    if (!contactSaved) return
-
-    setSendingSmsAgencyId(row.agency.id)
-    setMessage('')
-
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (!session?.access_token) {
-      setSendingSmsAgencyId(null)
-      setMessage('Login session expired. Please sign in again.')
-      return
-    }
-
-    try {
-      const response = await fetch(
-        `${COMPLAINT_WORKER_URL}/api/street-lights/notify-sms`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            inspection_id: row.inspectionId,
-          }),
-        }
-      )
-
-      let result = null
-
-      try {
-        result = await response.json()
-      } catch {
-        result = null
-      }
-
-      if (!response.ok || !result?.ok) {
-        throw new Error(
-          result?.error || `SMS service returned ${response.status}.`
-        )
-      }
-
-      setMessage(
-        `SMS complaint sent to ${row.agency.contact_name} (${mobile}).`
-      )
-    } catch (error) {
-      console.error('Background SMS send failed:', error)
-      setMessage(
-        error?.message ||
-          'Unable to send SMS complaint in background.'
-      )
-    } finally {
-      setSendingSmsAgencyId(null)
-    }
+    setNotificationByAgency((current) => ({
+      ...current,
+      [agencyId]: data,
+    }))
+    setMessage(`${agency.agency_name} complaint marked as sent.`)
   }
 
   if (loading) {
     return (
       <div className="street-light-page">
-        <div className="society-loading">Loading street-light inspection…</div>
+        <div className="society-loading">Loading street-light faults…</div>
       </div>
     )
   }
@@ -904,213 +594,181 @@ export default function StreetLightInspection({ config, onBack }) {
         <button type="button" onClick={onBack}>←</button>
         <div>
           <span>RWA POCKET-A</span>
-          <h1>Street Lights</h1>
-          <p>{config?.module_name || 'Society Inspection'} • {today}</p>
+          <h1>Street Light Faults</h1>
+          <p>{formatDate(today)} • Record faulty lights only</p>
         </div>
       </header>
 
       <main className="street-light-content">
         <div className="street-light-intro">
-          Record faulty street lights separately for each maintenance agency
-          and notify the concerned contact directly.
+          Enter only the faulty street lights. For every fault, capture the
+          lane/park location and select whether it belongs to UPPCL or TATA.
         </div>
 
-        {rows.map((row) => (
-          <section className="agency-card" key={row.agency.id}>
-            <div className="agency-card-heading">
-              <div>
-                <span>MAINTENANCE AGENCY</span>
-                <h2>{row.agency.agency_name}</h2>
-              </div>
+        <section className="street-fault-counter-card">
+          <div>
+            <span>FAULTY STREET LIGHTS</span>
+            <strong>{faults.length}</strong>
+          </div>
 
-              <span className={`agency-save-status ${row.saved ? 'saved' : ''}`}>
-                {row.saved ? '✓ Inspection Saved' : 'Not saved'}
-              </span>
-            </div>
-
-            <div className="agency-contact-card">
-              <div className="agency-contact-title">
-                <strong>👤 Agency Contact</strong>
-                <small>Used for complaint notification</small>
-              </div>
-
-              <label>
-                Person Name
-                <input
-                  value={row.agency.contact_name || ''}
-                  onChange={(event) =>
-                    updateAgencyContact(
-                      row.agency.id,
-                      'contact_name',
-                      event.target.value
-                    )
-                  }
-                  placeholder="Contact person name"
-                />
-              </label>
-
-              <label>
-                Mobile Number
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  value={row.agency.mobile_no || ''}
-                  onChange={(event) =>
-                    updateAgencyContact(
-                      row.agency.id,
-                      'mobile_no',
-                      event.target.value
-                    )
-                  }
-                  placeholder="10-digit mobile number"
-                />
-              </label>
-
-              <button
-                type="button"
-                className="agency-contact-save"
-                disabled={savingContactId === row.agency.id}
-                onClick={() => saveContact(row)}
-              >
-                {savingContactId === row.agency.id
-                  ? 'Saving Contact…'
-                  : 'Save Contact'}
-              </button>
-            </div>
-
-            <div className="fault-counter-label">Faulty Street Lights</div>
-
-            <div className="fault-counter">
-              <button
-                type="button"
-                onClick={() => setFaultyCount(row.agency.id, row.faultyCount - 1)}
-              >
-                −
-              </button>
-              <strong>{row.faultyCount}</strong>
-              <button
-                type="button"
-                onClick={() => setFaultyCount(row.agency.id, row.faultyCount + 1)}
-              >
-                +
-              </button>
-            </div>
-
-            {row.faultyCount === 0 ? (
-              <div className="all-working-button">
-                ✅ All Working
-              </div>
-            ) : (
-              <div className="fault-location-list">
-                <h3>Fault Locations</h3>
-
-                {row.locations.map((location, index) => (
-                  <label key={index} className="fault-location-field">
-                    <span>Fault {index + 1}</span>
-                    <input
-                      list="street-light-location-suggestions"
-                      value={location}
-                      onChange={(event) =>
-                        updateLocation(row.agency.id, index, event.target.value)
-                      }
-                      placeholder="e.g. In front of Tower 3"
-                    />
-                    {row.issueAges?.[normalizeLocationKey(location)] && (
-                      <small className="fault-open-days">
-                        ⏱ {row.issueAges[normalizeLocationKey(location)]} दिन से खराब
-                      </small>
-                    )}
-                  </label>
-                ))}
-              </div>
-            )}
-
-            <label className="agency-remarks">
-              Remarks (optional)
-              <textarea
-                rows="2"
-                value={row.remarks}
-                onChange={(event) =>
-                  updateRow(row.agency.id, (current) => ({
-                    ...current,
-                    remarks: event.target.value,
-                  }))
-                }
-                placeholder="Any additional observation"
-              />
-            </label>
-
+          <div className="street-fault-counter-actions">
             <button
               type="button"
-              className="society-primary-button"
-              disabled={savingAgencyId === row.agency.id}
-              onClick={() => saveAgency(row)}
+              onClick={() => updateFaultCount(faults.length - 1)}
+              disabled={faults.length === 0}
             >
-              {savingAgencyId === row.agency.id
-                ? 'Saving…'
-                : `Save ${row.agency.agency_name} Inspection`}
+              −
             </button>
+            <button
+              type="button"
+              onClick={() => updateFaultCount(faults.length + 1)}
+            >
+              +
+            </button>
+          </div>
+        </section>
 
-            {row.faultyCount > 0 && (
-              <div className="agency-notify-section">
-                <div className="agency-notify-heading">
-                  <strong>📣 Send Complaint</strong>
-                  <small>
-                    {row.saved
-                      ? 'Notify the configured agency contact'
-                      : 'Save inspection first'}
-                  </small>
-                </div>
+        {faults.length === 0 && (
+          <div className="street-all-working-card">
+            ✅ No faulty street light reported today
+          </div>
+        )}
 
-                <div className="agency-notify-actions">
-                  <button
-                    type="button"
-                    className="whatsapp-complaint-button"
-                    disabled={
-                      !row.saved ||
-                      sendingAgencyId === row.agency.id
-                    }
-                    onClick={() => sendWhatsAppComplaint(row)}
-                  >
-                    {sendingAgencyId === row.agency.id
-                      ? 'Sending…'
-                      : row.whatsappSent
-                      ? '✓ WhatsApp Delivered'
-                      : row.whatsappPending
-                      ? '⏳ WhatsApp Submitted'
-                      : row.whatsappManualOpened
-                      ? '↗ WhatsApp Opened'
-                      : row.whatsappFailed
-                      ? '↗ Open WhatsApp Manually'
-                      : '💬 Send WhatsApp'}
-                  </button>
+        <div className="street-fault-list">
+          {faults.map((fault, index) => (
+            <section className="street-fault-card" key={fault.key}>
+              <div className="street-fault-card-title">
+                <strong>Fault {index + 1}</strong>
+                {fault.issueDays > 1 && (
+                  <span>⏱ {fault.issueDays} दिन से खराब</span>
+                )}
+              </div>
 
-                  <button
-                    type="button"
-                    className="sms-complaint-button"
-                    disabled={
-                      !row.saved ||
-                      sendingSmsAgencyId === row.agency.id
-                    }
-                    onClick={() => sendSmsComplaint(row)}
-                  >
-                    {sendingSmsAgencyId === row.agency.id
-                      ? 'Sending SMS…'
-                      : '✉️ Send SMS'}
-                  </button>
+              <label>
+                Location
+                <input
+                  list="street-location-suggestions"
+                  value={fault.location}
+                  onChange={(event) =>
+                    updateFault(fault.key, 'location', event.target.value)
+                  }
+                  placeholder="Lane no. or Park no."
+                />
+              </label>
+
+              <div className="street-agency-choice">
+                <span>Agency</span>
+                <div>
+                  {agencies.map((agency) => (
+                    <button
+                      key={agency.id}
+                      type="button"
+                      className={
+                        String(fault.agencyId) === String(agency.id)
+                          ? 'selected'
+                          : ''
+                      }
+                      onClick={() =>
+                        updateFault(
+                          fault.key,
+                          'agencyId',
+                          String(agency.id)
+                        )
+                      }
+                    >
+                      {agency.agency_name}
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
-          </section>
-        ))}
+            </section>
+          ))}
+        </div>
 
-        <datalist id="street-light-location-suggestions">
+        <datalist id="street-location-suggestions">
           {LOCATION_SUGGESTIONS.map((location) => (
             <option key={location} value={location} />
           ))}
         </datalist>
 
+        <button
+          type="button"
+          className="society-primary-button street-save-all-button"
+          disabled={saving}
+          onClick={saveInspection}
+        >
+          {saving
+            ? 'Saving…'
+            : saved
+            ? '✓ Update Street Light Faults'
+            : 'Save Street Light Faults'}
+        </button>
+
+        {saved && (
+          <section className="street-complaint-summary">
+            <h2>Agency Complaints</h2>
+
+            {agencies.map((agency) => {
+              const agencyId = String(agency.id)
+              const agencyFaults = groupedFaults[agencyId] || []
+              const notification = notificationByAgency[agencyId]
+
+              if (agencyFaults.length === 0) return null
+
+              return (
+                <div className="street-agency-complaint-card" key={agency.id}>
+                  <div>
+                    <strong>{agency.agency_name}</strong>
+                    <span>
+                      {agencyFaults.length} fault
+                      {agencyFaults.length === 1 ? '' : 's'} •{' '}
+                      {agencyFaults
+                        .map((fault) => fault.location)
+                        .join(', ')}
+                    </span>
+                  </div>
+
+                  <div className="inspection-complaint-status">
+                    {notificationLabel(notification?.delivery_status)}
+                  </div>
+
+                  <div className="inspection-action-buttons">
+                    <button
+                      type="button"
+                      className="society-primary-button"
+                      disabled={sendingAgencyId === agency.id}
+                      onClick={() => openComplaint(agency)}
+                    >
+                      ↗ Open WhatsApp Complaint
+                    </button>
+
+                    {notification?.delivery_status === 'COMPOSER_OPENED' && (
+                      <button
+                        type="button"
+                        className="inspection-mark-sent-button"
+                        disabled={sendingAgencyId === agency.id}
+                        onClick={() => markComplaintSent(agency)}
+                      >
+                        ✓ Mark Complaint Sent
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </section>
+        )}
+
         {message && <div className="street-light-message">{message}</div>}
+
+        <button
+          type="button"
+          className="view-summary-button"
+          style={{ width: '100%', marginTop: '14px' }}
+          onClick={onContinue}
+        >
+          Continue to Final Summary Report →
+        </button>
       </main>
     </div>
   )
