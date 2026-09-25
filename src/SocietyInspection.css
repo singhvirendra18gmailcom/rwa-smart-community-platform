@@ -418,3 +418,27 @@
     width: 100%;
   }
 }
+
+
+.service-agency-save-status {
+  margin-top: 9px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.service-agency-save-status.info {
+  background: #f1f7ff;
+  color: #315a8a;
+}
+
+.service-agency-save-status.success {
+  background: #e9f8ee;
+  color: #15773a;
+}
+
+.service-agency-save-status.error {
+  background: #fff0f0;
+  color: #a42424;
+}
