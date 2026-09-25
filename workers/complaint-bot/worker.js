@@ -56,6 +56,13 @@ export default {
       try {
         const body = await request.json()
         const value = body?.entry?.[0]?.changes?.[0]?.value
+        const status = value?.statuses?.[0]
+
+        if (status) {
+          await handleWhatsAppStatusUpdate(env, status)
+          return webhookResponse()
+        }
+
         const message = value?.messages?.[0]
         if (!message) return webhookResponse()
 
@@ -121,6 +128,39 @@ function apiResponse(payload, status = 200) {
   })
 }
 
+
+async function handleWhatsAppStatusUpdate(env, status) {
+  const providerReference = String(status?.id || '').trim()
+  if (!providerReference) return
+
+  const providerStatus = String(status?.status || '').toLowerCase()
+
+  let deliveryStatus = 'PENDING'
+  if (providerStatus === 'delivered' || providerStatus === 'read') {
+    deliveryStatus = 'SENT'
+  } else if (providerStatus === 'failed') {
+    deliveryStatus = 'FAILED'
+  }
+
+  const payload = {
+    delivery_status: deliveryStatus,
+    provider_response: JSON.stringify(status || {})
+  }
+
+  if (deliveryStatus === 'SENT') {
+    payload.sent_at = new Date().toISOString()
+  }
+
+  await supabaseRequest(
+    env,
+    `/rest/v1/street_light_notifications?channel=eq.WHATSAPP&provider_reference=eq.${encodeURIComponent(providerReference)}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(payload)
+    }
+  )
+}
 
 async function getAuthenticatedUser(request, env) {
   const authorization = request.headers.get('Authorization') || ''
@@ -436,7 +476,7 @@ async function handleStreetLightWhatsapp(request, env) {
         channel: 'WHATSAPP',
         recipient,
         message,
-        status: 'SENT',
+        status: 'PENDING',
         providerReference,
         providerResponse: JSON.stringify(providerResult || {}),
         userId: user.id,
