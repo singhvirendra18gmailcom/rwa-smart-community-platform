@@ -464,3 +464,103 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* =========================================================
+   COMBINED SERVICE AGENCIES + CONTACTS
+   ========================================================= */
+
+.service-agency-supervisor-card {
+  margin-bottom: 14px;
+  border-color: #b9d6ff;
+  background: #f8fbff;
+}
+
+.service-category-list {
+  display: grid;
+  gap: 18px;
+}
+
+.service-category-group {
+  padding: 16px;
+  border: 1px solid #d8e3ef;
+  border-radius: 20px;
+  background: #f7f9fc;
+}
+
+.service-category-heading {
+  margin-bottom: 13px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.service-category-heading span {
+  color: var(--inspection-primary, #176cf0);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .45px;
+}
+
+.service-category-heading h2 {
+  margin: 3px 0 2px;
+  color: #26364f;
+  font-size: 20px;
+}
+
+.service-category-heading small {
+  color: #718095;
+  font-size: 12px;
+}
+
+.service-category-rwa-card {
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid #cfe0f2;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.service-category-rwa-title {
+  margin-bottom: 12px;
+}
+
+.service-category-rwa-title strong {
+  display: block;
+  color: #26364f;
+  font-size: 15px;
+}
+
+.service-category-rwa-title small {
+  display: block;
+  margin-top: 3px;
+  color: #718095;
+  font-size: 12px;
+}
+
+.service-category-agencies {
+  display: grid;
+  gap: 11px;
+}
+
+.service-category-agencies .service-agency-card {
+  box-shadow: none;
+}
+
+.service-category-empty {
+  padding: 14px;
+  border: 1px dashed #c9d5e3;
+  border-radius: 13px;
+  background: #fff;
+  color: #718095;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .service-category-group {
+    padding: 12px;
+  }
+}
