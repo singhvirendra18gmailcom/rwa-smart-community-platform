@@ -133,25 +133,71 @@ async function getAuthenticatedUser(request, env) {
   return response.json()
 }
 
-function streetLightComplaintMessage(agency, inspection, locations) {
-  const contactName = String(agency.contact_name || '').trim()
-  const greeting = contactName ? `Dear ${contactName},` : 'Dear Sir/Madam,'
-  const locationLines = locations
-    .map((item, index) => `${index + 1}. ${item.location_text}`)
+function calculateStreetLightIssueDays(firstReportedDate, today) {
+  const start = new Date(`${firstReportedDate}T00:00:00Z`)
+  const end = new Date(`${today}T00:00:00Z`)
+  const diff = Math.floor((end - start) / 86400000)
+  return Math.max(1, diff + 1)
+}
+
+function formatStreetLightMessageDate(value) {
+  const [year, month, day] = String(value || '').split('-')
+  return year && month && day ? `${day}-${month}-${year}` : value
+}
+
+function streetLightComplaintMessage(agency, inspection, locations, issues, settings) {
+  const issueById = new Map(
+    (issues || []).map((issue) => [Number(issue.id), issue])
+  )
+
+  const details = locations.map((item) => {
+    const issue = issueById.get(Number(item.issue_id))
+    const days = issue
+      ? calculateStreetLightIssueDays(
+          issue.first_reported_date,
+          inspection.inspection_date
+        )
+      : 1
+
+    return {
+      location: item.location_text,
+      days
+    }
+  })
+
+  const oldestDays = Math.max(1, ...details.map((item) => item.days))
+  const locationLines = details
+    .map(
+      (item, index) =>
+        `${index + 1}. ${item.location} — ${item.days} दिन से खराब`
+    )
     .join('\n')
 
-  return `${greeting}
+  const supervisor = [
+    settings?.supervisor_contact_name,
+    settings?.supervisor_contact_mobile
+  ].filter(Boolean).join(' - ') || '—'
 
-During today's RWA Pocket-A inspection, ${inspection.faulty_count} street light${inspection.faulty_count === 1 ? '' : 's'} maintained by ${agency.agency_name} ${inspection.faulty_count === 1 ? 'was' : 'were'} found not working.
+  const rwa = [
+    settings?.rwa_contact_name,
+    settings?.rwa_contact_mobile
+  ].filter(Boolean).join(' - ') || '—'
 
-Fault location${inspection.faulty_count === 1 ? '' : 's'}:
+  return `दिनांक: ${formatStreetLightMessageDate(inspection.inspection_date)}
+
+सेवा में,
+${agency.agency_name}
+
+Pocket-A, Sector-105 में निम्न स्ट्रीट लाइट पिछले ${oldestDays} दिन से खराब हैं। कृपया इन्हें जल्द से जल्द ठीक करवाने की कृपा करें।
+
+खराब स्ट्रीट लाइट:
 ${locationLines}
 
-Kindly arrange the necessary repair at the earliest.
+अधिक जानकारी के लिए संपर्क करें:
+Supervisor: ${supervisor}
+RWA: ${rwa}
 
-Inspection Date: ${inspection.inspection_date}
-
-Regards,
+धन्यवाद
 RWA Pocket-A`
 }
 
@@ -205,7 +251,7 @@ async function handleStreetLightWhatsapp(request, env) {
 
     const locations = await supabaseRequest(
       env,
-      `/rest/v1/street_light_fault_locations?inspection_id=eq.${inspection.id}&select=id,sequence_no,location_text,status&order=sequence_no.asc`,
+      `/rest/v1/street_light_fault_locations?inspection_id=eq.${inspection.id}&select=id,sequence_no,location_text,status,issue_id&order=sequence_no.asc`,
       { method: 'GET' }
     )
 
@@ -213,7 +259,36 @@ async function handleStreetLightWhatsapp(request, env) {
       return apiResponse({ ok: false, error: 'Please save all fault locations before sending the complaint.' }, 409)
     }
 
-    const message = streetLightComplaintMessage(agency, inspection, locations)
+    const issueIds = locations
+      .map((item) => Number(item.issue_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+
+    let issues = []
+
+    if (issueIds.length > 0) {
+      issues = await supabaseRequest(
+        env,
+        `/rest/v1/street_light_issues?id=in.(${issueIds.join(',')})&select=id,first_reported_date,last_seen_date,status`,
+        { method: 'GET' }
+      )
+    }
+
+    const settingsRows = await supabaseRequest(
+      env,
+      '/rest/v1/society_inspection_settings?id=eq.1&select=supervisor_contact_name,supervisor_contact_mobile,rwa_contact_name,rwa_contact_mobile',
+      { method: 'GET' }
+    )
+    const settings = Array.isArray(settingsRows) && settingsRows.length
+      ? settingsRows[0]
+      : {}
+
+    const message = streetLightComplaintMessage(
+      agency,
+      inspection,
+      locations,
+      issues,
+      settings
+    )
     const now = new Date().toISOString()
 
     try {
