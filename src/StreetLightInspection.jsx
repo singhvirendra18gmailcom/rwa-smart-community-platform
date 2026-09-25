@@ -141,6 +141,7 @@ export default function StreetLightInspection({ config, onBack }) {
   const [savingAgencyId, setSavingAgencyId] = useState(null)
   const [savingContactId, setSavingContactId] = useState(null)
   const [sendingAgencyId, setSendingAgencyId] = useState(null)
+  const [sendingSmsAgencyId, setSendingSmsAgencyId] = useState(null)
   const [message, setMessage] = useState('')
   const [escalation, setEscalation] = useState(null)
 
@@ -648,39 +649,10 @@ export default function StreetLightInspection({ config, onBack }) {
         `WhatsApp complaint sent to ${row.agency.contact_name} (${mobile}).`
       )
     } catch (error) {
-      const openIssues = await getOpenIssues(row.agency.id)
-      const complaintText = buildComplaintMessage(
-        row,
-        today,
-        openIssues,
-        escalation
-      )
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      await supabase
-        .from('street_light_notifications')
-        .insert({
-          inspection_id: row.inspectionId,
-          agency_id: row.agency.id,
-          channel: 'WHATSAPP',
-          recipient_name: row.agency.contact_name.trim(),
-          recipient_mobile: mobile,
-          message_text: complaintText,
-          delivery_status: 'COMPOSER_OPENED',
-          provider_response: String(error?.message || error),
-          sent_by: user?.id || null,
-        })
-
-      const whatsappUrl =
-        `https://wa.me/${mobile}?text=${encodeURIComponent(complaintText)}`
-
-      window.location.href = whatsappUrl
-
+      console.error('Background WhatsApp send failed:', error)
       setMessage(
-        'Background WhatsApp service is not available yet. WhatsApp opened with the complaint pre-filled.'
+        error?.message ||
+          'Unable to send WhatsApp complaint in background.'
       )
     } finally {
       setSendingAgencyId(null)
@@ -707,33 +679,60 @@ export default function StreetLightInspection({ config, onBack }) {
     })
     if (!contactSaved) return
 
-    const openIssues = await getOpenIssues(row.agency.id)
-    const complaintText = buildComplaintMessage(
-      row,
-      today,
-      openIssues,
-      escalation
-    )
+    setSendingSmsAgencyId(row.agency.id)
+    setMessage('')
 
     const {
-      data: { user },
-    } = await supabase.auth.getUser()
+      data: { session },
+    } = await supabase.auth.getSession()
 
-    await supabase
-      .from('street_light_notifications')
-      .insert({
-        inspection_id: row.inspectionId,
-        agency_id: row.agency.id,
-        channel: 'SMS',
-        recipient_name: row.agency.contact_name.trim(),
-        recipient_mobile: mobile,
-        message_text: complaintText,
-        delivery_status: 'COMPOSER_OPENED',
-        sent_by: user?.id || null,
-      })
+    if (!session?.access_token) {
+      setSendingSmsAgencyId(null)
+      setMessage('Login session expired. Please sign in again.')
+      return
+    }
 
-    window.location.href =
-      `sms:+${mobile}?body=${encodeURIComponent(complaintText)}`
+    try {
+      const response = await fetch(
+        `${COMPLAINT_WORKER_URL}/api/street-lights/notify-sms`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            inspection_id: row.inspectionId,
+          }),
+        }
+      )
+
+      let result = null
+
+      try {
+        result = await response.json()
+      } catch {
+        result = null
+      }
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(
+          result?.error || `SMS service returned ${response.status}.`
+        )
+      }
+
+      setMessage(
+        `SMS complaint sent to ${row.agency.contact_name} (${mobile}).`
+      )
+    } catch (error) {
+      console.error('Background SMS send failed:', error)
+      setMessage(
+        error?.message ||
+          'Unable to send SMS complaint in background.'
+      )
+    } finally {
+      setSendingSmsAgencyId(null)
+    }
   }
 
   if (loading) {
@@ -928,10 +927,15 @@ export default function StreetLightInspection({ config, onBack }) {
                   <button
                     type="button"
                     className="sms-complaint-button"
-                    disabled={!row.saved}
+                    disabled={
+                      !row.saved ||
+                      sendingSmsAgencyId === row.agency.id
+                    }
                     onClick={() => sendSmsComplaint(row)}
                   >
-                    ✉️ Send SMS
+                    {sendingSmsAgencyId === row.agency.id
+                      ? 'Sending SMS…'
+                      : '✉️ Send SMS'}
                   </button>
                 </div>
               </div>
