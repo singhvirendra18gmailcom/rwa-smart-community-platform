@@ -12,34 +12,56 @@ function normalizeMobile(value) {
 
 export default function EscalationContacts({ onBack }) {
   const [categories, setCategories] = useState([])
+  const [supervisor, setSupervisor] = useState({
+    name: '',
+    mobile: '',
+  })
   const [loading, setLoading] = useState(true)
   const [savingType, setSavingType] = useState(null)
+  const [savingSupervisor, setSavingSupervisor] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    loadCategories()
+    loadContacts()
   }, [])
 
-  const loadCategories = async () => {
+  const loadContacts = async () => {
     setLoading(true)
     setMessage('')
 
-    const { data, error } = await supabase
-      .from('society_service_categories')
-      .select(
-        'service_type,service_label,supervisor_name,supervisor_mobile,rwa_name,rwa_mobile,display_order,active'
-      )
-      .eq('active', true)
-      .order('display_order')
-      .order('service_label')
+    const [categoryResult, settingsResult] = await Promise.all([
+      supabase
+        .from('society_service_categories')
+        .select(
+          'service_type,service_label,rwa_name,rwa_mobile,display_order,active'
+        )
+        .eq('active', true)
+        .order('display_order')
+        .order('service_label'),
+      supabase
+        .from('society_inspection_settings')
+        .select('supervisor_contact_name,supervisor_contact_mobile')
+        .eq('id', 1)
+        .maybeSingle(),
+    ])
 
-    if (error) {
-      setMessage(error.message)
+    if (categoryResult.error) {
+      setMessage(categoryResult.error.message)
       setLoading(false)
       return
     }
 
-    setCategories(data || [])
+    if (settingsResult.error) {
+      setMessage(settingsResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    setCategories(categoryResult.data || [])
+    setSupervisor({
+      name: settingsResult.data?.supervisor_contact_name || '',
+      mobile: settingsResult.data?.supervisor_contact_mobile || '',
+    })
     setLoading(false)
   }
 
@@ -53,20 +75,50 @@ export default function EscalationContacts({ onBack }) {
     )
   }
 
-  const saveCategory = async (category) => {
-    const supervisorMobile = normalizeMobile(category.supervisor_mobile)
-    const rwaMobile = normalizeMobile(category.rwa_mobile)
+  const saveSupervisor = async () => {
+    const mobile = normalizeMobile(supervisor.mobile)
 
-    if (
-      supervisorMobile &&
-      (supervisorMobile.length !== 12 || !supervisorMobile.startsWith('91'))
-    ) {
-      setMessage(`Please enter a valid RWA Staff / Supervisor mobile for ${category.service_label}.`)
+    if (mobile && (mobile.length !== 12 || !mobile.startsWith('91'))) {
+      setMessage('Please enter a valid Supervisor mobile number.')
       return
     }
 
+    setSavingSupervisor(true)
+    setMessage('')
+
+    const { data, error } = await supabase
+      .from('society_inspection_settings')
+      .update({
+        supervisor_contact_name:
+          String(supervisor.name || '').trim() || null,
+        supervisor_contact_mobile: mobile || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', 1)
+      .select('supervisor_contact_name,supervisor_contact_mobile')
+      .single()
+
+    setSavingSupervisor(false)
+
+    if (error) {
+      setMessage(error.message)
+      return
+    }
+
+    setSupervisor({
+      name: data.supervisor_contact_name || '',
+      mobile: data.supervisor_contact_mobile || '',
+    })
+    setMessage('Common Supervisor contact saved.')
+  }
+
+  const saveCategory = async (category) => {
+    const rwaMobile = normalizeMobile(category.rwa_mobile)
+
     if (rwaMobile && (rwaMobile.length !== 12 || !rwaMobile.startsWith('91'))) {
-      setMessage(`Please enter a valid RWA Executive mobile for ${category.service_label}.`)
+      setMessage(
+        `Please enter a valid RWA Executive mobile for ${category.service_label}.`
+      )
       return
     }
 
@@ -76,15 +128,13 @@ export default function EscalationContacts({ onBack }) {
     const { data, error } = await supabase
       .from('society_service_categories')
       .update({
-        supervisor_name: String(category.supervisor_name || '').trim() || null,
-        supervisor_mobile: supervisorMobile || null,
         rwa_name: String(category.rwa_name || '').trim() || null,
         rwa_mobile: rwaMobile || null,
         updated_at: new Date().toISOString(),
       })
       .eq('service_type', category.service_type)
       .select(
-        'service_type,service_label,supervisor_name,supervisor_mobile,rwa_name,rwa_mobile,display_order,active'
+        'service_type,service_label,rwa_name,rwa_mobile,display_order,active'
       )
       .single()
 
@@ -100,13 +150,13 @@ export default function EscalationContacts({ onBack }) {
         item.service_type === data.service_type ? data : item
       )
     )
-    setMessage(`${data.service_label} service contacts saved.`)
+    setMessage(`${data.service_label} RWA Executive contact saved.`)
   }
 
   if (loading) {
     return (
       <div className="street-light-page">
-        <div className="society-loading">Loading escalation contacts…</div>
+        <div className="society-loading">Loading service contacts…</div>
       </div>
     )
   }
@@ -118,14 +168,65 @@ export default function EscalationContacts({ onBack }) {
         <div>
           <span>RWA POCKET-A</span>
           <h1>Service Contacts</h1>
-          <p>RWA staff and executive contacts for agency callbacks</p>
+          <p>Common Supervisor and category-wise RWA Executive contacts</p>
         </div>
       </header>
 
       <main className="street-light-content">
         <div className="street-light-intro">
-          Configure the RWA staff member and RWA Executive whom the concerned agency or mechanic can call back for coordination.
+          The same RWA Supervisor is used for all services. Configure only the
+          concerned RWA Executive separately for each service category.
         </div>
+
+        <section className="service-agency-card service-agency-add-card">
+          <div className="service-agency-card-title">
+            <div>
+              <span>COMMON FOR ALL SERVICES</span>
+              <h2>RWA Staff / Supervisor</h2>
+            </div>
+          </div>
+
+          <div className="service-agency-form-grid">
+            <label>
+              Supervisor Name
+              <input
+                value={supervisor.name}
+                onChange={(event) =>
+                  setSupervisor((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Supervisor name"
+              />
+            </label>
+
+            <label>
+              Supervisor Mobile
+              <input
+                type="tel"
+                inputMode="tel"
+                value={supervisor.mobile}
+                onChange={(event) =>
+                  setSupervisor((current) => ({
+                    ...current,
+                    mobile: event.target.value,
+                  }))
+                }
+                placeholder="10-digit mobile"
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            className="agency-contact-save"
+            disabled={savingSupervisor}
+            onClick={saveSupervisor}
+          >
+            {savingSupervisor ? 'Saving…' : 'Save Supervisor'}
+          </button>
+        </section>
 
         <div className="service-agency-list">
           {categories.map((category) => (
@@ -139,38 +240,6 @@ export default function EscalationContacts({ onBack }) {
 
               <div className="service-agency-form-grid">
                 <label>
-                  RWA Staff / Supervisor Name
-                  <input
-                    value={category.supervisor_name || ''}
-                    onChange={(event) =>
-                      updateCategory(
-                        category.service_type,
-                        'supervisor_name',
-                        event.target.value
-                      )
-                    }
-                    placeholder="Supervisor name"
-                  />
-                </label>
-
-                <label>
-                  RWA Staff / Supervisor Mobile
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    value={category.supervisor_mobile || ''}
-                    onChange={(event) =>
-                      updateCategory(
-                        category.service_type,
-                        'supervisor_mobile',
-                        event.target.value
-                      )
-                    }
-                    placeholder="10-digit mobile"
-                  />
-                </label>
-
-                <label>
                   RWA Executive Name
                   <input
                     value={category.rwa_name || ''}
@@ -181,7 +250,7 @@ export default function EscalationContacts({ onBack }) {
                         event.target.value
                       )
                     }
-                    placeholder="RWA member name"
+                    placeholder="RWA Executive name"
                   />
                 </label>
 
@@ -211,7 +280,7 @@ export default function EscalationContacts({ onBack }) {
               >
                 {savingType === category.service_type
                   ? 'Saving…'
-                  : 'Save Contacts'}
+                  : 'Save RWA Executive'}
               </button>
             </section>
           ))}
