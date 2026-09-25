@@ -1779,12 +1779,6 @@
    Status colors intentionally remain semantic.
    ========================================================= */
 
-.tower-inspection-page {
-  --inspection-primary: var(--inspection-primary, #176cf0);
-  --inspection-dark: var(--inspection-dark, #173f67);
-  --inspection-soft: var(--inspection-soft, #edf5ff);
-}
-
 .tower-inspection-page .inspection-brand {
   color: var(--inspection-primary, #176cf0);
 }
