@@ -240,22 +240,47 @@ export default function SocietyInspectionSummary({ onBack }) {
       data.agencies.map((agency) => [Number(agency.id), agency])
     )
 
-    const streetRows = data.streetInspections.map((inspection) => {
-      const agency = agencyById.get(Number(inspection.agency_id))
+    const streetAgencies = data.agencies.filter(
+      (agency) => agency.service_type === 'STREET_LIGHT'
+    )
 
-      const notification = data.streetNotifications.find(
-        (item) => Number(item.agency_id) === Number(inspection.agency_id)
+    const streetRows = streetAgencies.map((agency) => {
+      const inspection = data.streetInspections.find(
+        (item) => Number(item.agency_id) === Number(agency.id)
       )
 
+      const notification = data.streetNotifications.find(
+        (item) => Number(item.agency_id) === Number(agency.id)
+      )
+
+      if (!inspection?.saved_at) {
+        return {
+          agency: agency.agency_name,
+          faultyCount: null,
+          inspectionStatus: 'Pending',
+          complaintStatus: 'Pending Inspection',
+        }
+      }
+
       return {
-        agency: agency?.agency_name || 'Street Light Agency',
+        agency: agency.agency_name,
         faultyCount: inspection.faulty_count || 0,
+        inspectionStatus: 'Done',
         complaintStatus:
           inspection.faulty_count > 0
             ? statusText(notification?.delivery_status, true)
             : 'Not Required',
       }
     })
+
+    const allRequiredComplaintsSent =
+      (cameraIssues.length === 0 || cameraComplaint?.status === 'SENT') &&
+      (ledIssues.length === 0 || ledComplaint?.status === 'SENT') &&
+      streetRows.every(
+        (row) =>
+          row.faultyCount === 0 ||
+          row.complaintStatus === 'Sent'
+      )
 
     return {
       completedTowers: data.towerInspections.filter((item) => item.saved_at).length,
@@ -283,6 +308,7 @@ export default function SocietyInspectionSummary({ onBack }) {
           ? 'Not Disposed'
           : 'Pending',
       streetRows,
+      allRequiredComplaintsSent,
     }
   }, [data])
 
@@ -333,7 +359,9 @@ export default function SocietyInspectionSummary({ onBack }) {
 
       summary.streetRows.forEach((row) => {
         lines.push(
-          `${row.agency} Street Lights: ${row.faultyCount} faulty • Complaint: ${row.complaintStatus}`
+          row.faultyCount === null
+            ? `${row.agency} Street Lights: Inspection Pending`
+            : `${row.agency} Street Lights: ${row.faultyCount} faulty • Complaint: ${row.complaintStatus}`
         )
       })
 
@@ -461,7 +489,11 @@ export default function SocietyInspectionSummary({ onBack }) {
           {summary.streetRows.map((row) => (
             <div className="final-summary-row" key={row.agency}>
               <span>💡 {row.agency}</span>
-              <strong>{row.faultyCount} faulty</strong>
+              <strong>
+                {row.faultyCount === null
+                  ? 'Inspection Pending'
+                  : `${row.faultyCount} faulty`}
+              </strong>
               <b>{row.complaintStatus}</b>
             </div>
           ))}
@@ -513,10 +545,18 @@ export default function SocietyInspectionSummary({ onBack }) {
           and further action, wherever required.
         </div>
 
+        {!summary.allRequiredComplaintsSent && (
+          <div className="inspection-workflow-warning">
+            ⚠️ Final report can be shared after all required complaints are
+            marked Sent.
+          </div>
+        )}
+
         <button
           type="button"
           className="share-summary-button"
           style={{ width: '100%' }}
+          disabled={!summary.allRequiredComplaintsSent}
           onClick={shareReport}
         >
           🖼️ Share Final Summary Report
