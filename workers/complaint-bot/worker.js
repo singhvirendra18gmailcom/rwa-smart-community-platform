@@ -111,7 +111,7 @@ function apiResponse(payload, status = 200) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'POST, OPTIONS'
     }
   })
@@ -196,7 +196,8 @@ async function handleStreetLightWhatsapp(request, env) {
     }
 
     const agency = agencies[0]
-    const recipient = normalizeMobile(agency.mobile_no || agency.whatsapp_no)
+    let recipient = normalizeMobile(agency.mobile_no || agency.whatsapp_no)
+    if (recipient.length === 10) recipient = `91${recipient}`
 
     if (!recipient) {
       return apiResponse({ ok: false, error: 'Please configure the agency mobile number first.' }, 400)
