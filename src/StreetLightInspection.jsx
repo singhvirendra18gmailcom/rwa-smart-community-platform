@@ -94,11 +94,12 @@ export default function StreetLightInspection({ config, onBack }) {
     setMessage('')
 
     const { data: agencies, error: agencyError } = await supabase
-      .from('street_light_agencies')
+      .from('society_service_agencies')
       .select(
-        'id,agency_code,agency_name,display_order,contact_name,mobile_no,whatsapp_no,sms_no'
+        'id,agency_code,agency_name,service_type,service_label,display_order,contact_name,mobile_no,whatsapp_no,sms_no'
       )
       .eq('active', true)
+      .eq('service_type', 'STREET_LIGHT')
       .order('display_order')
 
     if (agencyError) {
@@ -257,7 +258,7 @@ export default function StreetLightInspection({ config, onBack }) {
     setMessage('')
 
     const { error } = await supabase
-      .from('street_light_agencies')
+      .from('society_service_agencies')
       .update({
         contact_name: row.agency.contact_name.trim(),
         mobile_no: mobile,
