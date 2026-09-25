@@ -150,28 +150,17 @@ function streetLightComplaintMessage(agency, inspection, locations, issues, sett
     (issues || []).map((issue) => [Number(issue.id), issue])
   )
 
-  const details = locations.map((item) => {
+  const issueDays = locations.map((item) => {
     const issue = issueById.get(Number(item.issue_id))
-    const days = issue
+    return issue
       ? calculateStreetLightIssueDays(
           issue.first_reported_date,
           inspection.inspection_date
         )
       : 1
-
-    return {
-      location: item.location_text,
-      days
-    }
   })
 
-  const oldestDays = Math.max(1, ...details.map((item) => item.days))
-  const locationLines = details
-    .map(
-      (item, index) =>
-        `${index + 1}. ${item.location} — ${item.days} दिन से खराब`
-    )
-    .join('\n')
+  const oldestDays = Math.max(1, ...issueDays)
 
   const supervisor = [
     settings?.supervisor_contact_name,
@@ -183,15 +172,16 @@ function streetLightComplaintMessage(agency, inspection, locations, issues, sett
     settings?.rwa_contact_mobile
   ].filter(Boolean).join(' - ') || '—'
 
+  const lightText = inspection.faulty_count === 1
+    ? '1 स्ट्रीट लाइट खराब है'
+    : `${inspection.faulty_count} स्ट्रीट लाइट खराब हैं`
+
   return `दिनांक: ${formatStreetLightMessageDate(inspection.inspection_date)}
 
 सेवा में,
 ${agency.agency_name}
 
-Pocket-A, Sector-105 में निम्न स्ट्रीट लाइट पिछले ${oldestDays} दिन से खराब हैं। कृपया इन्हें जल्द से जल्द ठीक करवाने की कृपा करें।
-
-खराब स्ट्रीट लाइट:
-${locationLines}
+Pocket-A, Sector-105 में ${lightText} और यह समस्या ${oldestDays} दिन से लंबित है। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
 
 अधिक जानकारी के लिए संपर्क करें:
 Supervisor: ${supervisor}
