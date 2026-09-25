@@ -138,7 +138,7 @@ export default function SocietyInspection({ onBack }) {
           <span className="society-hub-icon">📞</span>
           <span>
             <strong>Service Contacts</strong>
-            <small>RWA staff and executive contacts by service category</small>
+            <small>Common Supervisor and category-wise RWA Executive contacts</small>
           </span>
           <b>›</b>
         </button>
