@@ -141,6 +141,7 @@ function blankAgency(agency) {
     remarks: '',
     saved: false,
     whatsappSent: false,
+    issueAges: {},
   }
 }
 
@@ -190,12 +191,31 @@ export default function StreetLightInspection({ config, onBack }) {
     const inspectionIds = (inspections || []).map((item) => item.id)
     let locations = []
     let notifications = []
+    let openIssues = []
+
+    const agencyIds = (agencies || []).map((agency) => agency.id)
+
+    if (agencyIds.length > 0) {
+      const { data: issueData, error: issueError } = await supabase
+        .from('street_light_issues')
+        .select('id,agency_id,location_key,location_text,first_reported_date,last_seen_date,status')
+        .in('agency_id', agencyIds)
+        .eq('status', 'OPEN')
+
+      if (issueError) {
+        setMessage(issueError.message)
+        setLoading(false)
+        return
+      }
+
+      openIssues = issueData || []
+    }
 
     if (inspectionIds.length > 0) {
       const [locationResult, notificationResult] = await Promise.all([
         supabase
           .from('street_light_fault_locations')
-          .select('id,inspection_id,sequence_no,location_text,status')
+          .select('id,inspection_id,sequence_no,location_text,status,issue_id')
           .in('inspection_id', inspectionIds)
           .order('sequence_no'),
         supabase
@@ -241,6 +261,14 @@ export default function StreetLightInspection({ config, onBack }) {
         saved: true,
         whatsappSent: notifications.some(
           (item) => item.inspection_id === inspection.id
+        ),
+        issueAges: Object.fromEntries(
+          openIssues
+            .filter((issue) => issue.agency_id === agency.id)
+            .map((issue) => [
+              issue.location_key,
+              calculateIssueDays(issue.first_reported_date, today),
+            ])
         ),
       }
     })
@@ -798,6 +826,11 @@ export default function StreetLightInspection({ config, onBack }) {
                       }
                       placeholder="e.g. In front of Tower 3"
                     />
+                    {row.issueAges?.[normalizeLocationKey(location)] && (
+                      <small className="fault-open-days">
+                        ⏱ {row.issueAges[normalizeLocationKey(location)]} दिन से खराब
+                      </small>
+                    )}
                   </label>
                 ))}
               </div>
