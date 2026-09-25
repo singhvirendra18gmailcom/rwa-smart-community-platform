@@ -61,12 +61,12 @@ export default function EscalationContacts({ onBack }) {
       supervisorMobile &&
       (supervisorMobile.length !== 12 || !supervisorMobile.startsWith('91'))
     ) {
-      setMessage(`Please enter a valid Supervisor mobile for ${category.service_label}.`)
+      setMessage(`Please enter a valid RWA Staff / Supervisor mobile for ${category.service_label}.`)
       return
     }
 
     if (rwaMobile && (rwaMobile.length !== 12 || !rwaMobile.startsWith('91'))) {
-      setMessage(`Please enter a valid RWA mobile for ${category.service_label}.`)
+      setMessage(`Please enter a valid RWA Executive mobile for ${category.service_label}.`)
       return
     }
 
@@ -100,7 +100,7 @@ export default function EscalationContacts({ onBack }) {
         item.service_type === data.service_type ? data : item
       )
     )
-    setMessage(`${data.service_label} escalation contacts saved.`)
+    setMessage(`${data.service_label} service contacts saved.`)
   }
 
   if (loading) {
@@ -117,14 +117,14 @@ export default function EscalationContacts({ onBack }) {
         <button type="button" onClick={onBack}>←</button>
         <div>
           <span>RWA POCKET-A</span>
-          <h1>Escalation Contacts</h1>
-          <p>Supervisor and RWA contact by service category</p>
+          <h1>Service Contacts</h1>
+          <p>RWA staff and executive contacts for agency callbacks</p>
         </div>
       </header>
 
       <main className="street-light-content">
         <div className="street-light-intro">
-          Configure the concerned Supervisor and RWA member once for each service category.
+          Configure the RWA staff member and RWA Executive whom the concerned agency or mechanic can call back for coordination.
         </div>
 
         <div className="service-agency-list">
@@ -139,7 +139,7 @@ export default function EscalationContacts({ onBack }) {
 
               <div className="service-agency-form-grid">
                 <label>
-                  Supervisor Name
+                  RWA Staff / Supervisor Name
                   <input
                     value={category.supervisor_name || ''}
                     onChange={(event) =>
@@ -154,7 +154,7 @@ export default function EscalationContacts({ onBack }) {
                 </label>
 
                 <label>
-                  Supervisor Mobile
+                  RWA Staff / Supervisor Mobile
                   <input
                     type="tel"
                     inputMode="tel"
@@ -171,7 +171,7 @@ export default function EscalationContacts({ onBack }) {
                 </label>
 
                 <label>
-                  RWA Contact Name
+                  RWA Executive Name
                   <input
                     value={category.rwa_name || ''}
                     onChange={(event) =>
@@ -186,7 +186,7 @@ export default function EscalationContacts({ onBack }) {
                 </label>
 
                 <label>
-                  RWA Mobile
+                  RWA Executive Mobile
                   <input
                     type="tel"
                     inputMode="tel"
