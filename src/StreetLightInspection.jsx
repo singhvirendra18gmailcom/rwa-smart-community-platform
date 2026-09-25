@@ -530,6 +530,19 @@ export default function StreetLightInspection({ config, onBack }) {
               inspectionId: inspection.id,
               saved: true,
               whatsappSent: false,
+              issueAges: Object.fromEntries(
+                currentLocations.map((location) => {
+                  const existing = openIssues.find(
+                    (issue) => issue.location_key === location.location_key
+                  )
+                  return [
+                    location.location_key,
+                    existing
+                      ? calculateIssueDays(existing.first_reported_date, today)
+                      : 1,
+                  ]
+                })
+              ),
             }
           : item
       )
