@@ -1773,3 +1773,47 @@
       repeat(2, 1fr);
   }
 }
+
+/* =========================================================
+   SOCIETY INSPECTION CONFIGURABLE THEME
+   Status colors intentionally remain semantic.
+   ========================================================= */
+
+.tower-inspection-page {
+  --inspection-primary: var(--inspection-primary, #176cf0);
+  --inspection-dark: var(--inspection-dark, #173f67);
+  --inspection-soft: var(--inspection-soft, #edf5ff);
+}
+
+.tower-inspection-page .inspection-brand {
+  color: var(--inspection-primary, #176cf0);
+}
+
+.tower-inspection-page .inspection-header-back,
+.tower-inspection-page .retry-location-button {
+  background: var(--inspection-soft, #edf5ff);
+  color: var(--inspection-primary, #176cf0);
+}
+
+.tower-inspection-page .save-inspection-button,
+.tower-inspection-page .share-inspection-button,
+.tower-inspection-page .share-summary-button {
+  background: var(--inspection-primary, #176cf0);
+}
+
+.tower-inspection-page .view-summary-button {
+  border-color: var(--inspection-primary, #176cf0);
+  color: var(--inspection-primary, #176cf0);
+}
+
+.inspection-info-box {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--inspection-primary, #176cf0);
+  border-radius: 13px;
+  background: var(--inspection-soft, #edf5ff);
+  color: var(--inspection-dark, #173f67);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+}
