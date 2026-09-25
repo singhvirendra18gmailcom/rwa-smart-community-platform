@@ -98,8 +98,8 @@ function buildComplaintMessage(row, today, issues, escalation) {
 
 पॉकेट-A, सेक्टर-105 में ${lightText} और यह समस्या ${oldestDays} दिन से लंबित है। कृपया जल्द से जल्द ठीक करवाने की कृपा करें।
 अधिक जानकारी के लिए संपर्क करें:
-Supervisor: ${supervisor}
-RWA: ${rwa}
+RWA Staff / Supervisor: ${supervisor}
+RWA Executive: ${rwa}
 
 धन्यवाद
 RWA Pocket-A`
