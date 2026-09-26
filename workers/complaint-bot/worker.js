@@ -943,7 +943,7 @@ function languageMenu() {
 
 function categoryMenu(lang) {
   if (lang === 'HI') {
-    return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n*7.* 🧹 Housekeeping/Garbage\n*8.* 📋 Other\n\nकृपया केवल विकल्प संख्या भेजें।'
+    return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 प्लंबर\n*2.* ⚡ इलेक्ट्रीशियन\n*3.* 🚰 सीवरेज समस्या\n*4.* 📹 कैमरा रिकॉर्डिंग\n*5.* 🌿 हॉर्टिकल्चर\n*6.* 💡 स्ट्रीट लाइट\n*7.* 🧹 हाउसकीपिंग/कचरा\n*8.* 📋 अन्य\n\nकृपया केवल विकल्प संख्या भेजें।'
   }
   return '*Please select the complaint category:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n*7.* 🧹 Housekeeping/Garbage\n*8.* 📋 Other\n\nPlease send only the option number.'
 }
