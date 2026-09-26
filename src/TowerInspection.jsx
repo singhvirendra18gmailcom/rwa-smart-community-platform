@@ -2323,6 +2323,11 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
     setError('')
     setInfoMessage('')
 
+    if (initialLocation) {
+      await onBack?.()
+      return
+    }
+
     setScreen('list')
   }
 
@@ -2640,7 +2645,7 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
         <main className="inspection-list-content">
 
           <div className="inspection-info-box">
-            💡 Street lights are now inspected separately by maintenance agency (UPPCL / TATA).
+            💡 Street lights are now inspected separately by maintenance agency (Noida Authority / TATA).
           </div>
 
           <div className="inspection-summary">
@@ -2834,7 +2839,7 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -2954,7 +2959,7 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3353,7 +3358,7 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3609,7 +3614,7 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3880,7 +3885,7 @@ function TowerInspection({ onBack, onContinue, initialLocation }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
