@@ -106,7 +106,7 @@ export default function SocietyInspectionSummary({ onBack }) {
         .eq('inspection_date', today),
       supabase
         .from('society_daily_inspections')
-        .select('garbage_disposed,saved_at')
+        .select('garbage_collected,garbage_disposed,saved_at')
         .eq('inspection_date', today)
         .maybeSingle(),
       supabase
@@ -301,6 +301,12 @@ export default function SocietyInspectionSummary({ onBack }) {
         ledComplaint?.status,
         ledIssues.length > 0
       ),
+      garbageCollectedStatus:
+        data.society?.garbage_collected === true
+          ? 'Collected'
+          : data.society?.garbage_collected === false
+          ? 'Not Collected'
+          : 'Pending',
       garbageStatus:
         data.society?.garbage_disposed === true
           ? 'Disposed'
@@ -351,7 +357,8 @@ export default function SocietyInspectionSummary({ onBack }) {
         `Camera Complaint: ${summary.cameraComplaintStatus}`,
         `LED Screen: ${summary.ledIssues.length ? summary.ledIssues.join(', ') + ' not working' : 'All working'}`,
         `LED Complaint: ${summary.ledComplaintStatus}`,
-        `Garbage Disposal: ${summary.garbageStatus}`,
+        `Garbage Collected: ${summary.garbageCollectedStatus}`,
+        `Garbage Disposed: ${summary.garbageStatus}`,
         `Sweeping Issues: ${summary.sweepingIssues.length ? summary.sweepingIssues.join(', ') : 'None'}`,
         `Mopping Issues: ${summary.moppingIssues.length ? summary.moppingIssues.join(', ') : 'None'}`,
         `Water Leakage: ${summary.waterLeakageIssues.length ? summary.waterLeakageIssues.join(', ') : 'None'}`,
@@ -503,7 +510,11 @@ export default function SocietyInspectionSummary({ onBack }) {
           <h2>Inspection Status</h2>
 
           <div className="final-summary-line">
-            <span>Garbage Disposal</span>
+            <span>Garbage Collected</span>
+            <strong>{summary.garbageCollectedStatus}</strong>
+          </div>
+          <div className="final-summary-line">
+            <span>Garbage Disposed</span>
             <strong>{summary.garbageStatus}</strong>
           </div>
           <div className="final-summary-line">
