@@ -1457,3 +1457,111 @@
     width: fit-content;
   }
 }
+
+
+/* =========================================================
+   INLINE STREET-LIGHT MATRIX
+   ========================================================= */
+
+.street-inline-matrix {
+  margin-bottom: 12px;
+  border: 1px solid #dbe4ed;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.street-inline-matrix-head,
+.street-inline-matrix-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.2fr) repeat(2, minmax(110px, 1fr));
+  gap: 0;
+  align-items: center;
+}
+
+.street-inline-matrix-head {
+  background: #f3f7fb;
+  border-bottom: 1px solid #dbe4ed;
+}
+
+.street-inline-matrix-head > * {
+  padding: 10px 8px;
+  text-align: center;
+  color: #52647b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.street-inline-matrix-head > span {
+  text-align: left;
+}
+
+.street-inline-matrix-row {
+  border-bottom: 1px solid #edf1f5;
+}
+
+.street-inline-matrix-row:last-child {
+  border-bottom: 0;
+}
+
+.street-inline-matrix-row > strong {
+  padding: 11px 8px;
+  color: #26364f;
+  font-size: 11px;
+}
+
+.street-inline-counter {
+  padding: 7px 5px;
+  display: grid;
+  grid-template-columns: 30px 34px 30px;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  border-left: 1px solid #edf1f5;
+}
+
+.street-inline-counter button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #c9d6e3;
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: var(--inspection-primary, #176cf0);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.street-inline-counter button:disabled {
+  opacity: .4;
+}
+
+.street-inline-counter span {
+  text-align: center;
+  color: #26364f;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.street-inline-save-button {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--inspection-primary, #176cf0);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+@media (max-width: 430px) {
+  .street-inline-matrix {
+    overflow-x: auto;
+  }
+
+  .street-inline-matrix-head,
+  .street-inline-matrix-row {
+    min-width: 390px;
+  }
+}
