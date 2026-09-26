@@ -113,8 +113,12 @@ export default function SocietyInspection({ onBack }) {
   const [boardLoading, setBoardLoading] = useState(true)
   const [boardMessage, setBoardMessage] = useState('')
   const [savingGarbage, setSavingGarbage] = useState(null)
-  const [cameraLedExpanded, setCameraLedExpanded] = useState(false)
-  const [streetExpanded, setStreetExpanded] = useState(false)
+  const [cameraLedExpanded, setCameraLedExpanded] = useState(
+    () => sessionStorage.getItem('society-camera-led-expanded') === 'true'
+  )
+  const [streetExpanded, setStreetExpanded] = useState(
+    () => sessionStorage.getItem('society-street-expanded') === 'true'
+  )
   const [streetCounts, setStreetCounts] = useState({})
   const [savingStreet, setSavingStreet] = useState(false)
   const [savingComplaint, setSavingComplaint] = useState(null)
@@ -148,6 +152,20 @@ export default function SocietyInspection({ onBack }) {
   useEffect(() => {
     loadBoard()
   }, [])
+  useEffect(() => {
+    sessionStorage.setItem(
+      'society-camera-led-expanded',
+      cameraLedExpanded ? 'true' : 'false'
+    )
+  }, [cameraLedExpanded])
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      'society-street-expanded',
+      streetExpanded ? 'true' : 'false'
+    )
+  }, [streetExpanded])
+
 
   const loadBoard = async () => {
     setBoardLoading(true)
@@ -328,6 +346,20 @@ export default function SocietyInspection({ onBack }) {
     })
 
     setBoardLoading(false)
+  }
+
+  const openWhatsAppExternally = (url) => {
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+
+    if (!opened) {
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.target = '_blank'
+      anchor.rel = 'noopener noreferrer'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+    }
   }
 
   const returnHome = async () => {
@@ -545,8 +577,9 @@ RWA Pocket-A`
 
     await loadBoard()
 
-    window.location.href =
+    openWhatsAppExternally(
       `https://wa.me/${mobile}?text=${encodeURIComponent(complaintMessage)}`
+    )
   }
 
   const updateComplaintStatus = async (
@@ -822,8 +855,9 @@ RWA Pocket-A`
     setSavingComplaint(null)
     await loadBoard()
 
-    window.location.href =
+    openWhatsAppExternally(
       `https://wa.me/${mobile}?text=${encodeURIComponent(message)}`
+    )
   }
 
   const updateStreetComplaintStatus = async (
