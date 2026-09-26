@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import TowerInspection from './TowerInspection'
-import StreetLightInspection from './StreetLightInspection'
 import SocietyInspectionSettings from './SocietyInspectionSettings'
 import ServiceAgencies from './ServiceAgencies'
 import SocietyInspectionSummary from './SocietyInspectionSummary'
@@ -44,6 +43,13 @@ function normalizeMobile(value) {
   if (digits.length === 12 && digits.startsWith('91')) return digits
   return digits
 }
+
+const STREET_LIGHT_LOCATIONS = [
+  'Entry Lane',
+  'Exit Lane',
+  'Lane 1',
+  'Lane 2',
+]
 
 function towerHasIssue(inspection) {
   if (!inspection?.saved_at) return false
@@ -101,6 +107,9 @@ export default function SocietyInspection({ onBack }) {
   const [boardMessage, setBoardMessage] = useState('')
   const [savingGarbage, setSavingGarbage] = useState(null)
   const [cameraLedExpanded, setCameraLedExpanded] = useState(false)
+  const [streetExpanded, setStreetExpanded] = useState(false)
+  const [streetCounts, setStreetCounts] = useState({})
+  const [savingStreet, setSavingStreet] = useState(false)
   const [savingComplaint, setSavingComplaint] = useState(null)
   const [board, setBoard] = useState({
     towers: [],
@@ -114,6 +123,9 @@ export default function SocietyInspection({ onBack }) {
     serviceCategories: [],
     settings: null,
     streetInspections: [],
+    yesterdayStreetInspections: [],
+    streetLocations: [],
+    yesterdayStreetLocations: [],
     streetNotifications: [],
   })
 
@@ -188,8 +200,10 @@ export default function SocietyInspection({ onBack }) {
         .maybeSingle(),
       supabase
         .from('street_light_agency_daily_inspections')
-        .select('id,agency_id,faulty_count,saved_at')
-        .eq('inspection_date', today),
+        .select(
+          'id,inspection_date,agency_id,faulty_count,saved_at,complaint_status,complaint_opened_at,complaint_sent_at,resolved_at'
+        )
+        .in('inspection_date', [today, yesterday]),
     ])
 
     const error =
@@ -210,26 +224,76 @@ export default function SocietyInspection({ onBack }) {
       return
     }
 
-    const streetInspections = streetInspectionResult.data || []
-    const streetIds = streetInspections.map((item) => item.id)
+    const allStreetInspections = streetInspectionResult.data || []
+    const streetInspections = allStreetInspections.filter(
+      (item) => item.inspection_date === today
+    )
+    const yesterdayStreetInspections = allStreetInspections.filter(
+      (item) =>
+        item.inspection_date === yesterday &&
+        Number(item.faulty_count || 0) > 0 &&
+        item.complaint_status !== 'DONE'
+    )
+
+    const streetIds = allStreetInspections.map((item) => item.id)
     let streetNotifications = []
+    let streetLocationRows = []
 
     if (streetIds.length > 0) {
-      const notificationResult = await supabase
-        .from('street_light_notifications')
-        .select('id,inspection_id,agency_id,delivery_status,created_at')
-        .in('inspection_id', streetIds)
-        .eq('channel', 'WHATSAPP')
-        .order('created_at', { ascending: false })
+      const [notificationResult, locationResult] = await Promise.all([
+        supabase
+          .from('street_light_notifications')
+          .select('id,inspection_id,agency_id,delivery_status,created_at')
+          .in('inspection_id', streetIds)
+          .eq('channel', 'WHATSAPP')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('street_light_fault_locations')
+          .select('inspection_id,location_text,faulty_count,sequence_no')
+          .in('inspection_id', streetIds)
+          .order('sequence_no'),
+      ])
 
-      if (notificationResult.error) {
-        setBoardMessage(notificationResult.error.message)
+      if (notificationResult.error || locationResult.error) {
+        setBoardMessage(
+          notificationResult.error?.message ||
+          locationResult.error?.message
+        )
         setBoardLoading(false)
         return
       }
 
       streetNotifications = notificationResult.data || []
+      streetLocationRows = locationResult.data || []
     }
+
+    const todayStreetIds = new Set(
+      streetInspections.map((item) => Number(item.id))
+    )
+    const yesterdayStreetIds = new Set(
+      yesterdayStreetInspections.map((item) => Number(item.id))
+    )
+
+    const streetLocations = streetLocationRows.filter(
+      (row) => todayStreetIds.has(Number(row.inspection_id))
+    )
+    const yesterdayStreetLocations = streetLocationRows.filter(
+      (row) => yesterdayStreetIds.has(Number(row.inspection_id))
+    )
+
+    const nextStreetCounts = {}
+    streetInspections.forEach((inspection) => {
+      streetLocations
+        .filter(
+          (row) => Number(row.inspection_id) === Number(inspection.id)
+        )
+        .forEach((row) => {
+          nextStreetCounts[
+            `${row.location_text}|${inspection.agency_id}`
+          ] = Number(row.faulty_count || 1)
+        })
+    })
+    setStreetCounts(nextStreetCounts)
 
     setBoard({
       towers: towerResult.data || [],
@@ -250,6 +314,9 @@ export default function SocietyInspection({ onBack }) {
       serviceCategories: categoryResult.data || [],
       settings: settingsResult.data || null,
       streetInspections,
+      yesterdayStreetInspections,
+      streetLocations,
+      yesterdayStreetLocations,
       streetNotifications,
     })
 
@@ -513,6 +580,280 @@ RWA Pocket-A`
     await loadBoard()
   }
 
+  const streetAgencies = board.agencies.filter(
+    (agency) => agency.service_type === 'STREET_LIGHT'
+  )
+
+  const getStreetCount = (location, agencyId) =>
+    Number(streetCounts[`${location}|${agencyId}`] || 0)
+
+  const changeStreetCount = (location, agencyId, delta) => {
+    const key = `${location}|${agencyId}`
+    setStreetCounts((current) => ({
+      ...current,
+      [key]: Math.max(
+        0,
+        Math.min(50, Number(current[key] || 0) + delta)
+      ),
+    }))
+  }
+
+  const saveStreetLightMatrix = async () => {
+    setSavingStreet(true)
+    setBoardMessage('')
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) throw new Error('Login session expired.')
+
+      const now = new Date().toISOString()
+
+      for (const agency of streetAgencies) {
+        const rows = STREET_LIGHT_LOCATIONS.map((location) => ({
+          location,
+          count: getStreetCount(location, agency.id),
+        })).filter((item) => item.count > 0)
+
+        const total = rows.reduce(
+          (sum, item) => sum + item.count,
+          0
+        )
+
+        const existing = board.streetInspections.find(
+          (item) => Number(item.agency_id) === Number(agency.id)
+        )
+
+        const nextComplaintStatus =
+          total === 0
+            ? 'NOT_REQUIRED'
+            : existing?.complaint_status &&
+              existing.complaint_status !== 'NOT_REQUIRED'
+            ? existing.complaint_status
+            : 'PENDING'
+
+        const { data: inspection, error: inspectionError } =
+          await supabase
+            .from('street_light_agency_daily_inspections')
+            .upsert(
+              {
+                inspection_date: today,
+                agency_id: agency.id,
+                faulty_count: total,
+                remarks: null,
+                inspected_by: user.id,
+                saved_at: now,
+                complaint_status: nextComplaintStatus,
+                updated_at: now,
+              },
+              { onConflict: 'inspection_date,agency_id' }
+            )
+            .select('id')
+            .single()
+
+        if (inspectionError) throw inspectionError
+
+        const { error: deleteError } = await supabase
+          .from('street_light_fault_locations')
+          .delete()
+          .eq('inspection_id', inspection.id)
+
+        if (deleteError) throw deleteError
+
+        if (rows.length > 0) {
+          const { error: insertError } = await supabase
+            .from('street_light_fault_locations')
+            .insert(
+              rows.map((item, index) => ({
+                inspection_id: inspection.id,
+                sequence_no: index + 1,
+                location_text: item.location,
+                faulty_count: item.count,
+                status: 'OPEN',
+              }))
+            )
+
+          if (insertError) throw insertError
+        }
+      }
+
+      setBoardMessage('Street-light counts saved.')
+      await loadBoard()
+    } catch (error) {
+      console.error(error)
+      setBoardMessage(
+        error?.message || 'Unable to save street-light counts.'
+      )
+    } finally {
+      setSavingStreet(false)
+    }
+  }
+
+  const getStreetRowsForInspection = (inspection, sourceRows) =>
+    sourceRows.filter(
+      (row) => Number(row.inspection_id) === Number(inspection.id)
+    )
+
+  const buildStreetComplaintMessage = (
+    inspection,
+    agency,
+    sourceRows
+  ) => {
+    const rows = getStreetRowsForInspection(
+      inspection,
+      sourceRows
+    )
+
+    const detail = rows
+      .map(
+        (row) =>
+          `${row.location_text}: ${row.faulty_count} faulty`
+      )
+      .join(', ')
+
+    const category = board.serviceCategories.find(
+      (item) => item.service_type === 'STREET_LIGHT'
+    )
+
+    const supervisor = [
+      board.settings?.supervisor_contact_name,
+      board.settings?.supervisor_contact_mobile,
+    ].filter(Boolean).join(' - ') || '—'
+
+    const rwa = [
+      category?.rwa_name,
+      category?.rwa_mobile,
+    ].filter(Boolean).join(' - ') || '—'
+
+    return `दिनांक: ${formatDate(inspection.inspection_date)}
+सेवा में ${agency.agency_name},
+
+पॉकेट-A, सेक्टर-105 में ${inspection.faulty_count} स्ट्रीट लाइट खराब पाई गई हैं।
+
+स्थानवार विवरण: ${detail}
+
+कृपया आवश्यक जांच एवं मरम्मत जल्द से जल्द करवाने की कृपा करें।
+अधिक जानकारी के लिए संपर्क करें:
+RWA Staff / Supervisor: ${supervisor}
+RWA Executive: ${rwa}
+
+धन्यवाद
+RWA Pocket-A`
+  }
+
+  const openStreetComplaint = async (
+    inspection,
+    sourceRows
+  ) => {
+    const agency = board.agencies.find(
+      (item) => Number(item.id) === Number(inspection.agency_id)
+    )
+
+    if (!agency) {
+      setBoardMessage('Street-light agency is not configured.')
+      return
+    }
+
+    const mobile = normalizeMobile(agency.mobile_no)
+    if (mobile.length !== 12 || !mobile.startsWith('91')) {
+      setBoardMessage(
+        `Please configure a valid mobile number for ${agency.agency_name}.`
+      )
+      return
+    }
+
+    const message = buildStreetComplaintMessage(
+      inspection,
+      agency,
+      sourceRows
+    )
+
+    const now = new Date().toISOString()
+    setSavingComplaint(
+      `street-${inspection.id}-whatsapp`
+    )
+    setBoardMessage('')
+
+    const { error: updateError } = await supabase
+      .from('street_light_agency_daily_inspections')
+      .update({
+        complaint_status: 'WHATSAPP_OPENED',
+        complaint_opened_at: now,
+        resolved_at: null,
+        updated_at: now,
+      })
+      .eq('id', inspection.id)
+
+    if (updateError) {
+      setSavingComplaint(null)
+      setBoardMessage(updateError.message)
+      return
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    await supabase
+      .from('street_light_notifications')
+      .insert({
+        inspection_id: inspection.id,
+        agency_id: agency.id,
+        channel: 'WHATSAPP',
+        recipient_name: agency.contact_name || agency.agency_name,
+        recipient_mobile: mobile,
+        message_text: message,
+        delivery_status: 'COMPOSER_OPENED',
+        sent_by: user?.id || null,
+      })
+
+    setSavingComplaint(null)
+    await loadBoard()
+
+    window.location.href =
+      `https://wa.me/${mobile}?text=${encodeURIComponent(message)}`
+  }
+
+  const updateStreetComplaintStatus = async (
+    inspection,
+    status
+  ) => {
+    const now = new Date().toISOString()
+    setSavingComplaint(
+      `street-${inspection.id}-${status}`
+    )
+    setBoardMessage('')
+
+    const payload = {
+      complaint_status: status,
+      updated_at: now,
+    }
+
+    if (status === 'SENT') {
+      payload.complaint_sent_at = now
+    }
+
+    if (status === 'DONE') {
+      payload.resolved_at = now
+    }
+
+    const { error } = await supabase
+      .from('street_light_agency_daily_inspections')
+      .update(payload)
+      .eq('id', inspection.id)
+
+    setSavingComplaint(null)
+
+    if (error) {
+      setBoardMessage(error.message)
+      return
+    }
+
+    await loadBoard()
+  }
+
   const getTowerInspection = (towerId) =>
     board.towerInspections.find(
       (inspection) => Number(inspection.tower_id) === Number(towerId)
@@ -539,18 +880,11 @@ RWA Pocket-A`
     0
   )
 
-  const streetComplaintPending = board.streetInspections.some((inspection) => {
-    if (!inspection.saved_at || Number(inspection.faulty_count || 0) === 0) {
-      return false
-    }
-
-    const latest = board.streetNotifications.find(
-      (notification) =>
-        Number(notification.agency_id) === Number(inspection.agency_id)
-    )
-
-    return latest?.delivery_status !== 'SENT'
-  })
+  const streetComplaintPending = board.streetInspections.some(
+    (inspection) =>
+      Number(inspection.faulty_count || 0) > 0 &&
+      !['SENT', 'DONE'].includes(inspection.complaint_status)
+  )
 
   const completedTowers = board.towerInspections.filter(
     (inspection) => inspection.saved_at
@@ -567,18 +901,6 @@ RWA Pocket-A`
           initialLocation={inspectionTarget}
           onBack={returnHome}
           onContinue={returnHome}
-        />
-      </div>
-    )
-  }
-
-  if (screen === 'street-lights') {
-    return (
-      <div style={themeStyle}>
-        <StreetLightInspection
-          config={config}
-          onBack={returnHome}
-          onContinue={() => setScreen('final-summary')}
         />
       </div>
     )
@@ -1010,25 +1332,296 @@ RWA Pocket-A`
                 )}
               </div>
 
-              <button
-                type="button"
-                className="operations-action-row"
-                onClick={() => setScreen('street-lights')}
-              >
-                <span className="operations-action-main">
-                  <strong>Street Lights Complaints</strong>
-                  <small>
-                    {totalStreetFaults} faulty light{totalStreetFaults === 1 ? '' : 's'}
-                    {' • '}
-                    {totalStreetFaults === 0
-                      ? 'No complaint required'
-                      : streetComplaintPending
-                      ? 'Complaint pending'
-                      : 'Complaints sent'}
-                  </small>
-                </span>
-                <span className="operations-action-arrow">⌄</span>
-              </button>
+              <div className="operations-inline-section">
+                <button
+                  type="button"
+                  className="operations-action-row"
+                  onClick={() =>
+                    setStreetExpanded((current) => !current)
+                  }
+                  aria-expanded={streetExpanded}
+                >
+                  <span className="operations-action-main">
+                    <strong>Street Lights Complaints</strong>
+                    <small>
+                      {totalStreetFaults} faulty light{totalStreetFaults === 1 ? '' : 's'}
+                      {' • '}
+                      {totalStreetFaults === 0
+                        ? 'No complaint required'
+                        : streetComplaintPending
+                        ? 'Complaint pending'
+                        : 'Complaints sent'}
+                    </small>
+                  </span>
+                  <span
+                    className={`operations-action-arrow ${
+                      streetExpanded ? 'expanded' : ''
+                    }`}
+                  >
+                    ⌄
+                  </span>
+                </button>
+
+                {streetExpanded && (
+                  <div className="operations-inline-panel">
+                    <div className="operations-inline-heading">
+                      <strong>Today • Lane-wise Faults</strong>
+                      <small>Use − / + to set faulty light count</small>
+                    </div>
+
+                    <div className="street-inline-matrix">
+                      <div className="street-inline-matrix-head">
+                        <span>Location</span>
+                        {streetAgencies.map((agency) => (
+                          <strong key={agency.id}>
+                            {agency.agency_name}
+                          </strong>
+                        ))}
+                      </div>
+
+                      {STREET_LIGHT_LOCATIONS.map((location) => (
+                        <div
+                          className="street-inline-matrix-row"
+                          key={location}
+                        >
+                          <strong>{location}</strong>
+
+                          {streetAgencies.map((agency) => {
+                            const count = getStreetCount(
+                              location,
+                              agency.id
+                            )
+
+                            return (
+                              <div
+                                className="street-inline-counter"
+                                key={agency.id}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    changeStreetCount(
+                                      location,
+                                      agency.id,
+                                      -1
+                                    )
+                                  }
+                                  disabled={count === 0}
+                                >
+                                  −
+                                </button>
+                                <span>{count}</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    changeStreetCount(
+                                      location,
+                                      agency.id,
+                                      1
+                                    )
+                                  }
+                                >
+                                  +
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="street-inline-save-button"
+                      disabled={savingStreet}
+                      onClick={saveStreetLightMatrix}
+                    >
+                      {savingStreet
+                        ? 'Saving…'
+                        : 'Save Street Light Counts'}
+                    </button>
+
+                    {board.streetInspections
+                      .filter(
+                        (inspection) =>
+                          Number(inspection.faulty_count || 0) > 0
+                      )
+                      .map((inspection) => {
+                        const agency = board.agencies.find(
+                          (item) =>
+                            Number(item.id) ===
+                            Number(inspection.agency_id)
+                        )
+
+                        const rows = getStreetRowsForInspection(
+                          inspection,
+                          board.streetLocations
+                        )
+
+                        return (
+                          <div
+                            className="operations-complaint-card"
+                            key={inspection.id}
+                          >
+                            <div className="operations-complaint-card-top">
+                              <div>
+                                <strong>
+                                  💡 {agency?.agency_name || 'Street Light Agency'}
+                                </strong>
+                                <span>
+                                  {rows
+                                    .map(
+                                      (row) =>
+                                        `${row.location_text}: ${row.faulty_count}`
+                                    )
+                                    .join(' • ')}
+                                </span>
+                              </div>
+                              <b>
+                                {complaintStatusText(
+                                  inspection.complaint_status,
+                                  true
+                                )}
+                              </b>
+                            </div>
+
+                            <div className="operations-complaint-actions">
+                              <button
+                                type="button"
+                                className="operations-whatsapp-button"
+                                disabled={
+                                  savingComplaint ===
+                                  `street-${inspection.id}-whatsapp`
+                                }
+                                onClick={() =>
+                                  openStreetComplaint(
+                                    inspection,
+                                    board.streetLocations
+                                  )
+                                }
+                              >
+                                ↗ {inspection.complaint_status === 'NOT_REQUIRED'
+                                  ? 'Send WhatsApp'
+                                  : 'Resend WhatsApp'}
+                              </button>
+
+                              {inspection.complaint_status ===
+                                'WHATSAPP_OPENED' && (
+                                <button
+                                  type="button"
+                                  className="operations-mark-sent-button"
+                                  disabled={
+                                    savingComplaint ===
+                                    `street-${inspection.id}-SENT`
+                                  }
+                                  onClick={() =>
+                                    updateStreetComplaintStatus(
+                                      inspection,
+                                      'SENT'
+                                    )
+                                  }
+                                >
+                                  ✓ Mark Sent
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                    <div className="operations-inline-heading yesterday">
+                      <strong>Yesterday Pending Follow-up</strong>
+                      <small>{formatDate(yesterday)}</small>
+                    </div>
+
+                    {board.yesterdayStreetInspections.length === 0 && (
+                      <div className="operations-no-previous">
+                        No unresolved street-light complaint from yesterday.
+                      </div>
+                    )}
+
+                    {board.yesterdayStreetInspections.map(
+                      (inspection) => {
+                        const agency = board.agencies.find(
+                          (item) =>
+                            Number(item.id) ===
+                            Number(inspection.agency_id)
+                        )
+
+                        const rows = getStreetRowsForInspection(
+                          inspection,
+                          board.yesterdayStreetLocations
+                        )
+
+                        return (
+                          <div
+                            className="operations-complaint-card previous"
+                            key={inspection.id}
+                          >
+                            <div className="operations-complaint-card-top">
+                              <div>
+                                <strong>
+                                  💡 {agency?.agency_name || 'Street Light Agency'}
+                                </strong>
+                                <span>
+                                  {rows
+                                    .map(
+                                      (row) =>
+                                        `${row.location_text}: ${row.faulty_count}`
+                                    )
+                                    .join(' • ')}
+                                </span>
+                              </div>
+                              <b>
+                                {complaintStatusText(
+                                  inspection.complaint_status,
+                                  true
+                                )}
+                              </b>
+                            </div>
+
+                            <div className="operations-complaint-actions">
+                              <button
+                                type="button"
+                                className="operations-whatsapp-button secondary"
+                                disabled={
+                                  savingComplaint ===
+                                  `street-${inspection.id}-whatsapp`
+                                }
+                                onClick={() =>
+                                  openStreetComplaint(
+                                    inspection,
+                                    board.yesterdayStreetLocations
+                                  )
+                                }
+                              >
+                                ↗ Resend WhatsApp
+                              </button>
+
+                              <button
+                                type="button"
+                                className="operations-done-button"
+                                disabled={
+                                  savingComplaint ===
+                                  `street-${inspection.id}-DONE`
+                                }
+                                onClick={() =>
+                                  updateStreetComplaintStatus(
+                                    inspection,
+                                    'DONE'
+                                  )
+                                }
+                              >
+                                ✓ Mark Done
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+                    )}
+                  </div>
+                )}
+              </div>
             </section>
 
             <button
