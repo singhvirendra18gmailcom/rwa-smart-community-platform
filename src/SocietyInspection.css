@@ -1297,3 +1297,163 @@
     font-size: 9px;
   }
 }
+
+
+/* =========================================================
+   INLINE CAMERA / LED COMPLAINTS
+   ========================================================= */
+
+.operations-inline-section {
+  border: 1px solid #cad6e3;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.operations-inline-section .operations-action-row {
+  border: 0;
+  border-radius: 0;
+}
+
+.operations-action-arrow {
+  transition: transform .18s ease;
+}
+
+.operations-action-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.operations-inline-panel {
+  padding: 0 12px 12px;
+  border-top: 1px solid #edf1f5;
+  background: #fbfcfe;
+}
+
+.operations-inline-heading {
+  padding: 12px 2px 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.operations-inline-heading strong {
+  color: #26364f;
+  font-size: 12px;
+}
+
+.operations-inline-heading small {
+  color: #7a8798;
+  font-size: 10px;
+  text-align: right;
+}
+
+.operations-inline-heading.yesterday {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid #e4eaf1;
+}
+
+.operations-complaint-card {
+  margin-bottom: 9px;
+  padding: 11px;
+  border: 1px solid #dbe4ed;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.operations-complaint-card.previous {
+  border-color: #ead7b0;
+  background: #fffaf0;
+}
+
+.operations-complaint-card-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.operations-complaint-card-top > div strong,
+.operations-complaint-card-top > div span {
+  display: block;
+}
+
+.operations-complaint-card-top > div strong {
+  color: #26364f;
+  font-size: 12px;
+}
+
+.operations-complaint-card-top > div span {
+  margin-top: 4px;
+  color: #6d7b8d;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.operations-complaint-card-top > b {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f0f5fb;
+  color: #48617d;
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.operations-complaint-actions {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.operations-complaint-actions button {
+  padding: 9px 8px;
+  border-radius: 9px;
+  font-size: 10.5px;
+  font-weight: 900;
+}
+
+.operations-whatsapp-button {
+  border: 1px solid #9fd6ae;
+  background: #edf9f0;
+  color: #16763c;
+}
+
+.operations-whatsapp-button.secondary {
+  border-color: #b9d3ef;
+  background: #f1f7fd;
+  color: #2d5f91;
+}
+
+.operations-mark-sent-button {
+  border: 1px solid #b8cce2;
+  background: #f3f7fb;
+  color: #385b7e;
+}
+
+.operations-done-button {
+  border: 1px solid #93cfaa;
+  background: #e8f7ed;
+  color: #116f37;
+}
+
+.operations-no-previous {
+  padding: 10px 11px;
+  border: 1px dashed #d5dde7;
+  border-radius: 10px;
+  background: #fff;
+  color: #7b8796;
+  font-size: 10.5px;
+  text-align: center;
+}
+
+@media (max-width: 430px) {
+  .operations-complaint-card-top {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-complaint-card-top > b {
+    width: fit-content;
+  }
+}
