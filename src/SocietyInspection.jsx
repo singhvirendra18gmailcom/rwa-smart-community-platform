@@ -49,6 +49,13 @@ const STREET_LIGHT_LOCATIONS = [
   'Exit Lane',
   'Lane 1',
   'Lane 2',
+  'Lane 3',
+  'Lane 4',
+  'Lane 5',
+  'Lane 6',
+  'Lane 7',
+  'Park 1',
+  'Park 2',
 ]
 
 function towerHasIssue(inspection) {
@@ -745,7 +752,8 @@ RWA Pocket-A`
 
   const openStreetComplaint = async (
     inspection,
-    sourceRows
+    sourceRows,
+    markSentOnOpen = false
   ) => {
     const agency = board.agencies.find(
       (item) => Number(item.id) === Number(inspection.agency_id)
@@ -779,8 +787,9 @@ RWA Pocket-A`
     const { error: updateError } = await supabase
       .from('street_light_agency_daily_inspections')
       .update({
-        complaint_status: 'WHATSAPP_OPENED',
+        complaint_status: markSentOnOpen ? 'SENT' : 'WHATSAPP_OPENED',
         complaint_opened_at: now,
+        complaint_sent_at: markSentOnOpen ? now : inspection.complaint_sent_at,
         resolved_at: null,
         updated_at: now,
       })
@@ -805,7 +814,8 @@ RWA Pocket-A`
         recipient_name: agency.contact_name || agency.agency_name,
         recipient_mobile: mobile,
         message_text: message,
-        delivery_status: 'COMPOSER_OPENED',
+        delivery_status: markSentOnOpen ? 'SENT' : 'COMPOSER_OPENED',
+        sent_at: markSentOnOpen ? now : null,
         sent_by: user?.id || null,
       })
 
@@ -1381,7 +1391,105 @@ RWA Pocket-A`
 
                 {streetExpanded && (
                   <div className="operations-inline-panel">
-                    <div className="operations-inline-heading">
+                    <div className="operations-inline-heading yesterday">
+                      <strong>Yesterday Pending Follow-up</strong>
+                      <small>{formatDate(yesterday)}</small>
+                    </div>
+
+                    {board.yesterdayStreetInspections.length === 0 && (
+                      <div className="operations-no-previous">
+                        No unresolved street-light complaint from yesterday.
+                      </div>
+                    )}
+
+                    {board.yesterdayStreetInspections.map(
+                      (inspection) => {
+                        const agency = board.agencies.find(
+                          (item) =>
+                            Number(item.id) ===
+                            Number(inspection.agency_id)
+                        )
+
+                        const rows = getStreetRowsForInspection(
+                          inspection,
+                          board.yesterdayStreetLocations
+                        )
+
+                        const alreadyResent =
+                          inspection.complaint_status === 'SENT'
+
+                        return (
+                          <div
+                            className="operations-complaint-card previous"
+                            key={inspection.id}
+                          >
+                            <div className="operations-complaint-card-top">
+                              <div>
+                                <strong>
+                                  💡 {agency?.agency_name || 'Street Light Agency'}
+                                </strong>
+                                <span>
+                                  {rows
+                                    .map(
+                                      (row) =>
+                                        `${row.location_text}: ${row.faulty_count}`
+                                    )
+                                    .join(' • ')}
+                                </span>
+                              </div>
+                              <b>
+                                {complaintStatusText(
+                                  inspection.complaint_status,
+                                  true
+                                )}
+                              </b>
+                            </div>
+
+                            <div className="operations-complaint-actions">
+                              <button
+                                type="button"
+                                className="operations-whatsapp-button secondary"
+                                disabled={
+                                  alreadyResent ||
+                                  savingComplaint ===
+                                  `street-${inspection.id}-whatsapp`
+                                }
+                                onClick={() =>
+                                  openStreetComplaint(
+                                    inspection,
+                                    board.yesterdayStreetLocations,
+                                    true
+                                  )
+                                }
+                              >
+                                {alreadyResent
+                                  ? '✓ Sent'
+                                  : '↗ Re-Send Complaint'}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="operations-done-button"
+                                disabled={
+                                  savingComplaint ===
+                                  `street-${inspection.id}-DONE`
+                                }
+                                onClick={() =>
+                                  updateStreetComplaintStatus(
+                                    inspection,
+                                    'DONE'
+                                  )
+                                }
+                              >
+                                ✓ Done
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+                    )}
+
+                    <div className="operations-inline-heading street-today-heading">
                       <strong>Today • Lane-wise Faults</strong>
                       <small>Use − / + to set faulty light count</small>
                     </div>
@@ -1547,97 +1655,6 @@ RWA Pocket-A`
                           </div>
                         )
                       })}
-
-                    <div className="operations-inline-heading yesterday">
-                      <strong>Yesterday Pending Follow-up</strong>
-                      <small>{formatDate(yesterday)}</small>
-                    </div>
-
-                    {board.yesterdayStreetInspections.length === 0 && (
-                      <div className="operations-no-previous">
-                        No unresolved street-light complaint from yesterday.
-                      </div>
-                    )}
-
-                    {board.yesterdayStreetInspections.map(
-                      (inspection) => {
-                        const agency = board.agencies.find(
-                          (item) =>
-                            Number(item.id) ===
-                            Number(inspection.agency_id)
-                        )
-
-                        const rows = getStreetRowsForInspection(
-                          inspection,
-                          board.yesterdayStreetLocations
-                        )
-
-                        return (
-                          <div
-                            className="operations-complaint-card previous"
-                            key={inspection.id}
-                          >
-                            <div className="operations-complaint-card-top">
-                              <div>
-                                <strong>
-                                  💡 {agency?.agency_name || 'Street Light Agency'}
-                                </strong>
-                                <span>
-                                  {rows
-                                    .map(
-                                      (row) =>
-                                        `${row.location_text}: ${row.faulty_count}`
-                                    )
-                                    .join(' • ')}
-                                </span>
-                              </div>
-                              <b>
-                                {complaintStatusText(
-                                  inspection.complaint_status,
-                                  true
-                                )}
-                              </b>
-                            </div>
-
-                            <div className="operations-complaint-actions">
-                              <button
-                                type="button"
-                                className="operations-whatsapp-button secondary"
-                                disabled={
-                                  savingComplaint ===
-                                  `street-${inspection.id}-whatsapp`
-                                }
-                                onClick={() =>
-                                  openStreetComplaint(
-                                    inspection,
-                                    board.yesterdayStreetLocations
-                                  )
-                                }
-                              >
-                                ↗ Resend WhatsApp
-                              </button>
-
-                              <button
-                                type="button"
-                                className="operations-done-button"
-                                disabled={
-                                  savingComplaint ===
-                                  `street-${inspection.id}-DONE`
-                                }
-                                onClick={() =>
-                                  updateStreetComplaintStatus(
-                                    inspection,
-                                    'DONE'
-                                  )
-                                }
-                              >
-                                ✓ Mark Done
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      }
-                    )}
                   </div>
                 )}
               </div>
