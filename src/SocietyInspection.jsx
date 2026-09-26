@@ -349,17 +349,21 @@ export default function SocietyInspection({ onBack }) {
   }
 
   const openWhatsAppExternally = (url) => {
-    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    const opened = window.open(url, '_blank')
 
-    if (!opened) {
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.target = '_blank'
-      anchor.rel = 'noopener noreferrer'
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
+    if (opened) {
+      try {
+        opened.opener = null
+      } catch {
+        // Browser may prevent changing opener for external app links.
+      }
+      return
     }
+
+    // Popup blocked: fall back to same-tab navigation. The current
+    // Society Inspection screen and expanded section are persisted in
+    // sessionStorage, so returning from WhatsApp resumes this workflow.
+    window.location.href = url
   }
 
   const returnHome = async () => {
