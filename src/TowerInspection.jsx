@@ -835,35 +835,13 @@ function InspectionLocationRow({
         )}
 
         {completed && (
-          <>
-            <button
-              type="button"
-              className="location-rescan-button"
-              onClick={() => onScan(location)}
-            >
-              📷 Scan Again
-            </button>
-
-            <button
-              type="button"
-              className="location-report-button"
-              onClick={() => onReport(location)}
-            >
-              📄 Report
-            </button>
-
-            {location.type === 'tower' && (
-              <button
-                type="button"
-                className="location-share-button"
-                onClick={() =>
-                  onShare(location, inspection)
-                }
-              >
-                📲 Share
-              </button>
-            )}
-          </>
+          <button
+            type="button"
+            className="location-rescan-button"
+            onClick={() => onScan(location)}
+          >
+            📷 Scan Again
+          </button>
         )}
 
       </div>
@@ -872,12 +850,13 @@ function InspectionLocationRow({
   )
 }
 
-function TowerInspection({ onBack }) {
+function TowerInspection({ onBack, onContinue, initialLocation }) {
   const today =
     useMemo(() => getIndiaDate(), [])
 
   const scannerRef = useRef(null)
   const scanLockedRef = useRef(false)
+  const initialLocationOpenedRef = useRef(false)
 
   const [screen, setScreen] = useState('list')
 
@@ -1110,6 +1089,44 @@ function TowerInspection({ onBack }) {
       window.clearTimeout(timer)
     }
   }, [scannerActive, screen])
+
+  useEffect(() => {
+    if (
+      loading ||
+      initialLocationOpenedRef.current ||
+      !initialLocation
+    ) {
+      return
+    }
+
+    const rawLocation =
+      initialLocation.type === 'park'
+        ? parks.find(
+            (park) =>
+              String(park.id) ===
+              String(initialLocation.id)
+          )
+        : towers.find(
+            (tower) =>
+              String(tower.id) ===
+              String(initialLocation.id)
+          )
+
+    if (!rawLocation) return
+
+    initialLocationOpenedRef.current = true
+
+    startLocationScan(
+      initialLocation.type === 'park'
+        ? mapPark(rawLocation)
+        : mapTower(rawLocation)
+    )
+  }, [
+    loading,
+    initialLocation,
+    towers,
+    parks,
+  ])
 
   useEffect(() => {
     return () => {
@@ -2306,6 +2323,11 @@ function TowerInspection({ onBack }) {
     setError('')
     setInfoMessage('')
 
+    if (initialLocation) {
+      await onBack?.()
+      return
+    }
+
     setScreen('list')
   }
 
@@ -2623,7 +2645,7 @@ function TowerInspection({ onBack }) {
         <main className="inspection-list-content">
 
           <div className="inspection-info-box">
-            💡 Street lights are now inspected separately by maintenance agency (UPPCL / TATA).
+            💡 Street lights are now inspected separately by maintenance agency (Noida Authority / TATA).
           </div>
 
           <div className="inspection-summary">
@@ -2651,87 +2673,6 @@ function TowerInspection({ onBack }) {
               </strong>
               <small>Issues</small>
             </div>
-
-          </div>
-
-          <div className="society-garbage-card">
-
-            <div className="society-garbage-heading">
-              <div>
-                <strong>
-                  🗑️ Garbage Disposal from Society
-                </strong>
-
-                <small>
-                  Daily society-wide status
-                </small>
-              </div>
-
-              {societySaved && (
-                <span>
-                  ✅ Saved
-                </span>
-              )}
-            </div>
-
-            <div className="society-garbage-options">
-
-              <button
-                type="button"
-                className={`society-garbage-option good ${
-                  societyGarbageDisposed === true
-                    ? 'selected'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSocietyGarbageDisposed(
-                    true
-                  )
-
-                  setSocietySaved(false)
-                }}
-              >
-                ✅ Yes
-              </button>
-
-              <button
-                type="button"
-                className={`society-garbage-option bad ${
-                  societyGarbageDisposed === false
-                    ? 'selected'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSocietyGarbageDisposed(
-                    false
-                  )
-
-                  setSocietySaved(false)
-                }}
-              >
-                ❌ No
-              </button>
-
-            </div>
-
-            <button
-              type="button"
-              className="society-garbage-save"
-              disabled={
-                societySaving ||
-                societyGarbageDisposed === null ||
-                societySaved
-              }
-              onClick={
-                saveSocietyGarbage
-              }
-            >
-              {societySaving
-                ? 'Saving...'
-                : societySaved
-                ? '✅ Saved'
-                : 'Save Garbage Status'}
-            </button>
 
           </div>
 
@@ -2766,12 +2707,6 @@ function TowerInspection({ onBack }) {
                       onScan={
                         startLocationScan
                       }
-                      onReport={
-                        openReport
-                      }
-                      onShare={
-                        shareTowerImage
-                      }
                     />
                   )
                 )}
@@ -2795,12 +2730,6 @@ function TowerInspection({ onBack }) {
                       onScan={
                         startLocationScan
                       }
-                      onReport={
-                        openReport
-                      }
-                      onShare={
-                        shareTowerImage
-                      }
                     />
                   )
                 )}
@@ -2808,27 +2737,13 @@ function TowerInspection({ onBack }) {
               </div>
 
               <div className="daily-summary-actions">
-
-                <button
-                  type="button"
-                  className="view-summary-button"
-                  onClick={
-                    openSummary
-                  }
-                >
-                  📋 View Daily Summary
-                </button>
-
                 <button
                   type="button"
                   className="share-summary-button"
-                  onClick={
-                    shareSummaryImage
-                  }
+                  onClick={onContinue}
                 >
-                  🖼️ Share Summary Image
+                  Continue to Action Summary →
                 </button>
-
               </div>
             </>
           )}
@@ -2924,7 +2839,7 @@ function TowerInspection({ onBack }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3044,7 +2959,7 @@ function TowerInspection({ onBack }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3432,28 +3347,6 @@ function TowerInspection({ onBack }) {
             </div>
           )}
 
-          {saved && !isPark && (
-            <button
-              type="button"
-              className="share-inspection-button"
-              onClick={() => {
-                const inspection =
-                  getInspection(
-                    selectedLocation
-                  )
-
-                if (inspection) {
-                  shareTowerImage(
-                    selectedLocation,
-                    inspection
-                  )
-                }
-              }}
-            >
-              🖼️ Share Tower Report Image
-            </button>
-          )}
-
           <button
             type="button"
             className="view-summary-button"
@@ -3465,7 +3358,7 @@ function TowerInspection({ onBack }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3721,7 +3614,7 @@ function TowerInspection({ onBack }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>
@@ -3992,7 +3885,7 @@ function TowerInspection({ onBack }) {
               returnToList
             }
           >
-            ← Back to Inspection List
+            {initialLocation ? '← Back to Daily Board' : '← Back to Inspection List'}
           </button>
 
         </main>

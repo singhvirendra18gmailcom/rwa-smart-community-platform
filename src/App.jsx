@@ -31,10 +31,22 @@ function App() {
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
-  const [screen, setScreen] = useState('dashboard')
+  const [screen, setScreen] = useState(() =>
+    sessionStorage.getItem('rwa-resume-society-inspection') === 'true'
+      ? 'society-inspection'
+      : 'dashboard'
+  )
 
   const [rwbotProfile, setRwbotProfile] = useState(null)
   const { config: inspectionConfig } = useInspectionConfig()
+  useEffect(() => {
+    if (screen === 'society-inspection') {
+      sessionStorage.setItem('rwa-resume-society-inspection', 'true')
+    } else {
+      sessionStorage.removeItem('rwa-resume-society-inspection')
+    }
+  }, [screen])
+
 
   const [
     profileCheckedForUser,
