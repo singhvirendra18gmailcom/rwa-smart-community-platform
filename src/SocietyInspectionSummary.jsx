@@ -14,6 +14,33 @@ function getIndiaDate() {
   return `${value('year')}-${value('month')}-${value('day')}`
 }
 
+function getIndiaDateOffset(days) {
+  const target = new Date(Date.now() + days * 86400000)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(target)
+
+  const value = (type) => parts.find((part) => part.type === type)?.value
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+function getIndiaDateFromTimestamp(value) {
+  if (!value) return null
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value))
+
+  const part = (type) => parts.find((item) => item.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
 function formatDate(value) {
   const [year, month, day] = String(value || '').split('-')
   return year && month && day ? `${day}-${month}-${year}` : value
@@ -21,6 +48,7 @@ function formatDate(value) {
 
 function statusText(status, required = true) {
   if (!required) return 'Not Required'
+  if (status === 'DONE') return 'Done'
   if (status === 'SENT') return 'Sent'
   if (status === 'WHATSAPP_OPENED' || status === 'COMPOSER_OPENED') {
     return 'WhatsApp Opened'
@@ -64,6 +92,7 @@ async function canvasToBlob(canvas) {
 
 export default function SocietyInspectionSummary({ onBack }) {
   const today = useMemo(() => getIndiaDate(), [])
+  const yesterday = useMemo(() => getIndiaDateOffset(-1), [])
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [message, setMessage] = useState('')
@@ -119,8 +148,10 @@ export default function SocietyInspectionSummary({ onBack }) {
         .eq('active', true),
       supabase
         .from('street_light_agency_daily_inspections')
-        .select('id,agency_id,faulty_count,saved_at')
-        .eq('inspection_date', today),
+        .select(
+          'id,inspection_date,agency_id,faulty_count,saved_at,complaint_status,resolved_at'
+        )
+        .in('inspection_date', [today, yesterday]),
     ])
 
     const error =
@@ -139,7 +170,16 @@ export default function SocietyInspectionSummary({ onBack }) {
       return
     }
 
-    const streetInspections = streetInspectionResult.data || []
+    const allStreetInspections = streetInspectionResult.data || []
+    const streetInspections = allStreetInspections.filter(
+      (item) => item.inspection_date === today
+    )
+    const resolvedStreetFollowUps = allStreetInspections.filter(
+      (item) =>
+        item.inspection_date === yesterday &&
+        item.complaint_status === 'DONE' &&
+        getIndiaDateFromTimestamp(item.resolved_at) === today
+    )
     const streetIds = streetInspections.map((item) => item.id)
 
     let streetNotifications = []
@@ -170,6 +210,7 @@ export default function SocietyInspectionSummary({ onBack }) {
       serviceComplaints: serviceComplaintResult.data || [],
       agencies: agencyResult.data || [],
       streetInspections,
+      resolvedStreetFollowUps,
       streetNotifications,
     })
 
@@ -249,10 +290,6 @@ export default function SocietyInspectionSummary({ onBack }) {
         (item) => Number(item.agency_id) === Number(agency.id)
       )
 
-      const notification = data.streetNotifications.find(
-        (item) => Number(item.agency_id) === Number(agency.id)
-      )
-
       if (!inspection?.saved_at) {
         return {
           agency: agency.agency_name,
@@ -268,8 +305,21 @@ export default function SocietyInspectionSummary({ onBack }) {
         inspectionStatus: 'Done',
         complaintStatus:
           inspection.faulty_count > 0
-            ? statusText(notification?.delivery_status, true)
+            ? statusText(inspection.complaint_status, true)
             : 'Not Required',
+      }
+    })
+
+    const resolvedStreetFollowUps = (
+      data.resolvedStreetFollowUps || []
+    ).map((inspection) => {
+      const agency = agencyById.get(Number(inspection.agency_id))
+
+      return {
+        agency: agency?.agency_name || 'Street Light Agency',
+        faultyCount: Number(inspection.faulty_count || 0),
+        inspectionDate: inspection.inspection_date,
+        status: 'Done',
       }
     })
 
@@ -279,7 +329,7 @@ export default function SocietyInspectionSummary({ onBack }) {
       streetRows.every(
         (row) =>
           row.faultyCount === 0 ||
-          row.complaintStatus === 'Sent'
+          ['Sent', 'Done'].includes(row.complaintStatus)
       )
 
     return {
@@ -314,6 +364,7 @@ export default function SocietyInspectionSummary({ onBack }) {
           ? 'Not Disposed'
           : 'Pending',
       streetRows,
+      resolvedStreetFollowUps,
       allRequiredComplaintsSent,
     }
   }, [data])
@@ -369,6 +420,12 @@ export default function SocietyInspectionSummary({ onBack }) {
           row.faultyCount === null
             ? `${row.agency} Street Lights: Inspection Pending`
             : `${row.agency} Street Lights: ${row.faultyCount} faulty • Complaint: ${row.complaintStatus}`
+        )
+      })
+
+      summary.resolvedStreetFollowUps.forEach((row) => {
+        lines.push(
+          `Resolved Follow-up: ${row.agency} street-light complaint from ${formatDate(row.inspectionDate)} • ${row.faultyCount} faulty • Done today`
         )
       })
 
@@ -505,6 +562,25 @@ export default function SocietyInspectionSummary({ onBack }) {
             </div>
           ))}
         </section>
+
+        {summary.resolvedStreetFollowUps.length > 0 && (
+          <section className="final-summary-card">
+            <h2>Resolved Follow-ups Today</h2>
+
+            {summary.resolvedStreetFollowUps.map((row) => (
+              <div
+                className="final-summary-row"
+                key={`${row.inspectionDate}-${row.agency}`}
+              >
+                <span>✅ 💡 {row.agency}</span>
+                <strong>
+                  Yesterday: {row.faultyCount} faulty
+                </strong>
+                <b>Done Today</b>
+              </div>
+            ))}
+          </section>
+        )}
 
         <section className="final-summary-card">
           <h2>Inspection Status</h2>
