@@ -192,7 +192,7 @@ export default function SocietyInspection({ onBack }) {
       supabase
         .from('society_service_categories')
         .select('service_type,rwa_name,rwa_mobile')
-        .in('service_type', ['CAMERA_AMC', 'LED_AMC']),
+        .in('service_type', ['CAMERA_AMC', 'LED_AMC', 'STREET_LIGHT']),
       supabase
         .from('society_inspection_settings')
         .select('supervisor_contact_name,supervisor_contact_mobile')
@@ -844,13 +844,30 @@ RWA Pocket-A`
       .update(payload)
       .eq('id', inspection.id)
 
-    setSavingComplaint(null)
-
     if (error) {
+      setSavingComplaint(null)
       setBoardMessage(error.message)
       return
     }
 
+    if (status === 'SENT') {
+      const latestNotification = board.streetNotifications.find(
+        (item) =>
+          Number(item.inspection_id) === Number(inspection.id)
+      )
+
+      if (latestNotification?.id) {
+        await supabase
+          .from('street_light_notifications')
+          .update({
+            delivery_status: 'SENT',
+            sent_at: now,
+          })
+          .eq('id', latestNotification.id)
+      }
+    }
+
+    setSavingComplaint(null)
     await loadBoard()
   }
 
@@ -1500,7 +1517,9 @@ RWA Pocket-A`
                                   )
                                 }
                               >
-                                ↗ {inspection.complaint_status === 'NOT_REQUIRED'
+                                ↗ {['NOT_REQUIRED', 'PENDING'].includes(
+                                  inspection.complaint_status
+                                )
                                   ? 'Send WhatsApp'
                                   : 'Resend WhatsApp'}
                               </button>
