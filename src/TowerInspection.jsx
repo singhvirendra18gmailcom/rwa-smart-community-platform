@@ -850,12 +850,13 @@ function InspectionLocationRow({
   )
 }
 
-function TowerInspection({ onBack, onContinue }) {
+function TowerInspection({ onBack, onContinue, initialLocation }) {
   const today =
     useMemo(() => getIndiaDate(), [])
 
   const scannerRef = useRef(null)
   const scanLockedRef = useRef(false)
+  const initialLocationOpenedRef = useRef(false)
 
   const [screen, setScreen] = useState('list')
 
@@ -1088,6 +1089,44 @@ function TowerInspection({ onBack, onContinue }) {
       window.clearTimeout(timer)
     }
   }, [scannerActive, screen])
+
+  useEffect(() => {
+    if (
+      loading ||
+      initialLocationOpenedRef.current ||
+      !initialLocation
+    ) {
+      return
+    }
+
+    const rawLocation =
+      initialLocation.type === 'park'
+        ? parks.find(
+            (park) =>
+              String(park.id) ===
+              String(initialLocation.id)
+          )
+        : towers.find(
+            (tower) =>
+              String(tower.id) ===
+              String(initialLocation.id)
+          )
+
+    if (!rawLocation) return
+
+    initialLocationOpenedRef.current = true
+
+    startLocationScan(
+      initialLocation.type === 'park'
+        ? mapPark(rawLocation)
+        : mapTower(rawLocation)
+    )
+  }, [
+    loading,
+    initialLocation,
+    towers,
+    parks,
+  ])
 
   useEffect(() => {
     return () => {
@@ -2629,87 +2668,6 @@ function TowerInspection({ onBack, onContinue }) {
               </strong>
               <small>Issues</small>
             </div>
-
-          </div>
-
-          <div className="society-garbage-card">
-
-            <div className="society-garbage-heading">
-              <div>
-                <strong>
-                  🗑️ Garbage Disposal from Society
-                </strong>
-
-                <small>
-                  Daily society-wide status
-                </small>
-              </div>
-
-              {societySaved && (
-                <span>
-                  ✅ Saved
-                </span>
-              )}
-            </div>
-
-            <div className="society-garbage-options">
-
-              <button
-                type="button"
-                className={`society-garbage-option good ${
-                  societyGarbageDisposed === true
-                    ? 'selected'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSocietyGarbageDisposed(
-                    true
-                  )
-
-                  setSocietySaved(false)
-                }}
-              >
-                ✅ Yes
-              </button>
-
-              <button
-                type="button"
-                className={`society-garbage-option bad ${
-                  societyGarbageDisposed === false
-                    ? 'selected'
-                    : ''
-                }`}
-                onClick={() => {
-                  setSocietyGarbageDisposed(
-                    false
-                  )
-
-                  setSocietySaved(false)
-                }}
-              >
-                ❌ No
-              </button>
-
-            </div>
-
-            <button
-              type="button"
-              className="society-garbage-save"
-              disabled={
-                societySaving ||
-                societyGarbageDisposed === null ||
-                societySaved
-              }
-              onClick={
-                saveSocietyGarbage
-              }
-            >
-              {societySaving
-                ? 'Saving...'
-                : societySaved
-                ? '✅ Saved'
-                : 'Save Garbage Status'}
-            </button>
 
           </div>
 
