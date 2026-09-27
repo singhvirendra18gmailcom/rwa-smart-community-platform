@@ -58,8 +58,8 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
 
     const messages = {
       INSERT: complaint?.is_urgent
-        ? `तत्काल शिकायत प्राप्त हुई है। ${details}। कृपया कंप्लेंट सेंटर तुरंत देखें।`
-        : `नई शिकायत प्राप्त हुई है। ${details}। कृपया कंप्लेंट सेंटर देखें।`,
+        ? `तत्काल शिकायत प्राप्त हुई है। ${details}।`
+        : `नई शिकायत प्राप्त हुई है। ${details}।`,
       IN_PROGRESS: `${details}। शिकायत पर काम शुरू हो गया है।`,
       WORK_DONE: `${details}। शिकायत का काम पूरा हो गया है। निवासी की पुष्टि की प्रतीक्षा है।`,
       CLOSED: `${details}। शिकायत सफलतापूर्वक बंद हो गई है।`,
@@ -89,11 +89,14 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
 
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
-      const speech = new SpeechSynthesisUtterance(message)
-      speech.lang = 'hi-IN'
-      speech.rate = 0.92
-      speech.volume = 1
-      window.speechSynthesis.speak(speech)
+      const repeatCount = event === 'INSERT' ? 3 : 1
+      for (let i = 0; i < repeatCount; i += 1) {
+        const speech = new SpeechSynthesisUtterance(message)
+        speech.lang = 'hi-IN'
+        speech.rate = 0.92
+        speech.volume = 1
+        window.speechSynthesis.speak(speech)
+      }
     }
   }
 
