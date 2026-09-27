@@ -108,6 +108,9 @@ export default {
 
         const session = await getSession(env, from)
         if (!session) {
+          const handled = await handleResidentWorkDoneReply(env, from, originalText)
+          if (handled) return webhookResponse()
+
           await sendWhatsAppMessage(env, from, 'Please send *Hi* to register a complaint.\n\nशिकायत दर्ज करने के लिए *Hi* भेजें।\n\n— RWA Pocket-A')
           return webhookResponse()
         }
@@ -822,6 +825,83 @@ async function reopenComplaint(env, mobile, complaintNo) {
     : `Your complaint *${complaintNo}* has been reopened. 🔄\n\nThe Supervisor has been notified and the complaint will be attended again.\n\n*— RWA Pocket-A*`
 
   await sendWhatsAppMessage(env, mobile, message)
+}
+
+async function handleResidentWorkDoneReply(env, mobile, originalText) {
+  const text = String(originalText || '').trim()
+  const rows = await supabaseRequest(
+    env,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&status=in.(WORK_DONE,CLOSED)&order=updated_at.desc&limit=1&select=id,complaint_no,status,preferred_language,resident_rating`,
+    { method: 'GET' }
+  )
+
+  if (!Array.isArray(rows) || !rows.length) return false
+  const complaint = rows[0]
+  const lang = complaint.preferred_language || 'EN'
+  const now = new Date().toISOString()
+
+  if (complaint.status === 'WORK_DONE') {
+    if (!['1', '2'].includes(text)) {
+      await sendWhatsAppMessage(env, mobile, lang === 'HI'
+        ? `क्या आपकी शिकायत *${complaint.complaint_no}* हल हो गई है?\n\n*1.* हाँ\n*2.* नहीं`
+        : `Is complaint *${complaint.complaint_no}* resolved?\n\n*1.* Yes\n*2.* No`)
+      return true
+    }
+
+    if (text === '2') {
+      await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          status: 'REOPENED',
+          resident_confirmation: false,
+          resident_confirmed_at: now,
+          reopened_at: now,
+          updated_at: now
+        })
+      })
+      await sendWhatsAppMessage(env, mobile, lang === 'HI'
+        ? `आपकी शिकायत *${complaint.complaint_no}* दोबारा खोल दी गई है। 🔄\n\nप्लंबर को यह शिकायत फिर से दिखाई देगी।\n\n— RWA Pocket-A`
+        : `Your complaint *${complaint.complaint_no}* has been reopened. 🔄\n\nIt will appear again in the plumber's work queue.\n\n— RWA Pocket-A`)
+      return true
+    }
+
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        status: 'CLOSED',
+        resident_confirmation: true,
+        resident_confirmed_at: now,
+        closed_at: now,
+        updated_at: now
+      })
+    })
+    await sendWhatsAppMessage(env, mobile, lang === 'HI'
+      ? `धन्यवाद। शिकायत *${complaint.complaint_no}* बंद कर दी गई है। ✅\n\nकृपया किए गए कार्य को *1 से 5* तक रेट करें।\n*5 = उत्कृष्ट, 1 = खराब*\n\n— RWA Pocket-A`
+      : `Thank you. Complaint *${complaint.complaint_no}* is now closed. ✅\n\nPlease rate the work from *1 to 5*.\n*5 = Excellent, 1 = Poor*\n\n— RWA Pocket-A`)
+    return true
+  }
+
+  if (complaint.status === 'CLOSED' && complaint.resident_rating == null) {
+    if (!/^[1-5]$/.test(text)) {
+      await sendWhatsAppMessage(env, mobile, lang === 'HI'
+        ? 'कृपया *1 से 5* के बीच रेटिंग भेजें।'
+        : 'Please send a rating from *1 to 5*.')
+      return true
+    }
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ resident_rating: Number(text), rated_at: now, updated_at: now })
+    })
+    await sendWhatsAppMessage(env, mobile, lang === 'HI'
+      ? `आपकी *${text}/5* रेटिंग के लिए धन्यवाद। ⭐\n\n— RWA Pocket-A`
+      : `Thank you for your *${text}/5* rating. ⭐\n\n— RWA Pocket-A`)
+    return true
+  }
+
+  return false
 }
 
 async function startComplaint(env, mobile) {
