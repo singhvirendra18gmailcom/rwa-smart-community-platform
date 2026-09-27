@@ -54,6 +54,7 @@ function App() {
   ] = useState(null)
 
   const [profileError, setProfileError] = useState('')
+  const [operationsRole, setOperationsRole] = useState(null)
 
   useEffect(() => {
     const initialiseAuth = async () => {
@@ -99,6 +100,7 @@ function App() {
     if (!session?.user?.id) {
       setRwbotProfile(null)
       setProfileCheckedForUser(null)
+      setOperationsRole(null)
       return
     }
 
@@ -153,6 +155,14 @@ function App() {
       }
 
       setRwbotProfile(data)
+
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, active')
+        .eq('auth_user_id', userId)
+        .maybeSingle()
+
+      setOperationsRole(appUser?.active === false ? null : (appUser?.role || null))
       setProfileCheckedForUser(userId)
     }
 
@@ -310,6 +320,15 @@ function App() {
     )
   }
 
+  if (operationsRole === 'PLUMBER') {
+    return (
+      <ComplaintLiveDisplay
+        workerMode
+        onBack={handleLogout}
+      />
+    )
+  }
+
   /*
    * ======================================================
    * EXISTING SUPERVISOR APP
@@ -345,6 +364,15 @@ function App() {
         onBack={() =>
           setScreen('dashboard')
         }
+      />
+    )
+  }
+
+  if (screen === 'plumber-complaints') {
+    return (
+      <ComplaintLiveDisplay
+        workerMode
+        onBack={() => setScreen('dashboard')}
       />
     )
   }
@@ -533,6 +561,22 @@ function App() {
           <div className="feature-text">
             <h3>Live Complaint Display</h3>
             <p>See new complaints live and acknowledge them quickly</p>
+          </div>
+          <ArrowRight size={20} />
+        </button>
+
+        <button
+          className="feature-card feature-patrol"
+          onClick={() =>
+            setScreen('plumber-complaints')
+          }
+        >
+          <div className="feature-icon feature-icon-purple">
+            <MessageSquareWarning size={27} strokeWidth={1.8} />
+          </div>
+          <div className="feature-text">
+            <h3>Plumber Complaints</h3>
+            <p>Start plumbing work with resident OTP and mark it done</p>
           </div>
           <ArrowRight size={20} />
         </button>

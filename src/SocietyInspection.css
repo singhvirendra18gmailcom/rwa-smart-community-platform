@@ -1565,3 +1565,22 @@
     min-width: 390px;
   }
 }
+
+
+/* Resident complaint section in daily report */
+.complaint-report-summary{display:flex;flex-wrap:wrap;gap:7px 12px;padding:9px 0 12px;font-size:12px}
+.complaint-report-summary strong{color:#173f67}
+.complaint-report-summary span{color:#667085}
+.complaint-report-group{margin-top:12px}
+.complaint-report-group h3{margin:0 0 6px;font-size:14px;color:#173f67}
+.complaint-report-table{border:1px solid #e4e7ec;border-radius:9px;overflow:hidden}
+.complaint-report-row{display:grid;grid-template-columns:.8fr 1fr 1fr .65fr;gap:5px;align-items:center;padding:7px 8px;border-top:1px solid #eef1f5;font-size:11px}
+.complaint-report-row:first-child{border-top:0}
+.complaint-report-group:last-of-type .complaint-report-row{grid-template-columns:.75fr 1.1fr 1fr 1fr .65fr}
+.complaint-report-head{background:#f5f7fa;font-size:9px;font-weight:700;text-transform:uppercase;color:#667085}
+.complaint-report-row span,.complaint-report-row strong{min-width:0;overflow-wrap:anywhere}
+@media(max-width:420px){
+ .complaint-report-row{padding:6px 5px;font-size:9px;gap:3px}
+ .complaint-report-head{font-size:8px}
+ .complaint-report-summary{font-size:10px;gap:5px 8px}
+}
