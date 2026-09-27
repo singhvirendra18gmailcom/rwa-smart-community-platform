@@ -144,10 +144,10 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
             <div><BellRing size={18}/><strong>{statusCounts.waiting}</strong><span>Waiting</span></div>
           ) : (
             <div className="live-status-summary">
-              <span><strong>{statusCounts.waiting}</strong> Waiting</span>
-              <span><strong>{statusCounts.inProgress}</strong> In Progress</span>
-              <span><strong>{statusCounts.workDone}</strong> Work Done</span>
-              <span><strong>{statusCounts.closed}</strong> Closed</span>
+              <span className="summary-waiting"><strong>{statusCounts.waiting}</strong><small>Waiting</small></span>
+              <span className="summary-progress"><strong>{statusCounts.inProgress}</strong><small>In Progress</small></span>
+              <span className="summary-workdone"><strong>{statusCounts.workDone}</strong><small>Work Done</small></span>
+              <span className="summary-closed"><strong>{statusCounts.closed}</strong><small>Closed</small></span>
             </div>
           )}
           {!workerMode && <button onClick={onOpenComplaints}>Dashboard →</button>}
@@ -223,7 +223,14 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                         </button>
                       )}
                       {!((Number(c.category_id) !== 1) && ['OPEN', 'REOPENED'].includes(c.status)) && (
-                        <span className="live-current-status">{c.status === 'OPEN' ? 'WAITING' : c.status.replaceAll('_', ' ')}</span>
+                        <span className={`live-current-status status-${c.status.toLowerCase().replaceAll('_', '-')}`}>
+                          {c.status === 'OPEN' ? '● WAITING' :
+                           c.status === 'CLOSED' ? '✓ CLOSED' :
+                           c.status === 'IN_PROGRESS' ? '● IN PROGRESS' :
+                           c.status === 'WORK_DONE' ? '✓ WORK DONE' :
+                           c.status === 'REOPENED' ? '● REOPENED' :
+                           c.status.replaceAll('_', ' ')}
+                        </span>
                       )}
                     </>
                   )}
