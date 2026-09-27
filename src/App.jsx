@@ -580,40 +580,7 @@ function App() {
           </div>
           <ArrowRight size={20} />
         </button>
-
-        <button
-          className="feature-card feature-patrol"
-          onClick={() =>
-            setScreen('complaints')
-          }
-        >
-
-          <div className="feature-icon feature-icon-purple">
-
-            <MessageSquareWarning
-              size={27}
-              strokeWidth={1.8}
-            />
-
-          </div>
-
-          <div className="feature-text">
-
-            <h3>
-              Complaints
-            </h3>
-
-            <p>
-              View and acknowledge resident complaints
-            </p>
-
-          </div>
-
-          <ArrowRight size={20} />
-
-        </button>
-
-      </main>
+</main>
 
       <footer className="app-footer">
 
