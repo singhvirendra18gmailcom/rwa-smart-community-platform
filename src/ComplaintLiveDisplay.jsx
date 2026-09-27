@@ -41,14 +41,29 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   const playComplaintAlert = (event, complaint) => {
     if (workerMode || typeof window === 'undefined') return
 
+    const categoryKey = complaint?.service_categories?.name
+    const category = LABELS[categoryKey] || ({
+      1: 'प्लंबर',
+      2: 'इलेक्ट्रीशियन',
+      3: 'सीवरेज',
+      4: 'कैमरा रिकॉर्डिंग',
+      5: 'हॉर्टिकल्चर',
+      6: 'स्ट्रीट लाइट',
+      7: 'हाउसकीपिंग',
+      8: 'अन्य'
+    })[Number(complaint?.category_id)] || 'अन्य'
+
+    const location = complaint?.flat_no || complaint?.location_text || 'कॉमन एरिया'
+    const details = `${location}, ${category}`
+
     const messages = {
       INSERT: complaint?.is_urgent
-        ? 'तत्काल शिकायत प्राप्त हुई है। कृपया कंप्लेंट सेंटर तुरंत देखें।'
-        : 'नई शिकायत प्राप्त हुई है। कृपया कंप्लेंट सेंटर देखें।',
-      IN_PROGRESS: 'शिकायत पर काम शुरू हो गया है।',
-      WORK_DONE: 'शिकायत का काम पूरा हो गया है। निवासी की पुष्टि की प्रतीक्षा है।',
-      CLOSED: 'शिकायत सफलतापूर्वक बंद हो गई है।',
-      REOPENED: 'निवासी ने शिकायत दोबारा खोली है।'
+        ? `तत्काल शिकायत प्राप्त हुई है। ${details}। कृपया कंप्लेंट सेंटर तुरंत देखें।`
+        : `नई शिकायत प्राप्त हुई है। ${details}। कृपया कंप्लेंट सेंटर देखें।`,
+      IN_PROGRESS: `${details}। शिकायत पर काम शुरू हो गया है।`,
+      WORK_DONE: `${details}। शिकायत का काम पूरा हो गया है। निवासी की पुष्टि की प्रतीक्षा है।`,
+      CLOSED: `${details}। शिकायत सफलतापूर्वक बंद हो गई है।`,
+      REOPENED: `${details}। निवासी ने शिकायत दोबारा खोली है।`
     }
 
     const message = event === 'INSERT' ? messages.INSERT : messages[complaint?.status]
