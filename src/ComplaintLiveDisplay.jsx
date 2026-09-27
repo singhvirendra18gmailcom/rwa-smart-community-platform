@@ -89,7 +89,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     }
   }
 
-  const workerAction = async (complaint, action, enteredOtp = null) => {
+  const complaintAction = async (complaint, action, enteredOtp = null) => {
     try {
       setWorkingId(complaint.id)
       setError('')
@@ -201,7 +201,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                               onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                               placeholder="4-digit OTP"
                             />
-                            <button disabled={workingId === c.id || otp.length !== 4} onClick={() => workerAction(c, 'start', otp)}>
+                            <button disabled={workingId === c.id || otp.length !== 4} onClick={() => complaintAction(c, 'start', otp)}>
                               VERIFY & START
                             </button>
                           </div>
@@ -210,13 +210,22 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                         )
                       )}
                       {c.status === 'IN_PROGRESS' && (
-                        <button disabled={workingId === c.id} onClick={() => workerAction(c, 'done')}>
+                        <button disabled={workingId === c.id} onClick={() => complaintAction(c, 'done')}>
                           {workingId === c.id ? 'Saving...' : 'DONE'}
                         </button>
                       )}
                     </>
                   ) : (
-                    <span className="live-current-status">{c.status === 'OPEN' ? 'WAITING' : c.status.replaceAll('_', ' ')}</span>
+                    <>
+                      {Number(c.category_id) !== 1 && ['OPEN', 'REOPENED'].includes(c.status) && (
+                        <button disabled={workingId === c.id} onClick={() => complaintAction(c, 'supervisor-done')}>
+                          {workingId === c.id ? 'Saving...' : 'WORK DONE'}
+                        </button>
+                      )}
+                      {!((Number(c.category_id) !== 1) && ['OPEN', 'REOPENED'].includes(c.status)) && (
+                        <span className="live-current-status">{c.status === 'OPEN' ? 'WAITING' : c.status.replaceAll('_', ' ')}</span>
+                      )}
+                    </>
                   )}
                 </article>
               )
