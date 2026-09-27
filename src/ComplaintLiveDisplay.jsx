@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, BellRing, Check, Clock, RefreshCw } from 'lucide-react'
 import { supabase } from './supabase'
 import './ComplaintLiveDisplay.css'
@@ -23,6 +23,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   const [workingId, setWorkingId] = useState(null)
   const [otpFor, setOtpFor] = useState(null)
   const [otp, setOtp] = useState('')
+  const knownComplaintsRef = useRef(new Map())
 
   const load = async () => {
     setError('')
@@ -37,14 +38,67 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     setLoading(false)
   }
 
+  const playComplaintAlert = (event, complaint) => {
+    if (workerMode || typeof window === 'undefined') return
+
+    const messages = {
+      INSERT: complaint?.is_urgent
+        ? 'Urgent complaint received. Please check the Complaint Center immediately.'
+        : 'New complaint received. Please check the Complaint Center.',
+      IN_PROGRESS: 'Complaint work has started.',
+      WORK_DONE: 'Complaint work completed. Waiting for resident confirmation.',
+      CLOSED: 'Complaint closed successfully.',
+      REOPENED: 'Complaint reopened by resident.'
+    }
+
+    const message = event === 'INSERT' ? messages.INSERT : messages[complaint?.status]
+    if (!message) return
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (AudioContext) {
+        const ctx = new AudioContext()
+        const oscillator = ctx.createOscillator()
+        const gain = ctx.createGain()
+        oscillator.connect(gain)
+        gain.connect(ctx.destination)
+        oscillator.frequency.value = complaint?.status === 'REOPENED' || complaint?.is_urgent ? 880 : 660
+        gain.gain.setValueAtTime(0.22, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65)
+        oscillator.start()
+        oscillator.stop(ctx.currentTime + 0.65)
+      }
+    } catch (e) {
+      console.warn('Complaint alert tone unavailable:', e)
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+      const speech = new SpeechSynthesisUtterance(message)
+      speech.rate = 0.95
+      speech.volume = 1
+      window.speechSynthesis.speak(speech)
+    }
+  }
+
   useEffect(() => {
     load()
     const channel = supabase
       .channel('complaint-live-display')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          playComplaintAlert('INSERT', payload.new)
+        } else if (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status) {
+          playComplaintAlert('UPDATE', payload.new)
+        }
+        load()
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    }
   }, [])
 
   const statusCounts = useMemo(() => ({
