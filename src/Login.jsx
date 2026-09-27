@@ -10,7 +10,8 @@ import {
   EyeOff,
   Bot,
   Home,
-  UserRound
+  UserRound,
+  Wrench
 } from 'lucide-react'
 
 import { supabase } from './supabase'
@@ -50,8 +51,8 @@ function Login() {
     useState('')
 
 
-  const isRwbot =
-    loginMode === 'rwbot'
+  const isRwbot = loginMode === 'rwbot'
+  const isWorker = loginMode === 'worker'
 
 
   const selectMode = (mode) => {
@@ -85,7 +86,7 @@ function Login() {
     setLoading(true)
     setError('')
 
-    let loginEmail = email
+    let loginEmail = isWorker ? 'plumber@rwapocketa.local' : email
 
 
     // =====================================================
@@ -327,6 +328,15 @@ function Login() {
 
             <button
               type="button"
+              className={isWorker ? 'rwa-login-mode active' : 'rwa-login-mode'}
+              onClick={() => selectMode('worker')}
+            >
+              <Wrench size={18} />
+              Worker
+            </button>
+
+            <button
+              type="button"
               className={
                 isRwbot
                   ? 'rwa-login-mode active'
@@ -442,6 +452,16 @@ function Login() {
                 </div>
 
 
+              </div>
+
+            ) : isWorker ? (
+
+              <div className="rwa-login-field">
+                <label>Worker</label>
+                <div className="rwa-login-input">
+                  <div className="rwa-login-input-icon"><Wrench size={22} /></div>
+                  <input type="text" value="Plumber" readOnly />
+                </div>
               </div>
 
             ) : (
@@ -589,7 +609,9 @@ function Login() {
                 ? 'Signing in...'
                 : isRwbot
                   ? 'Enter RWBOT'
-                  : 'Sign In'
+                  : isWorker
+                    ? 'Plumber Sign In'
+                    : 'Sign In'
               }
 
 
