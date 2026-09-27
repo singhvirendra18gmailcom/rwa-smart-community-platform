@@ -180,7 +180,9 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                     {c.is_urgent && <span className="urgent-badge">URGENT</span>}
                     
                   </div>
-                  <p>{c.description || c.issue_type?.replaceAll('_', ' ') || ''}</p>
+                  {!['WORK_DONE', 'CLOSED'].includes(c.status) && (
+                    <p>{c.description || c.issue_type?.replaceAll('_', ' ') || ''}</p>
+                  )}
                   {!workerMode && ['WORK_DONE', 'CLOSED'].includes(c.status) && (
                     <div className="live-work-result">
                       <span><strong>Time Taken:</strong> {formatDuration(c.work_started_at, c.work_done_at)}</span>
