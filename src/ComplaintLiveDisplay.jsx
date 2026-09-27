@@ -43,12 +43,12 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
 
     const messages = {
       INSERT: complaint?.is_urgent
-        ? 'Urgent complaint received. Please check the Complaint Center immediately.'
-        : 'New complaint received. Please check the Complaint Center.',
-      IN_PROGRESS: 'Complaint work has started.',
-      WORK_DONE: 'Complaint work completed. Waiting for resident confirmation.',
-      CLOSED: 'Complaint closed successfully.',
-      REOPENED: 'Complaint reopened by resident.'
+        ? 'तत्काल शिकायत प्राप्त हुई है। कृपया कंप्लेंट सेंटर तुरंत देखें।'
+        : 'नई शिकायत प्राप्त हुई है। कृपया कंप्लेंट सेंटर देखें।',
+      IN_PROGRESS: 'शिकायत पर काम शुरू हो गया है।',
+      WORK_DONE: 'शिकायत का काम पूरा हो गया है। निवासी की पुष्टि की प्रतीक्षा है।',
+      CLOSED: 'शिकायत सफलतापूर्वक बंद हो गई है।',
+      REOPENED: 'निवासी ने शिकायत दोबारा खोली है।'
     }
 
     const message = event === 'INSERT' ? messages.INSERT : messages[complaint?.status]
@@ -75,7 +75,8 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
       const speech = new SpeechSynthesisUtterance(message)
-      speech.rate = 0.95
+      speech.lang = 'hi-IN'
+      speech.rate = 0.92
       speech.volume = 1
       window.speechSynthesis.speak(speech)
     }
