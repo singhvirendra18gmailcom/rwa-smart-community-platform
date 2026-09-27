@@ -43,6 +43,14 @@ export default {
       return handleSupervisorAction(request, env, 'RESOLVED')
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/complaints/start') {
+      return handleWorkerStart(request, env)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/complaints/done') {
+      return handleWorkerDone(request, env)
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/street-lights/notify-whatsapp') {
       return handleStreetLightWhatsapp(request, env)
     }
@@ -587,6 +595,82 @@ async function handleStreetLightSms(request, env) {
       { ok: false, error: 'Unable to process street-light SMS complaint.' },
       500
     )
+  }
+}
+
+async function handleWorkerStart(request, env) {
+  try {
+    const user = await getAuthenticatedUser(request, env)
+    if (!user?.id) return apiResponse({ ok: false, error: 'Authentication required.' }, 401)
+
+    const body = await request.json()
+    const complaintId = Number(body?.complaint_id)
+    const otp = String(body?.otp || '').trim()
+    if (!Number.isInteger(complaintId) || complaintId <= 0 || !/^\d{4}$/.test(otp)) {
+      return apiResponse({ ok: false, error: 'Enter the 4-digit OTP provided by the resident.' }, 400)
+    }
+
+    const rows = await supabaseRequest(env,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,status,category_id,work_start_otp,otp_attempts`,
+      { method: 'GET' })
+    if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
+    const complaint = rows[0]
+    if (!['OPEN', 'REOPENED'].includes(String(complaint.status || '').toUpperCase())) {
+      return apiResponse({ ok: false, error: 'This complaint cannot be started in its current status.' }, 409)
+    }
+    if (Number(complaint.category_id) !== 1) {
+      return apiResponse({ ok: false, error: 'This worker screen can start Plumbing complaints only.' }, 403)
+    }
+    const attempts = Number(complaint.otp_attempts || 0)
+    if (attempts >= 5) return apiResponse({ ok: false, error: 'OTP locked after too many incorrect attempts. Contact the supervisor.' }, 423)
+    if (otp !== String(complaint.work_start_otp || '')) {
+      await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ otp_attempts: attempts + 1, updated_at: new Date().toISOString() })
+      })
+      return apiResponse({ ok: false, error: 'Incorrect OTP.' }, 400)
+    }
+
+    const now = new Date().toISOString()
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'IN_PROGRESS', otp_verified_at: now, work_started_at: now, work_started_by: user.id, updated_at: now })
+    })
+    return apiResponse({ ok: true, status: 'IN_PROGRESS', work_started_at: now }, 200)
+  } catch (error) {
+    console.error('Worker start error:', error)
+    return apiResponse({ ok: false, error: 'Unable to start complaint.' }, 500)
+  }
+}
+
+async function handleWorkerDone(request, env) {
+  try {
+    const user = await getAuthenticatedUser(request, env)
+    if (!user?.id) return apiResponse({ ok: false, error: 'Authentication required.' }, 401)
+    const body = await request.json()
+    const complaintId = Number(body?.complaint_id)
+    const rows = await supabaseRequest(env,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,category_id,preferred_language`,
+      { method: 'GET' })
+    if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
+    const complaint = rows[0]
+    if (Number(complaint.category_id) !== 1) return apiResponse({ ok: false, error: 'Plumbing complaints only.' }, 403)
+    if (String(complaint.status || '').toUpperCase() !== 'IN_PROGRESS') return apiResponse({ ok: false, error: 'Complaint is not in progress.' }, 409)
+
+    const now = new Date().toISOString()
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'WORK_DONE', work_done_at: now, updated_at: now })
+    })
+    const lang = complaint.preferred_language || 'EN'
+    const message = lang === 'HI'
+      ? `शिकायत *${complaint.complaint_no}* पर कार्य पूरा बताया गया है। ✅\n\nक्या आपकी समस्या हल हो गई है?\n\n*1.* हाँ\n*2.* नहीं\n\n— RWA Pocket-A`
+      : `Work has been marked done for complaint *${complaint.complaint_no}*. ✅\n\nIs your problem resolved?\n\n*1.* Yes\n*2.* No\n\n— RWA Pocket-A`
+    await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
+    return apiResponse({ ok: true, status: 'WORK_DONE', whatsapp_sent: true }, 200)
+  } catch (error) {
+    console.error('Worker done error:', error)
+    return apiResponse({ ok: false, error: 'Unable to complete complaint.' }, 500)
   }
 }
 
