@@ -47,6 +47,13 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  const statusCounts = useMemo(() => ({
+    waiting: complaints.filter(c => ['OPEN', 'REOPENED'].includes(c.status)).length,
+    inProgress: complaints.filter(c => c.status === 'IN_PROGRESS').length,
+    workDone: complaints.filter(c => c.status === 'WORK_DONE').length,
+    closed: complaints.filter(c => c.status === 'CLOSED').length
+  }), [complaints])
+
   const ordered = useMemo(() => [...complaints].sort((a, b) => {
     const priority = x => x.is_urgent ? 0 : x.elderly_citizen_70_plus ? 1 : 2
     return priority(a) - priority(b) || new Date(a.created_at) - new Date(b.created_at)
@@ -133,13 +140,22 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
 
       <main className="live-content">
         <div className="live-summary">
-          <div><BellRing size={18}/><strong>{ordered.length}</strong><span>Waiting</span></div>
+          {workerMode ? (
+            <div><BellRing size={18}/><strong>{statusCounts.waiting}</strong><span>Waiting</span></div>
+          ) : (
+            <div className="live-status-summary">
+              <span><strong>{statusCounts.waiting}</strong> Waiting</span>
+              <span><strong>{statusCounts.inProgress}</strong> In Progress</span>
+              <span><strong>{statusCounts.workDone}</strong> Work Done</span>
+              <span><strong>{statusCounts.closed}</strong> Closed</span>
+            </div>
+          )}
           {!workerMode && <button onClick={onOpenComplaints}>Dashboard →</button>}
         </div>
 
         {error && <div className="live-error">{error}</div>}
         {loading ? <div className="live-empty">Loading complaints...</div> :
-          ordered.length === 0 ? <div className="live-empty"><Check size={32}/><strong>All caught up</strong><span>No new complaints need acknowledgement.</span></div> :
+          ordered.length === 0 ? <div className="live-empty"><Check size={32}/><strong>All caught up</strong><span>{workerMode ? 'No plumbing complaints are waiting for work.' : 'No active complaints to display.'}</span></div> :
           <div className="live-grid">
             {ordered.map(c => {
               const category = c.service_categories?.name || 'OTHER'
