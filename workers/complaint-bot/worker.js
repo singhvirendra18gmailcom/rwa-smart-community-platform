@@ -963,19 +963,19 @@ function getCategoryById(id) { return CATEGORIES[id] || null }
 
 function flatNumberQuestion(lang, category) {
   return lang === 'HI'
-    ? `आपने *${category.hi}* चुना है।\n\nकृपया अपना *Flat Number* भेजें।\nउदाहरण: *36-D*`
+    ? `आपने *${category.hi}* चुना है।\n\nकृपया अपना *फ्लैट नंबर* भेजें।\nउदाहरण: *36-D*`
     : `You selected *${category.label}*.\n\nPlease enter your *Flat Number*.\nExample: *36-D*`
 }
 
 function locationQuestion(lang, category) {
   return lang === 'HI'
-    ? `आपने *${category?.hi || ''}* चुना है।\n\nकृपया समस्या का *स्थान* बताएं।\nउदाहरण: Near Tower 4, Park-1, Gate-2`
+    ? `आपने *${category?.hi || ''}* चुना है।\n\nकृपया समस्या का *स्थान* बताएं।\nउदाहरण: टावर 4 के पास, पार्क-1, गेट-2`
     : `You selected *${category?.label || ''}*.\n\nPlease enter the *location*.\nExample: Near Tower 4, Park-1, Gate-2`
 }
 
 function urgentQuestion(categoryId, lang) {
   return lang === 'HI'
-    ? 'शिकायत की प्राथमिकता चुनें:\n\n*1.* Normal\n*2.* Urgent'
+    ? 'शिकायत की प्राथमिकता चुनें:\n\n*1.* सामान्य\n*2.* अत्यावश्यक'
     : 'Select complaint priority:\n\n*1.* Normal\n*2.* Urgent'
 }
 
@@ -990,41 +990,41 @@ function defaultUrgency(categoryId) {
 
 function elderlyQuestion(lang) {
   return lang === 'HI'
-    ? 'क्या आप *70 वर्ष या उससे अधिक आयु के Elderly Citizen* हैं?\n\n*1.* No\n*2.* Yes'
+    ? 'क्या आपकी आयु *70 वर्ष या उससे अधिक* है?\n\n*1.* नहीं\n*2.* हाँ'
     : 'Are you an *Elderly Citizen (70 years or above)*?\n\n*1.* No\n*2.* Yes'
 }
 
 function addNoteQuestion(lang) {
   return lang === 'HI'
-    ? 'क्या आप समस्या के बारे में कोई *Note/Description* जोड़ना चाहते हैं?\n\n*1.* No\n*2.* Yes'
+    ? 'क्या आप समस्या के बारे में कोई *टिप्पणी/विवरण* जोड़ना चाहते हैं?\n\n*1.* नहीं\n*2.* हाँ'
     : 'Would you like to add any *note/description* about the problem?\n\n*1.* No\n*2.* Yes'
 }
 
 function descriptionQuestion(lang) {
   return lang === 'HI'
-    ? `कृपया संक्षिप्त विवरण भेजें। अधिकतम *${MAX_DESCRIPTION} characters*.`
+    ? `कृपया संक्षिप्त विवरण भेजें। अधिकतम *${MAX_DESCRIPTION} अक्षर*।`
     : `Please enter a short description. Maximum *${MAX_DESCRIPTION} characters*.`
 }
 
 function incidentDateTimeQuestion(lang) {
   return lang === 'HI'
-    ? 'कृपया Camera Recording के लिए अनुमानित *Date & Time* बताएं।\nउदाहरण: *20 Sep, around 8:30 PM*'
+    ? 'कृपया कैमरा रिकॉर्डिंग के लिए अनुमानित *दिनांक और समय* बताएं।\nउदाहरण: *20 सितम्बर, रात लगभग 8:30 बजे*'
     : 'Please enter the approximate *Date & Time* for the camera recording.\nExample: *20 Sep, around 8:30 PM*'
 }
 
 function issueTypeMenu(categoryId, lang) {
   if (categoryId === 7) {
     return lang === 'HI'
-      ? '*Housekeeping/Garbage समस्या चुनें:*\n\n*1.* Garbage Not Collected\n*2.* Common Area Cleaning\n*3.* Sweeping/Cleaning Issue\n*4.* Garbage Dumping\n*5.* Other'
+      ? '*हाउसकीपिंग/कचरा समस्या चुनें:*\n\n*1.* कचरा नहीं उठाया गया\n*2.* कॉमन एरिया की सफाई\n*3.* झाड़ू/सफाई की समस्या\n*4.* कचरा फेंकने की समस्या\n*5.* अन्य'
       : '*Select Housekeeping/Garbage issue:*\n\n*1.* Garbage Not Collected\n*2.* Common Area Cleaning\n*3.* Sweeping/Cleaning Issue\n*4.* Garbage Dumping\n*5.* Other'
   }
   if (categoryId === 5) {
     return lang === 'HI'
-      ? '*Horticulture समस्या चुनें:*\n\n*1.* Tree/Branch Cutting\n*2.* Grass/Plant Maintenance\n*3.* Watering Issue\n*4.* Fallen/Damaged Tree or Branch\n*5.* Other'
+      ? '*हॉर्टिकल्चर समस्या चुनें:*\n\n*1.* पेड़/शाखा की कटाई\n*2.* घास/पौधों का रखरखाव\n*3.* पानी देने की समस्या\n*4.* गिरा/क्षतिग्रस्त पेड़ या शाखा\n*5.* अन्य'
       : '*Select Horticulture issue:*\n\n*1.* Tree/Branch Cutting\n*2.* Grass/Plant Maintenance\n*3.* Watering Issue\n*4.* Fallen/Damaged Tree or Branch\n*5.* Other'
   }
   return lang === 'HI'
-    ? '*Street Light समस्या चुनें:*\n\n*1.* Light Not Working\n*2.* Light Blinking/Flickering\n*3.* Light ON During Daytime\n*4.* Pole/Wiring Issue\n*5.* Other'
+    ? '*स्ट्रीट लाइट समस्या चुनें:*\n\n*1.* लाइट काम नहीं कर रही\n*2.* लाइट झपक रही है\n*3.* दिन में लाइट चालू है\n*4.* पोल/वायरिंग की समस्या\n*5.* अन्य'
     : '*Select Street Light issue:*\n\n*1.* Light Not Working\n*2.* Light Blinking/Flickering\n*3.* Light ON During Daytime\n*4.* Pole/Wiring Issue\n*5.* Other'
 }
 
@@ -1037,28 +1037,48 @@ function getIssueType(categoryId, text) {
   return values[text] || null
 }
 
+function getIssueTypeLabel(categoryId, issueType, lang) {
+  if (lang !== 'HI') return String(issueType || '').replaceAll('_', ' ')
+  const labels = {
+    TREE_BRANCH_CUTTING: 'पेड़/शाखा की कटाई',
+    GRASS_PLANT_MAINTENANCE: 'घास/पौधों का रखरखाव',
+    WATERING_ISSUE: 'पानी देने की समस्या',
+    FALLEN_DAMAGED_TREE_BRANCH: 'गिरा/क्षतिग्रस्त पेड़ या शाखा',
+    GARBAGE_NOT_COLLECTED: 'कचरा नहीं उठाया गया',
+    COMMON_AREA_CLEANING: 'कॉमन एरिया की सफाई',
+    SWEEPING_CLEANING_ISSUE: 'झाड़ू/सफाई की समस्या',
+    GARBAGE_DUMPING: 'कचरा फेंकने की समस्या',
+    LIGHT_NOT_WORKING: 'लाइट काम नहीं कर रही',
+    LIGHT_FLICKERING: 'लाइट झपक रही है',
+    LIGHT_ON_DAYTIME: 'दिन में लाइट चालू है',
+    POLE_WIRING_ISSUE: 'पोल/वायरिंग की समस्या',
+    OTHER: 'अन्य'
+  }
+  return labels[issueType] || String(issueType || '').replaceAll('_', ' ')
+}
+
 async function sendConfirmation(env, mobile, session) {
   const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
   const rows = []
   rows.push(lang === 'HI' ? '*कृपया जानकारी जाँच लें:*' : '*Please review the complaint:*')
   rows.push('')
-  rows.push(`*Category:* ${lang === 'HI' ? c?.hi : c?.label}`)
-  if (session.flat_no) rows.push(`*Flat:* ${session.flat_no}`)
-  if (session.location_text) rows.push(`*Location:* ${session.location_text}`)
-  if (session.issue_type) rows.push(`*Issue:* ${session.issue_type.replaceAll('_', ' ')}`)
-  if (session.incident_datetime_text) rows.push(`*Date/Time:* ${session.incident_datetime_text}`)
-  if (session.description) rows.push(`*Note:* ${session.description}`)
-  if ([1,2,3,6].includes(Number(session.category_id))) rows.push(`*Urgent:* ${session.is_urgent ? 'Yes' : 'No'}`)
-  if ([1,2].includes(Number(session.category_id))) rows.push(`*Elderly Citizen 70+:* ${session.elderly_citizen_70_plus ? 'Yes' : 'No'}`)
-  rows.push(`*Priority:* ${getPriorityLabel(session)}`)
+  rows.push(`${lang === 'HI' ? '*श्रेणी:*' : '*Category:*'} ${lang === 'HI' ? c?.hi : c?.label}`)
+  if (session.flat_no) rows.push(`${lang === 'HI' ? '*फ्लैट:*' : '*Flat:*'} ${session.flat_no}`)
+  if (session.location_text) rows.push(`${lang === 'HI' ? '*स्थान:*' : '*Location:*'} ${session.location_text}`)
+  if (session.issue_type) rows.push(`${lang === 'HI' ? '*समस्या:*' : '*Issue:*'} ${getIssueTypeLabel(Number(session.category_id), session.issue_type, lang)}`)
+  if (session.incident_datetime_text) rows.push(`${lang === 'HI' ? '*दिनांक/समय:*' : '*Date/Time:*'} ${session.incident_datetime_text}`)
+  if (session.description) rows.push(`${lang === 'HI' ? '*विवरण:*' : '*Note:*'} ${session.description}`)
+  if ([1,2,3,6].includes(Number(session.category_id))) rows.push(`${lang === 'HI' ? '*अत्यावश्यक:*' : '*Urgent:*'} ${lang === 'HI' ? (session.is_urgent ? 'हाँ' : 'नहीं') : (session.is_urgent ? 'Yes' : 'No')}`)
+  if ([1,2].includes(Number(session.category_id))) rows.push(`${lang === 'HI' ? '*आयु 70 वर्ष या अधिक:*' : '*Elderly Citizen 70+:*'} ${lang === 'HI' ? (session.elderly_citizen_70_plus ? 'हाँ' : 'नहीं') : (session.elderly_citizen_70_plus ? 'Yes' : 'No')}`)
+  rows.push(`${lang === 'HI' ? '*प्राथमिकता:*' : '*Priority:*'} ${getPriorityLabel(session, lang)}`)
   rows.push('')
-  rows.push(lang === 'HI' ? '*1.* शिकायत दर्ज करें\n*2.* Cancel' : '*1.* Register Complaint\n*2.* Cancel')
+  rows.push(lang === 'HI' ? '*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : '*1.* Register Complaint\n*2.* Cancel')
   await sendWhatsAppMessage(env, mobile, rows.join('\n'))
 }
 
 function confirmChoiceMessage(lang) {
-  return lang === 'HI' ? 'कृपया चुनें:\n\n*1.* शिकायत दर्ज करें\n*2.* Cancel' : 'Please choose:\n\n*1.* Register Complaint\n*2.* Cancel'
+  return lang === 'HI' ? 'कृपया चुनें:\n\n*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : 'Please choose:\n\n*1.* Register Complaint\n*2.* Cancel'
 }
 
 async function createComplaint(env, mobile, session) {
@@ -1119,19 +1139,23 @@ function complaintCreatedMessage(complaint, session, complaintsAhead = 0) {
   const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
   const location = session.flat_no || session.location_text || ''
-  const priority = getPriorityLabel(session)
+  const priority = getPriorityLabel(session, lang)
   if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*Category:* ${c?.hi}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*आपसे पहले शिकायतें:* ${complaintsAhead}\n\nSupervisor द्वारा शिकायत प्राप्त करने के बाद आपको सूचित किया जाएगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*आपसे पहले शिकायतें:* ${complaintsAhead}\n\nसुपरवाइज़र द्वारा शिकायत स्वीकार करने के बाद आपको सूचित किया जाएगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
   }
   return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Complaints ahead of you:* ${complaintsAhead}\n\nYou will be notified after the Supervisor acknowledges the complaint.\n\nThank you.\n\n*— RWA Pocket-A*`
 }
 
-function getPriorityLabel(session) {
+function getPriorityLabel(session, lang = 'EN') {
+  if (lang === 'HI') {
+    if (session.is_urgent) return 'अत्यावश्यक'
+    if (session.elderly_citizen_70_plus) return '70 वर्ष या अधिक'
+    return 'सामान्य'
+  }
   if (session.is_urgent) return 'URGENT'
   if (session.elderly_citizen_70_plus) return 'ELDERLY 70+'
   return 'NORMAL'
 }
-
 async function createSession(env, mobile) {
   await supabaseRequest(env, '/rest/v1/whatsapp_complaint_sessions', {
     method: 'POST',
