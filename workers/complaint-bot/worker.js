@@ -51,6 +51,10 @@ export default {
       return handleWorkerDone(request, env)
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/complaints/supervisor-done') {
+      return handleSupervisorDone(request, env)
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/street-lights/notify-whatsapp') {
       return handleStreetLightWhatsapp(request, env)
     }
@@ -646,6 +650,48 @@ async function handleWorkerStart(request, env) {
   }
 }
 
+async function handleSupervisorDone(request, env) {
+  try {
+    const user = await getAuthenticatedUser(request, env)
+    if (!user?.id) return apiResponse({ ok: false, error: 'Authentication required.' }, 401)
+
+    const profiles = await supabaseRequest(env,
+      `/rest/v1/app_users?auth_user_id=eq.${user.id}&active=eq.true&select=role`,
+      { method: 'GET' })
+    if (!Array.isArray(profiles) || String(profiles[0]?.role || '').toUpperCase() !== 'SUPERVISOR') {
+      return apiResponse({ ok: false, error: 'Supervisor access required.' }, 403)
+    }
+
+    const body = await request.json()
+    const complaintId = Number(body?.complaint_id)
+    const rows = await supabaseRequest(env,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,category_id,preferred_language`,
+      { method: 'GET' })
+    if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
+    const complaint = rows[0]
+    if (Number(complaint.category_id) === 1) return apiResponse({ ok: false, error: 'Plumber complaints are completed by the plumber workflow.' }, 409)
+    if (!['OPEN', 'REOPENED'].includes(String(complaint.status || '').toUpperCase())) {
+      return apiResponse({ ok: false, error: 'Complaint cannot be marked done in its current status.' }, 409)
+    }
+
+    const now = new Date().toISOString()
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'WORK_DONE', work_done_at: now, updated_at: now })
+    })
+
+    const lang = complaint.preferred_language || 'EN'
+    const message = lang === 'HI'
+      ? `शिकायत *${complaint.complaint_no}* पर कार्य पूरा बताया गया है। ✅\n\nक्या आपकी समस्या हल हो गई है?\n\n*1.* हाँ\n*2.* नहीं\n\n— RWA Pocket-A`
+      : `Work has been marked done for complaint *${complaint.complaint_no}*. ✅\n\nIs your problem resolved?\n\n*1.* Yes\n*2.* No\n\n— RWA Pocket-A`
+    await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
+    return apiResponse({ ok: true, status: 'WORK_DONE', whatsapp_sent: true }, 200)
+  } catch (error) {
+    console.error('Supervisor done error:', error)
+    return apiResponse({ ok: false, error: 'Unable to mark complaint work done.' }, 500)
+  }
+}
+
 async function handleWorkerDone(request, env) {
   try {
     const user = await getAuthenticatedUser(request, env)
@@ -1225,8 +1271,8 @@ async function createComplaint(env, mobile, session) {
     urgency_code: session.urgency_code || null,
     urgency_reason: session.urgency_reason || null,
     elderly_citizen_70_plus: false,
-    work_start_otp: generateWorkStartOtp(),
-    otp_generated_at: now,
+    work_start_otp: Number(session.category_id) === 1 ? generateWorkStartOtp() : null,
+    otp_generated_at: Number(session.category_id) === 1 ? now : null,
     location_text: session.location_text || null,
     issue_type: session.issue_type || null,
     incident_datetime_text: session.incident_datetime_text || null
@@ -1272,10 +1318,18 @@ function complaintCreatedMessage(complaint, session, complaintsAhead = 0) {
   const c = getCategoryById(Number(session.category_id))
   const location = session.flat_no || session.location_text || ''
   const priority = getPriorityLabel(session, lang)
+  const isPlumber = Number(session.category_id) === 1
+  const otpHi = isPlumber
+    ? `\n*कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\n\nप्लंबर के आपके पास पहुँचने पर ही यह OTP साझा करें। OTP सत्यापित होने के बाद कार्य प्रारंभ होगा।`
+    : ''
+  const otpEn = isPlumber
+    ? `\n*Work Start OTP:* *${complaint.work_start_otp}*\n\nShare this OTP only when the plumber reaches you. Work will start after OTP verification.`
+    : ''
+
   if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*कतार में आपका क्रम:* ${complaintsAhead + 1}\n*कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\n\nकर्मचारी के आपके पास पहुँचने पर ही यह OTP साझा करें। OTP सत्यापित होने के बाद कार्य प्रारंभ होगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*कतार में आपका क्रम:* ${complaintsAhead + 1}${otpHi}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
   }
-  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Your sequence in queue:* ${complaintsAhead + 1}\n*Work Start OTP:* *${complaint.work_start_otp}*\n\nShare this OTP only when the worker reaches you. Work will start after OTP verification.\n\nThank you.\n\n*— RWA Pocket-A*`
+  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Your sequence in queue:* ${complaintsAhead + 1}${otpEn}\n\nThank you.\n\n*— RWA Pocket-A*`
 }
 
 function getPriorityLabel(session, lang = 'EN') {
