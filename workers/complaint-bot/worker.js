@@ -839,9 +839,11 @@ async function processConversation(env, mobile, originalText, session) {
     }
     const next = categoryId === 6 ? 'URGENT' : 'CONFIRM'
     await updateSession(env, mobile, { issue_type: issue, step: next })
-    await sendWhatsAppMessage(env, mobile,
-      next === 'URGENT' ? urgentQuestion(categoryId, lang) : (await getSession(env, mobile), ''))
-    if (next === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
+    if (next === 'URGENT') {
+      await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
+    } else {
+      await sendConfirmation(env, mobile, await getSession(env, mobile))
+    }
     return
   }
 
@@ -860,8 +862,7 @@ async function processConversation(env, mobile, originalText, session) {
         urgency_reason: urgent.reason,
         step: next
       })
-      await sendWhatsAppMessage(env, mobile,
-        next === 'CONFIRM' ? (await sendConfirmation(env, mobile, await getSession(env, mobile)), '') : ''
+      await sendConfirmation(env, mobile, await getSession(env, mobile))
       return
     }
 
@@ -869,8 +870,7 @@ async function processConversation(env, mobile, originalText, session) {
     await updateSession(env, mobile, {
       is_urgent: false, urgency_code: null, urgency_reason: null, step: next
     })
-    await sendWhatsAppMessage(env, mobile,
-      next === 'CONFIRM' ? (await sendConfirmation(env, mobile, await getSession(env, mobile)), '') : ''
+    await sendConfirmation(env, mobile, await getSession(env, mobile))
     return
   }
 
