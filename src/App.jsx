@@ -54,6 +54,7 @@ function App() {
   ] = useState(null)
 
   const [profileError, setProfileError] = useState('')
+  const [operationsRole, setOperationsRole] = useState(null)
 
   useEffect(() => {
     const initialiseAuth = async () => {
@@ -99,6 +100,7 @@ function App() {
     if (!session?.user?.id) {
       setRwbotProfile(null)
       setProfileCheckedForUser(null)
+      setOperationsRole(null)
       return
     }
 
@@ -153,6 +155,14 @@ function App() {
       }
 
       setRwbotProfile(data)
+
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, active')
+        .eq('auth_user_id', userId)
+        .maybeSingle()
+
+      setOperationsRole(appUser?.active === false ? null : (appUser?.role || null))
       setProfileCheckedForUser(userId)
     }
 
@@ -306,6 +316,15 @@ function App() {
         onManageDocuments={() =>
           setScreen('rwbot-documents')
         }
+      />
+    )
+  }
+
+  if (operationsRole === 'PLUMBER') {
+    return (
+      <ComplaintLiveDisplay
+        workerMode
+        onBack={handleLogout}
       />
     )
   }
