@@ -349,6 +349,15 @@ function App() {
     )
   }
 
+  if (screen === 'plumber-complaints') {
+    return (
+      <ComplaintLiveDisplay
+        workerMode
+        onBack={() => setScreen('dashboard')}
+      />
+    )
+  }
+
   if (screen === 'complaint-live') {
     return (
       <ComplaintLiveDisplay
@@ -533,6 +542,22 @@ function App() {
           <div className="feature-text">
             <h3>Live Complaint Display</h3>
             <p>See new complaints live and acknowledge them quickly</p>
+          </div>
+          <ArrowRight size={20} />
+        </button>
+
+        <button
+          className="feature-card feature-patrol"
+          onClick={() =>
+            setScreen('plumber-complaints')
+          }
+        >
+          <div className="feature-icon feature-icon-purple">
+            <MessageSquareWarning size={27} strokeWidth={1.8} />
+          </div>
+          <div className="feature-text">
+            <h3>Plumber Complaints</h3>
+            <p>Start plumbing work with resident OTP and mark it done</p>
           </div>
           <ArrowRight size={20} />
         </button>
