@@ -1101,6 +1101,15 @@ async function processConversation(env, mobile, originalText, session) {
     const complaintsAhead = await getComplaintsAhead(env, complaint.id)
     await deleteSession(env, mobile)
     await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
+
+    if (Number(current.category_id) === 1) {
+      try {
+        await notifyPlumberOfNewComplaint(env, complaint, current)
+      } catch (error) {
+        // Resident registration must still succeed if the plumber notification fails.
+        console.error('Plumber WhatsApp notification failed:', error)
+      }
+    }
     return
   }
 
@@ -1284,6 +1293,44 @@ async function createComplaint(env, mobile, session) {
   })
   if (!Array.isArray(result) || !result.length) throw new Error('Complaint could not be created.')
   return result[0]
+}
+
+async function notifyPlumberOfNewComplaint(env, complaint, session) {
+  const workers = await supabaseRequest(
+    env,
+    '/rest/v1/workers?service_category_id=eq.1&active=eq.true&select=name,mobile_no&limit=1',
+    { method: 'GET' }
+  )
+
+  const plumber = Array.isArray(workers) && workers.length ? workers[0] : null
+  const mobile = normalizeMobile(plumber?.mobile_no)
+
+  if (!mobile) {
+    console.warn('No active plumber mobile number found in workers master data.')
+    return
+  }
+
+  const registeredAt = complaint.opened_at || complaint.created_at || new Date().toISOString()
+  const time = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  }).format(new Date(registeredAt))
+
+  const flat = complaint.flat_no || session.flat_no || session.location_text || '—'
+  const priority = session.is_urgent ? 'URGENT' : 'NORMAL'
+
+  const message =
+    '*RWA POCKET-A*\n\n' +
+    '🔧 *New Plumber Complaint*\n\n' +
+    `*Complaint No.:* ${complaint.complaint_no}\n` +
+    `*Flat No.:* ${flat}\n` +
+    `*Time:* ${time}\n` +
+    `*Priority:* ${priority}\n\n` +
+    'Please check the RWA Pocket-A App for details.'
+
+  await sendWhatsAppMessage(env, mobile, message)
 }
 
 function generateWorkStartOtp() {
