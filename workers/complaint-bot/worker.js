@@ -3,7 +3,6 @@
 // Deployment is managed from GitHub through Cloudflare Builds.
 
 const GRAPH_API_VERSION = 'v26.0'
-const MAX_DESCRIPTION = 100
 
 export default {
   async fetch(request, env) {
@@ -813,11 +812,12 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, locationQuestion(lang, getCategoryById(categoryId)))
       return
     }
-    const next = categoryId === 3 ? 'URGENT' : categoryId === 4 ? 'INCIDENT_DATETIME' : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'ADD_NOTE'
+    const next = categoryId === 3 ? 'URGENT' : categoryId === 4 ? 'INCIDENT_DATETIME' : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'CONFIRM'
     await updateSession(env, mobile, { location_text: location, step: next })
     if (next === 'URGENT') await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
     if (next === 'INCIDENT_DATETIME') await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
     if (next === 'ISSUE_TYPE') await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
+    if (next === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
     return
   }
 
@@ -826,8 +826,8 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
       return
     }
-    await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'ADD_NOTE' })
-    await sendWhatsAppMessage(env, mobile, addNoteQuestion(lang))
+    await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'CONFIRM' })
+    await sendConfirmation(env, mobile, await getSession(env, mobile))
     return
   }
 
@@ -837,10 +837,11 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
       return
     }
-    const next = categoryId === 6 ? 'URGENT' : 'ADD_NOTE'
+    const next = categoryId === 6 ? 'URGENT' : 'CONFIRM'
     await updateSession(env, mobile, { issue_type: issue, step: next })
     await sendWhatsAppMessage(env, mobile,
-      next === 'URGENT' ? urgentQuestion(categoryId, lang) : addNoteQuestion(lang))
+      next === 'URGENT' ? urgentQuestion(categoryId, lang) : (await getSession(env, mobile), ''))
+    if (next === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
     return
   }
 
@@ -852,7 +853,7 @@ async function processConversation(env, mobile, originalText, session) {
 
     if (text === '2') {
       const urgent = defaultUrgency(categoryId)
-      const next = [1, 2].includes(categoryId) ? 'ELDERLY' : 'ADD_NOTE'
+      const next = 'CONFIRM'
       await updateSession(env, mobile, {
         is_urgent: true,
         urgency_code: urgent.code,
@@ -860,54 +861,16 @@ async function processConversation(env, mobile, originalText, session) {
         step: next
       })
       await sendWhatsAppMessage(env, mobile,
-        next === 'ELDERLY' ? elderlyQuestion(lang) : addNoteQuestion(lang))
+        next === 'CONFIRM' ? (await sendConfirmation(env, mobile, await getSession(env, mobile)), '') : ''
       return
     }
 
-    const next = [1, 2].includes(categoryId) ? 'ELDERLY' : 'ADD_NOTE'
+    const next = 'CONFIRM'
     await updateSession(env, mobile, {
       is_urgent: false, urgency_code: null, urgency_reason: null, step: next
     })
     await sendWhatsAppMessage(env, mobile,
-      next === 'ELDERLY' ? elderlyQuestion(lang) : addNoteQuestion(lang))
-    return
-  }
-
-  if (step === 'ELDERLY') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, elderlyQuestion(lang))
-      return
-    }
-    await updateSession(env, mobile, {
-      elderly_citizen_70_plus: text === '2',
-      step: 'ADD_NOTE'
-    })
-    await sendWhatsAppMessage(env, mobile, addNoteQuestion(lang))
-    return
-  }
-
-  if (step === 'ADD_NOTE') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, addNoteQuestion(lang))
-      return
-    }
-    if (text === '2') {
-      await updateSession(env, mobile, { wants_description: true, step: 'DESCRIPTION' })
-      await sendWhatsAppMessage(env, mobile, descriptionQuestion(lang))
-      return
-    }
-    await updateSession(env, mobile, { wants_description: false, description: null, step: 'CONFIRM' })
-    await sendConfirmation(env, mobile, await getSession(env, mobile))
-    return
-  }
-
-  if (step === 'DESCRIPTION') {
-    if (!text) {
-      await sendWhatsAppMessage(env, mobile, descriptionQuestion(lang))
-      return
-    }
-    await updateSession(env, mobile, { description: text.slice(0, MAX_DESCRIPTION), step: 'CONFIRM' })
-    await sendConfirmation(env, mobile, await getSession(env, mobile))
+      next === 'CONFIRM' ? (await sendConfirmation(env, mobile, await getSession(env, mobile)), '') : ''
     return
   }
 
@@ -1070,7 +1033,6 @@ async function sendConfirmation(env, mobile, session) {
   if (session.incident_datetime_text) rows.push(`${lang === 'HI' ? '*दिनांक/समय:*' : '*Date/Time:*'} ${session.incident_datetime_text}`)
   if (session.description) rows.push(`${lang === 'HI' ? '*विवरण:*' : '*Note:*'} ${session.description}`)
   if ([1,2,3,6].includes(Number(session.category_id))) rows.push(`${lang === 'HI' ? '*अत्यावश्यक:*' : '*Urgent:*'} ${lang === 'HI' ? (session.is_urgent ? 'हाँ' : 'नहीं') : (session.is_urgent ? 'Yes' : 'No')}`)
-  if ([1,2].includes(Number(session.category_id))) rows.push(`${lang === 'HI' ? '*आयु 70 वर्ष या अधिक:*' : '*Elderly Citizen 70+:*'} ${lang === 'HI' ? (session.elderly_citizen_70_plus ? 'हाँ' : 'नहीं') : (session.elderly_citizen_70_plus ? 'Yes' : 'No')}`)
   rows.push(`${lang === 'HI' ? '*प्राथमिकता:*' : '*Priority:*'} ${getPriorityLabel(session, lang)}`)
   rows.push('')
   rows.push(lang === 'HI' ? '*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : '*1.* Register Complaint\n*2.* Cancel')
@@ -1098,7 +1060,9 @@ async function createComplaint(env, mobile, session) {
     is_urgent: Boolean(session.is_urgent),
     urgency_code: session.urgency_code || null,
     urgency_reason: session.urgency_reason || null,
-    elderly_citizen_70_plus: Boolean(session.elderly_citizen_70_plus),
+    elderly_citizen_70_plus: false,
+    work_start_otp: generateWorkStartOtp(),
+    otp_generated_at: now,
     location_text: session.location_text || null,
     issue_type: session.issue_type || null,
     incident_datetime_text: session.incident_datetime_text || null
@@ -1110,6 +1074,10 @@ async function createComplaint(env, mobile, session) {
   })
   if (!Array.isArray(result) || !result.length) throw new Error('Complaint could not be created.')
   return result[0]
+}
+
+function generateWorkStartOtp() {
+  return String(Math.floor(1000 + Math.random() * 9000))
 }
 
 function buildDefaultDescription(session) {
@@ -1141,19 +1109,17 @@ function complaintCreatedMessage(complaint, session, complaintsAhead = 0) {
   const location = session.flat_no || session.location_text || ''
   const priority = getPriorityLabel(session, lang)
   if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*आपसे पहले शिकायतें:* ${complaintsAhead}\n\nसुपरवाइज़र द्वारा शिकायत स्वीकार करने के बाद आपको सूचित किया जाएगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
+    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*कतार में आपका क्रम:* ${complaintsAhead + 1}\n*कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\n\nकर्मचारी के आपके पास पहुँचने पर ही यह OTP साझा करें। OTP सत्यापित होने के बाद कार्य प्रारंभ होगा।\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
   }
-  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Complaints ahead of you:* ${complaintsAhead}\n\nYou will be notified after the Supervisor acknowledges the complaint.\n\nThank you.\n\n*— RWA Pocket-A*`
+  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Your sequence in queue:* ${complaintsAhead + 1}\n*Work Start OTP:* *${complaint.work_start_otp}*\n\nShare this OTP only when the worker reaches you. Work will start after OTP verification.\n\nThank you.\n\n*— RWA Pocket-A*`
 }
 
 function getPriorityLabel(session, lang = 'EN') {
   if (lang === 'HI') {
     if (session.is_urgent) return 'अत्यावश्यक'
-    if (session.elderly_citizen_70_plus) return '70 वर्ष या अधिक'
     return 'सामान्य'
   }
   if (session.is_urgent) return 'URGENT'
-  if (session.elderly_citizen_70_plus) return 'ELDERLY 70+'
   return 'NORMAL'
 }
 async function createSession(env, mobile) {
