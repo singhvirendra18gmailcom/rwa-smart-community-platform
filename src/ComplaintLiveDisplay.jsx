@@ -16,22 +16,24 @@ const LABELS = {
   OTHER: 'Other'
 }
 
-function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
+function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) {
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [workingId, setWorkingId] = useState(null)
+  const [otpFor, setOtpFor] = useState(null)
+  const [otp, setOtp] = useState('')
 
   const load = async () => {
     setError('')
     const { data, error: loadError } = await supabase
       .from('complaints')
       .select('*, service_categories(id,name)')
-      .in('status', ['OPEN', 'REOPENED'])
+      .in('status', workerMode ? ['OPEN', 'REOPENED', 'IN_PROGRESS'] : ['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE'])
       .order('created_at', { ascending: true })
 
     if (loadError) setError(loadError.message)
-    else setComplaints(data || [])
+    else setComplaints(workerMode ? (data || []).filter(c => Number(c.category_id) === 1) : (data || []))
     setLoading(false)
   }
 
@@ -80,6 +82,34 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
     }
   }
 
+  const workerAction = async (complaint, action, enteredOtp = null) => {
+    try {
+      setWorkingId(complaint.id)
+      setError('')
+      const { data: { session } } = await supabase.auth.getSession()
+      const response = await fetch(
+        `https://rwa-complaint-bot.singh-virendra18.workers.dev/api/complaints/${action}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token || ''}`
+          },
+          body: JSON.stringify({ complaint_id: complaint.id, ...(enteredOtp ? { otp: enteredOtp } : {}) })
+        }
+      )
+      const result = await response.json()
+      if (!response.ok || !result.ok) throw new Error(result.error || 'Unable to update complaint.')
+      setOtpFor(null)
+      setOtp('')
+      await load()
+    } catch (e) {
+      setError(e.message || 'Unable to update complaint.')
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
   const formatTime = value => new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(value))
@@ -88,14 +118,14 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
     <div className="live-page">
       <header className="live-header">
         <button onClick={onBack}><ArrowLeft size={18}/> Back</button>
-        <div><h1>Live Complaints</h1><p>Supervisor Attention Board</p></div>
+        <div><h1>{workerMode ? 'Plumber Complaints' : 'Live Complaints'}</h1><p>{workerMode ? 'Plumbing Work Queue' : 'Supervisor Live Status Board'}</p></div>
         <button className="live-refresh" onClick={load}><RefreshCw size={18}/></button>
       </header>
 
       <main className="live-content">
         <div className="live-summary">
           <div><BellRing size={18}/><strong>{ordered.length}</strong><span>Waiting</span></div>
-          <button onClick={onOpenComplaints}>Dashboard →</button>
+          {!workerMode && <button onClick={onOpenComplaints}>Dashboard →</button>}
         </div>
 
         {error && <div className="live-error">{error}</div>}
@@ -123,12 +153,38 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints }) {
                   <div className="live-flat">{c.flat_no || c.location_text || 'Common Area'}</div>
                   <div className="live-badges">
                     {c.is_urgent && <span className="urgent-badge">URGENT</span>}
-                    {c.elderly_citizen_70_plus && <span className="elderly-badge">70+</span>}
+                    
                   </div>
                   <p>{c.description || c.issue_type?.replaceAll('_', ' ') || ''}</p>
-                  <button disabled={workingId === c.id} onClick={() => acknowledge(c)}>
-                    <Check size={18}/>{workingId === c.id ? 'Acknowledging...' : 'ACKNOWLEDGE'}
-                  </button>
+                  {workerMode ? (
+                    <>
+                      {(c.status === 'OPEN' || c.status === 'REOPENED') && (
+                        otpFor === c.id ? (
+                          <div className="worker-otp-box">
+                            <input
+                              inputMode="numeric"
+                              maxLength={4}
+                              value={otp}
+                              onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="4-digit OTP"
+                            />
+                            <button disabled={workingId === c.id || otp.length !== 4} onClick={() => workerAction(c, 'start', otp)}>
+                              VERIFY & START
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setOtpFor(c.id); setOtp('') }}>START</button>
+                        )
+                      )}
+                      {c.status === 'IN_PROGRESS' && (
+                        <button disabled={workingId === c.id} onClick={() => workerAction(c, 'done')}>
+                          {workingId === c.id ? 'Saving...' : 'DONE'}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <span className="live-current-status">{c.status === 'OPEN' ? 'WAITING' : c.status.replaceAll('_', ' ')}</span>
+                  )}
                 </article>
               )
             })}
