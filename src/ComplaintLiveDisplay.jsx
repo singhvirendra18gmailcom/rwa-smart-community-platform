@@ -29,7 +29,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     const { data, error: loadError } = await supabase
       .from('complaints')
       .select('*, service_categories(id,name)')
-      .in('status', workerMode ? ['OPEN', 'REOPENED', 'IN_PROGRESS'] : ['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE'])
+      .in('status', workerMode ? ['OPEN', 'REOPENED', 'IN_PROGRESS'] : ['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED'])
       .order('created_at', { ascending: true })
 
     if (loadError) setError(loadError.message)
@@ -110,6 +110,15 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     }
   }
 
+  const formatDuration = (start, end) => {
+    if (!start || !end) return '—'
+    const mins = Math.max(0, Math.round((new Date(end) - new Date(start)) / 60000))
+    if (mins < 60) return `${mins} min`
+    const hours = Math.floor(mins / 60)
+    const rest = mins % 60
+    return rest ? `${hours} hr ${rest} min` : `${hours} hr`
+  }
+
   const formatTime = value => new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(value))
@@ -156,6 +165,12 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                     
                   </div>
                   <p>{c.description || c.issue_type?.replaceAll('_', ' ') || ''}</p>
+                  {!workerMode && ['WORK_DONE', 'CLOSED'].includes(c.status) && (
+                    <div className="live-work-result">
+                      <span><strong>Time Taken:</strong> {formatDuration(c.work_started_at, c.work_done_at)}</span>
+                      <span><strong>Rating:</strong> {c.resident_rating ? `${c.resident_rating}/5 ⭐` : 'Pending'}</span>
+                    </div>
+                  )}
                   {workerMode ? (
                     <>
                       {(c.status === 'OPEN' || c.status === 'REOPENED') && (
