@@ -134,7 +134,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     <div className="live-page">
       <header className="live-header">
         <button onClick={onBack}><ArrowLeft size={18}/> Back</button>
-        <div><h1>{workerMode ? 'Plumber Complaints' : 'Live Complaints'}</h1><p>{workerMode ? 'Plumbing Work Queue' : 'Supervisor Live Status Board'}</p></div>
+        <div><h1>{workerMode ? 'Plumber Complaints' : 'Complaint Center'}</h1><p>{workerMode ? 'Plumbing Work Queue' : 'Supervisor Complaint Dashboard'}</p></div>
         <button className="live-refresh" onClick={load}><RefreshCw size={18}/></button>
       </header>
 
