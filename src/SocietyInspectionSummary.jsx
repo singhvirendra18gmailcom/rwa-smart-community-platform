@@ -114,6 +114,7 @@ export default function SocietyInspectionSummary({ onBack }) {
       serviceComplaintResult,
       agencyResult,
       streetInspectionResult,
+      residentComplaintResult,
     ] = await Promise.all([
       supabase
         .from('towers')
@@ -152,6 +153,12 @@ export default function SocietyInspectionSummary({ onBack }) {
           'id,inspection_date,agency_id,faulty_count,saved_at,complaint_status,resolved_at'
         )
         .in('inspection_date', [today, yesterday]),
+      supabase
+        .from('complaints')
+        .select('id,complaint_no,category_id,flat_no,location_text,status,resident_rating,created_at,service_categories(id,name)')
+        .gte('created_at', `${today}T00:00:00+05:30`)
+        .lt('created_at', `${getIndiaDateOffset(1)}T00:00:00+05:30`)
+        .order('created_at', { ascending: true }),
     ])
 
     const error =
@@ -162,7 +169,8 @@ export default function SocietyInspectionSummary({ onBack }) {
       societyResult.error ||
       serviceComplaintResult.error ||
       agencyResult.error ||
-      streetInspectionResult.error
+      streetInspectionResult.error ||
+      residentComplaintResult.error
 
     if (error) {
       setMessage(error.message)
@@ -212,6 +220,7 @@ export default function SocietyInspectionSummary({ onBack }) {
       streetInspections,
       resolvedStreetFollowUps,
       streetNotifications,
+      residentComplaints: residentComplaintResult.data || [],
     })
 
     setLoading(false)
@@ -323,6 +332,39 @@ export default function SocietyInspectionSummary({ onBack }) {
       }
     })
 
+    const complaintGroup = (item) => {
+      const name = String(item.service_categories?.name || '').toUpperCase()
+      if (Number(item.category_id) === 1 || ['PLUMBER', 'PLUMBING'].includes(name)) return 'plumber'
+      if (Number(item.category_id) === 2 || ['ELECTRICIAN', 'ELECTRICAL'].includes(name)) return 'electrician'
+      return 'others'
+    }
+    const complaintStatus = (status) => {
+      const value = String(status || 'OPEN').toUpperCase()
+      if (value === 'OPEN') return 'Pending'
+      if (value === 'REOPENED') return 'Reopened'
+      if (value === 'IN_PROGRESS') return 'In Progress'
+      if (value === 'WORK_DONE') return 'Work Done'
+      if (value === 'CLOSED') return 'Closed'
+      return value.replaceAll('_', ' ')
+    }
+    const residentComplaints = (data.residentComplaints || []).map((item) => ({
+      ...item,
+      group: complaintGroup(item),
+      categoryLabel: String(item.service_categories?.name || 'Other').replaceAll('_', ' '),
+      statusLabel: complaintStatus(item.status),
+      location: item.flat_no || item.location_text || 'Common Area',
+      ratingLabel: item.resident_rating ? `${item.resident_rating}/5` : (item.status === 'WORK_DONE' ? 'Pending' : '—'),
+    }))
+    const complaintSummary = {
+      total: residentComplaints.length,
+      closed: residentComplaints.filter((item) => item.status === 'CLOSED').length,
+      workDone: residentComplaints.filter((item) => item.status === 'WORK_DONE').length,
+      pending: residentComplaints.filter((item) => ['OPEN', 'REOPENED', 'IN_PROGRESS'].includes(item.status)).length,
+      plumber: residentComplaints.filter((item) => item.group === 'plumber'),
+      electrician: residentComplaints.filter((item) => item.group === 'electrician'),
+      others: residentComplaints.filter((item) => item.group === 'others'),
+    }
+
     const allRequiredComplaintsSent =
       (cameraIssues.length === 0 || cameraComplaint?.status === 'SENT') &&
       (ledIssues.length === 0 || ledComplaint?.status === 'SENT') &&
@@ -366,6 +408,7 @@ export default function SocietyInspectionSummary({ onBack }) {
       streetRows,
       resolvedStreetFollowUps,
       allRequiredComplaintsSent,
+      complaintSummary,
     }
   }, [data])
 
@@ -375,7 +418,7 @@ export default function SocietyInspectionSummary({ onBack }) {
     try {
       const canvas = document.createElement('canvas')
       canvas.width = 1080
-      canvas.height = 1500
+      canvas.height = Math.max(1500, 1500 + summary.complaintSummary.total * 46)
 
       const ctx = canvas.getContext('2d')
       ctx.fillStyle = '#ffffff'
@@ -432,6 +475,17 @@ export default function SocietyInspectionSummary({ onBack }) {
       if (summary.otherIssues.length > 0) {
         lines.push(`Other Issues: ${summary.otherIssues.join(' | ')}`)
       }
+
+      lines.push(`Complaints: ${summary.complaintSummary.total} Registered • ${summary.complaintSummary.closed} Closed • ${summary.complaintSummary.workDone} Work Done • ${summary.complaintSummary.pending} Pending/Reopened`)
+      ;[['Plumber', summary.complaintSummary.plumber], ['Electrician', summary.complaintSummary.electrician], ['Others', summary.complaintSummary.others]].forEach(([group, rows]) => {
+        if (!rows.length) return
+        lines.push(`${group} Complaints:`)
+        rows.forEach((item) => lines.push(
+          group === 'Others'
+            ? `${item.complaint_no} • ${item.categoryLabel} • ${item.location} • ${item.statusLabel} • Rating: ${item.ratingLabel}`
+            : `${item.complaint_no} • ${item.location} • ${item.statusLabel} • Rating: ${item.ratingLabel}`
+        ))
+      })
 
       ctx.font = '600 25px Arial'
       lines.forEach((line) => {
@@ -581,6 +635,50 @@ export default function SocietyInspectionSummary({ onBack }) {
             ))}
           </section>
         )}
+
+        <section className="final-summary-card complaint-report-section">
+          <h2>Resident Complaints</h2>
+          <div className="complaint-report-summary">
+            <strong>{summary.complaintSummary.total} Registered</strong>
+            <span>{summary.complaintSummary.closed} Closed</span>
+            <span>{summary.complaintSummary.workDone} Work Done</span>
+            <span>{summary.complaintSummary.pending} Pending/Reopened</span>
+          </div>
+
+          {[
+            ['Plumber', summary.complaintSummary.plumber],
+            ['Electrician', summary.complaintSummary.electrician],
+            ['Others', summary.complaintSummary.others],
+          ].map(([title, rows]) => rows.length > 0 && (
+            <div className="complaint-report-group" key={title}>
+              <h3>{title}</h3>
+              <div className="complaint-report-table">
+                <div className="complaint-report-row complaint-report-head">
+                  <span>Complaint</span>
+                  {title === 'Others' && <span>Category</span>}
+                  <span>Flat/Location</span>
+                  <span>Status</span>
+                  <span>Rating</span>
+                </div>
+                {rows.map((item) => (
+                  <div className="complaint-report-row" key={item.id}>
+                    <strong>{item.complaint_no}</strong>
+                    {title === 'Others' && <span>{item.categoryLabel}</span>}
+                    <span>{item.location}</span>
+                    <span>{item.statusLabel}</span>
+                    <span>{item.ratingLabel}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {summary.complaintSummary.total === 0 && (
+            <div className="final-summary-line">
+              <span>No resident complaints registered today.</span>
+            </div>
+          )}
+        </section>
 
         <section className="final-summary-card">
           <h2>Inspection Status</h2>
