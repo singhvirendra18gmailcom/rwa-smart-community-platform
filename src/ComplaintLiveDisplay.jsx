@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, BellRing, Check, Clock, RefreshCw } from 'lucide-react'
 import { supabase } from './supabase'
 import './ComplaintLiveDisplay.css'
@@ -23,6 +23,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   const [workingId, setWorkingId] = useState(null)
   const [otpFor, setOtpFor] = useState(null)
   const [otp, setOtp] = useState('')
+  const knownComplaintsRef = useRef(new Map())
 
   const load = async () => {
     setError('')
@@ -37,14 +38,86 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     setLoading(false)
   }
 
+  const playComplaintAlert = (event, complaint) => {
+    if (workerMode || typeof window === 'undefined') return
+
+    const categoryKey = complaint?.service_categories?.name
+    const category = LABELS[categoryKey] || ({
+      1: 'प्लंबर',
+      2: 'इलेक्ट्रीशियन',
+      3: 'सीवरेज',
+      4: 'कैमरा रिकॉर्डिंग',
+      5: 'हॉर्टिकल्चर',
+      6: 'स्ट्रीट लाइट',
+      7: 'हाउसकीपिंग',
+      8: 'अन्य'
+    })[Number(complaint?.category_id)] || 'अन्य'
+
+    const location = complaint?.flat_no || complaint?.location_text || 'कॉमन एरिया'
+    const details = `${location}, ${category}`
+
+    const messages = {
+      INSERT: complaint?.is_urgent
+        ? `तत्काल शिकायत प्राप्त हुई है। ${details}।`
+        : `नई शिकायत प्राप्त हुई है। ${details}।`,
+      IN_PROGRESS: `${details}। शिकायत पर काम शुरू हो गया है।`,
+      WORK_DONE: `${details}। शिकायत का काम पूरा हो गया है। निवासी की पुष्टि की प्रतीक्षा है।`,
+      CLOSED: `${details}। शिकायत सफलतापूर्वक बंद हो गई है।`,
+      REOPENED: `${details}। निवासी ने शिकायत दोबारा खोली है।`
+    }
+
+    const message = event === 'INSERT' ? messages.INSERT : messages[complaint?.status]
+    if (!message) return
+
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (AudioContext) {
+        const ctx = new AudioContext()
+        const oscillator = ctx.createOscillator()
+        const gain = ctx.createGain()
+        oscillator.connect(gain)
+        gain.connect(ctx.destination)
+        oscillator.frequency.value = complaint?.status === 'REOPENED' || complaint?.is_urgent ? 880 : 660
+        gain.gain.setValueAtTime(0.22, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65)
+        oscillator.start()
+        oscillator.stop(ctx.currentTime + 0.65)
+      }
+    } catch (e) {
+      console.warn('Complaint alert tone unavailable:', e)
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+      const repeatCount = event === 'INSERT' ? 3 : 1
+      for (let i = 0; i < repeatCount; i += 1) {
+        const speech = new SpeechSynthesisUtterance(message)
+        speech.lang = 'hi-IN'
+        speech.rate = 0.92
+        speech.volume = 1
+        window.speechSynthesis.speak(speech)
+      }
+    }
+  }
+
   useEffect(() => {
     load()
     const channel = supabase
       .channel('complaint-live-display')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          playComplaintAlert('INSERT', payload.new)
+        } else if (payload.eventType === 'UPDATE' && payload.old?.status !== payload.new?.status) {
+          playComplaintAlert('UPDATE', payload.new)
+        }
+        load()
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+    }
   }, [])
 
   const statusCounts = useMemo(() => ({
