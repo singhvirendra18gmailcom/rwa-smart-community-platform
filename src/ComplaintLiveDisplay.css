@@ -160,3 +160,78 @@
  .live-status-summary>span small{font-size:8px}
  .live-current-status{padding:5px 9px;font-size:9px}
 }
+
+
+/* Complaint Center filters */
+.complaint-filters {
+  margin: 10px 0 16px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #dbe3ec;
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px 24px;
+}
+.complaint-date-filters, .complaint-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.complaint-date-filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+}
+.complaint-date-filters input {
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font: inherit;
+  background: #fff;
+}
+.complaint-status-filters > strong {
+  margin-right: 2px;
+  color: #334155;
+}
+.status-filter {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  background: #fff;
+}
+.status-filter input { accent-color: currentColor; }
+.status-filter.selected { box-shadow: inset 0 0 0 1px currentColor; }
+.status-filter-open.selected { background: #fff7d6; color: #8a5b00; }
+.status-filter-in-progress.selected { background: #e5f0ff; color: #1558c0; }
+.status-filter-work-done.selected { background: #fff0e5; color: #b84a00; }
+.status-filter-closed.selected { background: #e4faec; color: #087a39; }
+.status-filter-reopened.selected { background: #ffe7e7; color: #bd2020; }
+.status-filter-action {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 800;
+  cursor: pointer;
+}
+@media (max-width: 680px) {
+  .complaint-filters { align-items: stretch; }
+  .complaint-date-filters, .complaint-status-filters { width: 100%; }
+  .complaint-date-filters label { flex: 1; min-width: 125px; }
+  .complaint-date-filters input { width: 100%; box-sizing: border-box; }
+}
