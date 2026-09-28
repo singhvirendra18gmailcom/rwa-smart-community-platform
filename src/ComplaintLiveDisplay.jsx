@@ -224,10 +224,9 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     return rest ? `${hours} hr ${rest} min` : `${hours} hr`
   }
 
-  const formatDateTime = value => value ? new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
+  const formatTime = value => new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit', minute: '2-digit', hour12: true
-  }).format(new Date(value)) : '—'
+  }).format(new Date(value))
 
   return (
     <div className="live-page">
@@ -300,14 +299,9 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                   <div className="live-card-top">
                     <span className="live-number">{c.complaint_no}</span>
                     <span className="live-category">{label}</span>
-                    <span className="live-time"><Clock size={13}/>{formatDateTime(c.created_at)}</span>
+                    <span className="live-time"><Clock size={13}/>{formatTime(c.created_at)}</span>
                   </div>
                   <div className="live-flat">{c.flat_no || c.location_text || 'Common Area'}</div>
-                  <div className="complaint-timestamps">
-                    <span><strong>Registered:</strong> {formatDateTime(c.created_at)}</span>
-                    <span><strong>Started:</strong> {formatDateTime(c.work_started_at)}</span>
-                    <span><strong>Work Done:</strong> {formatDateTime(c.work_done_at)}</span>
-                  </div>
                   <div className="live-badges">
                     {c.is_urgent && <span className="urgent-badge">URGENT</span>}
                     
