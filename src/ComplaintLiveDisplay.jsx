@@ -28,6 +28,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   const [fromDate, setFromDate] = useState(today)
   const [toDate, setToDate] = useState(today)
   const [selectedStatuses, setSelectedStatuses] = useState(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED']))
+  const [defaultView, setDefaultView] = useState(true)
 
   const load = async () => {
     setError('')
@@ -126,8 +127,9 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
 
   const dateFiltered = useMemo(() => complaints.filter(c => {
     const complaintDate = new Date(c.created_at).toLocaleDateString('en-CA')
+    if (defaultView) return complaintDate === today || c.status !== 'CLOSED'
     return (!fromDate || complaintDate >= fromDate) && (!toDate || complaintDate <= toDate)
-  }), [complaints, fromDate, toDate])
+  }), [complaints, fromDate, toDate, defaultView, today])
 
   const statusCounts = useMemo(() => ({
     waiting: dateFiltered.filter(c => ['OPEN', 'REOPENED'].includes(c.status)).length,
@@ -146,8 +148,8 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   }
 
   const filteredComplaints = useMemo(
-    () => dateFiltered.filter(c => selectedStatuses.has(c.status)),
-    [dateFiltered, selectedStatuses]
+    () => defaultView ? dateFiltered : dateFiltered.filter(c => selectedStatuses.has(c.status)),
+    [dateFiltered, selectedStatuses, defaultView]
   )
 
   const ordered = useMemo(() => [...filteredComplaints].sort((a, b) => {
@@ -222,9 +224,10 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     return rest ? `${hours} hr ${rest} min` : `${hours} hr`
   }
 
-  const formatTime = value => new Intl.DateTimeFormat('en-IN', {
+  const formatDateTime = value => value ? new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: true
-  }).format(new Date(value))
+  }).format(new Date(value)) : '—'
 
   return (
     <div className="live-page">
@@ -252,9 +255,10 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
         {!workerMode && (
           <section className="complaint-filters">
             <div className="complaint-date-filters">
-              <label>From Date<input type="date" value={fromDate} max={toDate || undefined} onChange={e => setFromDate(e.target.value)} /></label>
+              <button type="button" className={`default-filter ${defaultView ? 'selected' : ''}`} onClick={() => setDefaultView(true)}>Default</button>
+              <label>From Date<input type="date" value={fromDate} max={toDate || undefined} onChange={e => { setFromDate(e.target.value); setDefaultView(false) }} /></label>
               <span>→</span>
-              <label>To Date<input type="date" value={toDate} min={fromDate || undefined} onChange={e => setToDate(e.target.value)} /></label>
+              <label>To Date<input type="date" value={toDate} min={fromDate || undefined} onChange={e => { setToDate(e.target.value); setDefaultView(false) }} /></label>
             </div>
             <div className="complaint-status-filters">
               <strong>Status</strong>
@@ -266,12 +270,12 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                 ['REOPENED', 'Reopened']
               ].map(([value, label]) => (
                 <label className={`status-filter status-filter-${value.toLowerCase().replaceAll('_', '-')} ${selectedStatuses.has(value) ? 'selected' : ''}`} key={value}>
-                  <input type="checkbox" checked={selectedStatuses.has(value)} onChange={() => toggleStatus(value)} />
+                  <input type="checkbox" checked={selectedStatuses.has(value)} onChange={() => { setDefaultView(false); toggleStatus(value) }} />
                   {label}
                 </label>
               ))}
-              <button type="button" className="status-filter-action" onClick={() => setSelectedStatuses(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED']))}>All</button>
-              <button type="button" className="status-filter-action" onClick={() => setSelectedStatuses(new Set())}>Clear</button>
+              <button type="button" className="status-filter-action" onClick={() => { setDefaultView(false); setSelectedStatuses(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED'])) }}>All</button>
+              <button type="button" className="status-filter-action" onClick={() => { setDefaultView(false); setSelectedStatuses(new Set()) }}>Clear</button>
             </div>
           </section>
         )}
@@ -296,9 +300,14 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                   <div className="live-card-top">
                     <span className="live-number">{c.complaint_no}</span>
                     <span className="live-category">{label}</span>
-                    <span className="live-time"><Clock size={13}/>{formatTime(c.created_at)}</span>
+                    <span className="live-time"><Clock size={13}/>{formatDateTime(c.created_at)}</span>
                   </div>
                   <div className="live-flat">{c.flat_no || c.location_text || 'Common Area'}</div>
+                  <div className="complaint-timestamps">
+                    <span><strong>Registered:</strong> {formatDateTime(c.created_at)}</span>
+                    <span><strong>Started:</strong> {formatDateTime(c.work_started_at)}</span>
+                    <span><strong>Work Done:</strong> {formatDateTime(c.work_done_at)}</span>
+                  </div>
                   <div className="live-badges">
                     {c.is_urgent && <span className="urgent-badge">URGENT</span>}
                     
