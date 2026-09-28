@@ -251,21 +251,3 @@
   border-color: #0f4c81;
   color: #fff;
 }
-.complaint-timestamps {
-  margin: 8px 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  font-size: 12px;
-  line-height: 1.35;
-}
-.complaint-timestamps span {
-  white-space: nowrap;
-}
-@media (max-width: 680px) {
-  .complaint-timestamps {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 3px;
-  }
-}
