@@ -24,6 +24,11 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   const [otpFor, setOtpFor] = useState(null)
   const [otp, setOtp] = useState('')
   const knownComplaintsRef = useRef(new Map())
+  const today = new Date().toLocaleDateString('en-CA')
+  const [fromDate, setFromDate] = useState(today)
+  const [toDate, setToDate] = useState(today)
+  const [selectedStatuses, setSelectedStatuses] = useState(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED']))
+  const [defaultView, setDefaultView] = useState(true)
 
   const load = async () => {
     setError('')
@@ -120,17 +125,37 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     }
   }, [])
 
-  const statusCounts = useMemo(() => ({
-    waiting: complaints.filter(c => ['OPEN', 'REOPENED'].includes(c.status)).length,
-    inProgress: complaints.filter(c => c.status === 'IN_PROGRESS').length,
-    workDone: complaints.filter(c => c.status === 'WORK_DONE').length,
-    closed: complaints.filter(c => c.status === 'CLOSED').length
-  }), [complaints])
+  const dateFiltered = useMemo(() => complaints.filter(c => {
+    const complaintDate = new Date(c.created_at).toLocaleDateString('en-CA')
+    if (defaultView) return complaintDate === today || c.status !== 'CLOSED'
+    return (!fromDate || complaintDate >= fromDate) && (!toDate || complaintDate <= toDate)
+  }), [complaints, fromDate, toDate, defaultView, today])
 
-  const ordered = useMemo(() => [...complaints].sort((a, b) => {
+  const statusCounts = useMemo(() => ({
+    waiting: dateFiltered.filter(c => ['OPEN', 'REOPENED'].includes(c.status)).length,
+    inProgress: dateFiltered.filter(c => c.status === 'IN_PROGRESS').length,
+    workDone: dateFiltered.filter(c => c.status === 'WORK_DONE').length,
+    closed: dateFiltered.filter(c => c.status === 'CLOSED').length
+  }), [dateFiltered])
+
+  const toggleStatus = status => {
+    setSelectedStatuses(current => {
+      const next = new Set(current)
+      if (next.has(status)) next.delete(status)
+      else next.add(status)
+      return next
+    })
+  }
+
+  const filteredComplaints = useMemo(
+    () => defaultView ? dateFiltered : dateFiltered.filter(c => selectedStatuses.has(c.status)),
+    [dateFiltered, selectedStatuses, defaultView]
+  )
+
+  const ordered = useMemo(() => [...filteredComplaints].sort((a, b) => {
     const priority = x => x.is_urgent ? 0 : x.elderly_citizen_70_plus ? 1 : 2
     return priority(a) - priority(b) || new Date(a.created_at) - new Date(b.created_at)
-  }), [complaints])
+  }), [filteredComplaints])
 
   const acknowledge = async complaint => {
     try {
@@ -225,6 +250,34 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
           )}
           {!workerMode && <button onClick={onOpenComplaints}>Dashboard →</button>}
         </div>
+
+        {!workerMode && (
+          <section className="complaint-filters">
+            <div className="complaint-date-filters">
+              <button type="button" className={`default-filter ${defaultView ? 'selected' : ''}`} onClick={() => setDefaultView(true)}>Default</button>
+              <label>From Date<input type="date" value={fromDate} max={toDate || undefined} onChange={e => { setFromDate(e.target.value); setDefaultView(false) }} /></label>
+              <span>→</span>
+              <label>To Date<input type="date" value={toDate} min={fromDate || undefined} onChange={e => { setToDate(e.target.value); setDefaultView(false) }} /></label>
+            </div>
+            <div className="complaint-status-filters">
+              <strong>Status</strong>
+              {[
+                ['OPEN', 'Waiting'],
+                ['IN_PROGRESS', 'In Progress'],
+                ['WORK_DONE', 'Work Done'],
+                ['CLOSED', 'Closed'],
+                ['REOPENED', 'Reopened']
+              ].map(([value, label]) => (
+                <label className={`status-filter status-filter-${value.toLowerCase().replaceAll('_', '-')} ${selectedStatuses.has(value) ? 'selected' : ''}`} key={value}>
+                  <input type="checkbox" checked={selectedStatuses.has(value)} onChange={() => { setDefaultView(false); toggleStatus(value) }} />
+                  {label}
+                </label>
+              ))}
+              <button type="button" className="status-filter-action" onClick={() => { setDefaultView(false); setSelectedStatuses(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED'])) }}>All</button>
+              <button type="button" className="status-filter-action" onClick={() => { setDefaultView(false); setSelectedStatuses(new Set()) }}>Clear</button>
+            </div>
+          </section>
+        )}
 
         {error && <div className="live-error">{error}</div>}
         {loading ? <div className="live-empty">Loading complaints...</div> :
