@@ -8,7 +8,6 @@ import {
   ArrowRight,
   ClipboardCheck,
   MessageSquareWarning,
-  ArrowLeft,
   WalletCards
 } from 'lucide-react'
 
@@ -28,7 +27,7 @@ import RwbotHome from './rwbot/RwbotHome'
 import RwbotChangePassword from './rwbot/RwbotChangePassword'
 import RwbotChat from './rwbot/RwbotChat'
 import RwbotDocuments from './rwbot/RwbotDocuments'
-import TowerInspection from './TowerInspection'
+
 import AccountsApp from './accounts/AccountsApp'
 
 function App() {
@@ -43,6 +42,7 @@ function App() {
 
   const [rwbotProfile, setRwbotProfile] = useState(null)
   const { config: inspectionConfig } = useInspectionConfig()
+
   useEffect(() => {
     if (screen === 'society-inspection') {
       sessionStorage.setItem('rwa-resume-society-inspection', 'true')
@@ -50,7 +50,6 @@ function App() {
       sessionStorage.removeItem('rwa-resume-society-inspection')
     }
   }, [screen])
-
 
   const [
     profileCheckedForUser,
@@ -109,7 +108,6 @@ function App() {
     }
 
     const userId = session.user.id
-
     let cancelled = false
 
     const loadProfile = async () => {
@@ -166,7 +164,12 @@ function App() {
         .eq('auth_user_id', userId)
         .maybeSingle()
 
-      setOperationsRole(appUser?.active === false ? null : (appUser?.role || null))
+      setOperationsRole(
+        appUser?.active === false
+          ? null
+          : (appUser?.role || null)
+      )
+
       setProfileCheckedForUser(userId)
     }
 
@@ -220,28 +223,10 @@ function App() {
     )
   }
 
-  if (screen === 'tower-inspection') {
-    return (
-      <TowerInspection
-        onBack={() => setScreen('dashboard')}
-      />
-    )
-  }
-
-  if (screen === 'accounts') {
-    return (
-      <AccountsApp
-        onBack={() => setScreen('dashboard')}
-      />
-    )
-  }
-
-  if (screen === 'complaints') {
   if (profileError) {
     return (
       <div className="app-shell">
         <main className="page-content">
-
           <h2>
             Unable to load account
           </h2>
@@ -253,7 +238,6 @@ function App() {
           <button onClick={handleLogout}>
             Logout
           </button>
-
         </main>
       </div>
     )
@@ -270,7 +254,6 @@ function App() {
       return (
         <div className="app-shell">
           <main className="page-content">
-
             <h2>
               RWBOT Account Disabled
             </h2>
@@ -283,7 +266,6 @@ function App() {
             <button onClick={handleLogout}>
               Logout
             </button>
-
           </main>
         </div>
       )
@@ -389,6 +371,16 @@ function App() {
     )
   }
 
+  if (screen === 'accounts') {
+    return (
+      <AccountsApp
+        onBack={() =>
+          setScreen('dashboard')
+        }
+      />
+    )
+  }
+
   if (screen === 'plumber-complaints') {
     return (
       <ComplaintLiveDisplay
@@ -419,11 +411,8 @@ function App() {
 
   return (
     <div className="app-shell">
-
       <header className="app-hero dashboard-hero">
-
         <div className="brand-row">
-
           <div className="brand-icon">
             <Building2
               size={28}
@@ -432,7 +421,6 @@ function App() {
           </div>
 
           <div className="brand-copy">
-
             <h1>
               RWA Pocket-A
             </h1>
@@ -440,7 +428,6 @@ function App() {
             <p>
               Sector -105 Noida
             </p>
-
           </div>
 
           <button
@@ -450,19 +437,15 @@ function App() {
             <LogOut size={16} />
             Logout
           </button>
-
         </div>
 
         <div className="brand-tagline">
           Safer Homes • Stronger Community
         </div>
-
       </header>
 
       <main className="page-content">
-
         <div className="dashboard-welcome">
-
           <h2>
             Hello, Supervisor
           </h2>
@@ -470,7 +453,6 @@ function App() {
           <p>
             Manage and monitor daily RWA operations
           </p>
-
         </div>
 
         <button
@@ -480,18 +462,14 @@ function App() {
               'https://rwa-pocket-a.singh-virendra18.workers.dev/?view=report'
           }}
         >
-
           <div className="feature-icon feature-icon-purple">
-
             <Moon
               size={27}
               strokeWidth={1.8}
             />
-
           </div>
 
           <div className="feature-text">
-
             <h3>
               Night Patrol Report
             </h3>
@@ -499,11 +477,9 @@ function App() {
             <p>
               View and share last night's patrol report
             </p>
-
           </div>
 
           <ArrowRight size={20} />
-
         </button>
 
         <button
@@ -512,18 +488,14 @@ function App() {
             setScreen('attendance')
           }
         >
-
           <div className="feature-icon feature-icon-green">
-
             <Users
               size={27}
               strokeWidth={1.8}
             />
-
           </div>
 
           <div className="feature-text">
-
             <h3>
               Staff Attendance
             </h3>
@@ -531,11 +503,9 @@ function App() {
             <p>
               Mark today's attendance and share on WhatsApp
             </p>
-
           </div>
 
           <ArrowRight size={20} />
-
         </button>
 
         <button
@@ -544,18 +514,14 @@ function App() {
             setScreen('society-inspection')
           }
         >
-
           <div className="feature-icon feature-icon-blue">
-
             <ClipboardCheck
               size={27}
               strokeWidth={1.8}
             />
-
           </div>
 
           <div className="feature-text">
-
             <h3>
               {inspectionConfig.module_name}
             </h3>
@@ -563,18 +529,15 @@ function App() {
             <p>
               Inspect towers, parks and street lights across the society
             </p>
-
           </div>
 
           <ArrowRight size={20} />
-
         </button>
 
         <button
           className="feature-card feature-attendance"
           onClick={() => setScreen('accounts')}
         >
-
           <div className="feature-icon feature-icon-green">
             <WalletCards
               size={27}
@@ -583,7 +546,6 @@ function App() {
           </div>
 
           <div className="feature-text">
-
             <h3>
               Income & Expense
             </h3>
@@ -591,11 +553,9 @@ function App() {
             <p>
               Daily accounts, bank reconciliation and monthly statement
             </p>
-
           </div>
 
           <ArrowRight size={20} />
-
         </button>
 
         <button
@@ -607,16 +567,17 @@ function App() {
           <div className="feature-icon feature-icon-purple">
             <MessageSquareWarning size={27} strokeWidth={1.8} />
           </div>
+
           <div className="feature-text">
             <h3>Complaint Center</h3>
             <p>Track and manage resident complaints</p>
           </div>
+
           <ArrowRight size={20} />
         </button>
-</main>
+      </main>
 
       <footer className="app-footer">
-
         <strong>
           RWA Pocket-A
         </strong>
@@ -626,9 +587,7 @@ function App() {
         <span>
           Sector -105 Noida
         </span>
-
       </footer>
-
     </div>
   )
 }
