@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+
 import {
   Building2,
   Moon,
@@ -14,9 +15,19 @@ import {
 import './App.css'
 
 import { supabase } from './supabase'
+
 import Login from './Login'
 import Attendance from './Attendance'
 import ManageStaff from './ManageStaff'
+import SocietyInspection from './SocietyInspection'
+import { useInspectionConfig } from './inspectionConfig'
+import Complaints from './Complaints'
+import ComplaintLiveDisplay from './ComplaintLiveDisplay'
+
+import RwbotHome from './rwbot/RwbotHome'
+import RwbotChangePassword from './rwbot/RwbotChangePassword'
+import RwbotChat from './rwbot/RwbotChat'
+import RwbotDocuments from './rwbot/RwbotDocuments'
 import TowerInspection from './TowerInspection'
 import AccountsApp from './accounts/AccountsApp'
 
@@ -24,19 +35,62 @@ function App() {
   const [session, setSession] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
-  const [screen, setScreen] = useState('dashboard')
+  const [screen, setScreen] = useState(() =>
+    sessionStorage.getItem('rwa-resume-society-inspection') === 'true'
+      ? 'society-inspection'
+      : 'dashboard'
+  )
+
+  const [rwbotProfile, setRwbotProfile] = useState(null)
+  const { config: inspectionConfig } = useInspectionConfig()
+  useEffect(() => {
+    if (screen === 'society-inspection') {
+      sessionStorage.setItem('rwa-resume-society-inspection', 'true')
+    } else {
+      sessionStorage.removeItem('rwa-resume-society-inspection')
+    }
+  }, [screen])
+
+
+  const [
+    profileCheckedForUser,
+    setProfileCheckedForUser
+  ] = useState(null)
+
+  const [profileError, setProfileError] = useState('')
+  const [operationsRole, setOperationsRole] = useState(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+    const initialiseAuth = async () => {
+      const {
+        data: { session: currentSession }
+      } = await supabase.auth.getSession()
+
+      setSession(currentSession)
       setAuthLoading(false)
-    })
+    }
+
+    initialiseAuth()
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession(newSession)
+
+        if (
+          event === 'SIGNED_IN' ||
+          event === 'SIGNED_OUT'
+        ) {
+          setScreen('dashboard')
+        }
+
+        if (!newSession) {
+          setRwbotProfile(null)
+          setProfileCheckedForUser(null)
+          setProfileError('')
+        }
+
         setAuthLoading(false)
       }
     )
@@ -46,9 +100,97 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setRwbotProfile(null)
+      setProfileCheckedForUser(null)
+      setOperationsRole(null)
+      return
+    }
+
+    const userId = session.user.id
+
+    let cancelled = false
+
+    const loadProfile = async () => {
+      setProfileError('')
+
+      const {
+        data,
+        error
+      } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          role,
+          active,
+          must_change_password,
+          flat:flats (
+            id,
+            flat_no,
+            tower_no,
+            unit_no,
+            floor_code,
+            floor_name
+          )
+        `)
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (cancelled) {
+        return
+      }
+
+      if (error) {
+        console.error(
+          'RWBOT profile lookup failed:',
+          error
+        )
+
+        setProfileError(
+          'Unable to verify user profile.'
+        )
+
+        setRwbotProfile(null)
+        setProfileCheckedForUser(userId)
+
+        return
+      }
+
+      setRwbotProfile(data)
+
+      const { data: appUser } = await supabase
+        .from('app_users')
+        .select('role, active')
+        .eq('auth_user_id', userId)
+        .maybeSingle()
+
+      setOperationsRole(appUser?.active === false ? null : (appUser?.role || null))
+      setProfileCheckedForUser(userId)
+    }
+
+    loadProfile()
+
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.id])
+
   const handleLogout = async () => {
-    await supabase.auth.signOut()
     setScreen('dashboard')
+    setRwbotProfile(null)
+    setProfileCheckedForUser(null)
+    setProfileError('')
+
+    await supabase.auth.signOut()
+  }
+
+  const handleRwbotPasswordCompleted = () => {
+    setRwbotProfile((current) => ({
+      ...current,
+      must_change_password: false
+    }))
   }
 
   if (authLoading) {
@@ -65,20 +207,16 @@ function App() {
     return <Login />
   }
 
-  if (screen === 'manage-staff') {
+  if (
+    profileCheckedForUser !==
+    session.user.id
+  ) {
     return (
-      <ManageStaff
-        onBack={() => setScreen('dashboard')}
-      />
-    )
-  }
-
-  if (screen === 'attendance') {
-    return (
-      <Attendance
-        onBack={() => setScreen('dashboard')}
-        onManageStaff={() => setScreen('manage-staff')}
-      />
+      <div className="app-shell">
+        <main className="page-content">
+          <p>Loading...</p>
+        </main>
+      </div>
     )
   }
 
@@ -99,66 +237,183 @@ function App() {
   }
 
   if (screen === 'complaints') {
+  if (profileError) {
     return (
       <div className="app-shell">
-
-        <header className="app-hero dashboard-hero">
-
-          <div className="brand-row">
-
-            <button
-              className="logout-button"
-              onClick={() => setScreen('dashboard')}
-            >
-              <ArrowLeft size={16} />
-              Back
-            </button>
-
-            <div className="brand-copy">
-              <h1>Complaints</h1>
-              <p>RWA Pocket-A</p>
-            </div>
-
-          </div>
-
-        </header>
-
         <main className="page-content">
 
-          <div className="dashboard-welcome">
+          <h2>
+            Unable to load account
+          </h2>
 
-            <div
-              className="feature-icon feature-icon-purple"
-              style={{
-                marginBottom: '14px'
-              }}
-            >
-              <MessageSquareWarning
-                size={30}
-                strokeWidth={1.8}
-              />
-            </div>
+          <p>
+            {profileError}
+          </p>
+
+          <button onClick={handleLogout}>
+            Logout
+          </button>
+
+        </main>
+      </div>
+    )
+  }
+
+  /*
+   * ======================================================
+   * RWBOT USER
+   * ======================================================
+   */
+
+  if (rwbotProfile) {
+    if (!rwbotProfile.active) {
+      return (
+        <div className="app-shell">
+          <main className="page-content">
 
             <h2>
-              Complaint Management
+              RWBOT Account Disabled
             </h2>
 
             <p>
-              Resident complaint acknowledgement
-              will be integrated here.
+              Please contact RWA Pocket-A
+              for assistance.
             </p>
 
-          </div>
+            <button onClick={handleLogout}>
+              Logout
+            </button>
 
-        </main>
+          </main>
+        </div>
+      )
+    }
 
-        <footer className="app-footer">
-          <strong>RWA Pocket-A</strong>
-          <span>•</span>
-          <span>Sector -105 Noida</span>
-        </footer>
+    if (
+      rwbotProfile.must_change_password
+    ) {
+      return (
+        <RwbotChangePassword
+          profile={rwbotProfile}
+          onCompleted={
+            handleRwbotPasswordCompleted
+          }
+        />
+      )
+    }
 
-      </div>
+    if (screen === 'rwbot-chat') {
+      return (
+        <RwbotChat
+          profile={rwbotProfile}
+          onBack={() =>
+            setScreen('dashboard')
+          }
+        />
+      )
+    }
+
+    if (
+      screen === 'rwbot-documents' &&
+      rwbotProfile.role === 'RWA_MEMBER'
+    ) {
+      return (
+        <RwbotDocuments
+          profile={rwbotProfile}
+          onBack={() =>
+            setScreen('dashboard')
+          }
+        />
+      )
+    }
+
+    return (
+      <RwbotHome
+        profile={rwbotProfile}
+        onLogout={handleLogout}
+        onAsk={() =>
+          setScreen('rwbot-chat')
+        }
+        onManageDocuments={() =>
+          setScreen('rwbot-documents')
+        }
+      />
+    )
+  }
+
+  if (operationsRole === 'PLUMBER') {
+    return (
+      <ComplaintLiveDisplay
+        workerMode
+        onBack={handleLogout}
+      />
+    )
+  }
+
+  /*
+   * ======================================================
+   * EXISTING SUPERVISOR APP
+   * ======================================================
+   */
+
+  if (screen === 'manage-staff') {
+    return (
+      <ManageStaff
+        onBack={() =>
+          setScreen('dashboard')
+        }
+      />
+    )
+  }
+
+  if (screen === 'attendance') {
+    return (
+      <Attendance
+        onBack={() =>
+          setScreen('dashboard')
+        }
+        onManageStaff={() =>
+          setScreen('manage-staff')
+        }
+      />
+    )
+  }
+
+  if (screen === 'society-inspection') {
+    return (
+      <SocietyInspection
+        onBack={() =>
+          setScreen('dashboard')
+        }
+      />
+    )
+  }
+
+  if (screen === 'plumber-complaints') {
+    return (
+      <ComplaintLiveDisplay
+        workerMode
+        onBack={() => setScreen('dashboard')}
+      />
+    )
+  }
+
+  if (screen === 'complaint-live') {
+    return (
+      <ComplaintLiveDisplay
+        onBack={() => setScreen('dashboard')}
+        onOpenComplaints={() => setScreen('complaints')}
+      />
+    )
+  }
+
+  if (screen === 'complaints') {
+    return (
+      <Complaints
+        onBack={() =>
+          setScreen('dashboard')
+        }
+      />
     )
   }
 
@@ -177,8 +432,15 @@ function App() {
           </div>
 
           <div className="brand-copy">
-            <h1>RWA Pocket-A</h1>
-            <p>Sector -105 Noida</p>
+
+            <h1>
+              RWA Pocket-A
+            </h1>
+
+            <p>
+              Sector -105 Noida
+            </p>
+
           </div>
 
           <button
@@ -200,11 +462,15 @@ function App() {
       <main className="page-content">
 
         <div className="dashboard-welcome">
-          <h2>Hello, Supervisor</h2>
+
+          <h2>
+            Hello, Supervisor
+          </h2>
 
           <p>
             Manage and monitor daily RWA operations
           </p>
+
         </div>
 
         <button
@@ -216,10 +482,12 @@ function App() {
         >
 
           <div className="feature-icon feature-icon-purple">
+
             <Moon
               size={27}
               strokeWidth={1.8}
             />
+
           </div>
 
           <div className="feature-text">
@@ -240,14 +508,18 @@ function App() {
 
         <button
           className="feature-card feature-attendance"
-          onClick={() => setScreen('attendance')}
+          onClick={() =>
+            setScreen('attendance')
+          }
         >
 
           <div className="feature-icon feature-icon-green">
+
             <Users
               size={27}
               strokeWidth={1.8}
             />
+
           </div>
 
           <div className="feature-text">
@@ -268,24 +540,28 @@ function App() {
 
         <button
           className="feature-card feature-manage"
-          onClick={() => setScreen('tower-inspection')}
+          onClick={() =>
+            setScreen('society-inspection')
+          }
         >
 
           <div className="feature-icon feature-icon-blue">
+
             <ClipboardCheck
               size={27}
               strokeWidth={1.8}
             />
+
           </div>
 
           <div className="feature-text">
 
             <h3>
-              Tower Inspection
+              {inspectionConfig.module_name}
             </h3>
 
             <p>
-              Scan tower QR, verify GPS and submit inspection
+              Inspect towers, parks and street lights across the society
             </p>
 
           </div>
@@ -324,33 +600,20 @@ function App() {
 
         <button
           className="feature-card feature-patrol"
-          onClick={() => setScreen('complaints')}
+          onClick={() =>
+            setScreen('complaint-live')
+          }
         >
-
           <div className="feature-icon feature-icon-purple">
-            <MessageSquareWarning
-              size={27}
-              strokeWidth={1.8}
-            />
+            <MessageSquareWarning size={27} strokeWidth={1.8} />
           </div>
-
           <div className="feature-text">
-
-            <h3>
-              Complaints
-            </h3>
-
-            <p>
-              View and acknowledge resident complaints
-            </p>
-
+            <h3>Complaint Center</h3>
+            <p>Track and manage resident complaints</p>
           </div>
-
           <ArrowRight size={20} />
-
         </button>
-
-      </main>
+</main>
 
       <footer className="app-footer">
 

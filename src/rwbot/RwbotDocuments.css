@@ -1,0 +1,312 @@
+.rwbot-documents-main {
+  width: 100%;
+  max-width: 900px;
+  flex: 1;
+  margin: 0 auto;
+  padding: 24px 16px 45px;
+}
+
+.rwbot-upload-card,
+.rwbot-document-list-card {
+  margin-bottom: 20px;
+  padding: 22px;
+  background: white;
+  border: 1px solid #dfe6ec;
+  border-radius: 16px;
+  box-shadow: 0 5px 16px rgba(40, 60, 80, 0.04);
+}
+
+.rwbot-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 20px;
+  color: #1e5c91;
+}
+
+.rwbot-section-heading h2 {
+  margin: 0;
+  color: #2a3f54;
+  font-size: 18px;
+}
+
+.rwbot-section-heading p {
+  margin: 3px 0 0;
+  color: #84919e;
+  font-size: 11px;
+}
+
+.rwbot-upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.rwbot-upload-form label {
+  margin-top: 6px;
+  color: #45586a;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.rwbot-upload-form input[type="text"],
+.rwbot-upload-form input[type="date"],
+.rwbot-upload-form select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #ccd6df;
+  border-radius: 9px;
+  outline: none;
+  background: white;
+  color: #34475a;
+}
+
+.rwbot-upload-form input:focus,
+.rwbot-upload-form select:focus {
+  border-color: #5083af;
+  box-shadow: 0 0 0 3px rgba(80, 131, 175, 0.1);
+}
+
+.rwbot-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+}
+
+.rwbot-form-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.rwbot-file-input {
+  padding: 10px;
+  border: 1px dashed #bdcad5;
+  border-radius: 10px;
+  background: #f8fafb;
+  color: #536577;
+}
+
+.rwbot-selected-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: #eef6fb;
+  color: #376487;
+}
+
+.rwbot-selected-file div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.rwbot-selected-file strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rwbot-selected-file span {
+  margin-top: 2px;
+  color: #718698;
+  font-size: 10px;
+}
+
+.rwbot-visibility-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.rwbot-visibility-option input {
+  width: 16px;
+  height: 16px;
+}
+
+.rwbot-upload-help {
+  margin: 1px 0 0;
+  color: #8996a3;
+  font-size: 10px;
+}
+
+.rwbot-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #edf8f2;
+  color: #367058;
+  font-size: 12px;
+}
+
+.rwbot-document-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rwbot-upload-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.rwbot-document-loading,
+.rwbot-empty-documents {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #7d8b98;
+  font-size: 12px;
+}
+
+.rwbot-empty-documents {
+  flex-direction: column;
+}
+
+.rwbot-empty-documents strong {
+  margin-top: 5px;
+  color: #536575;
+  font-size: 13px;
+}
+
+.rwbot-empty-documents span {
+  color: #8a97a4;
+  font-size: 11px;
+}
+
+.rwbot-document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rwbot-document-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e0e6eb;
+  border-radius: 11px;
+  background: #fafbfc;
+}
+
+.rwbot-document-icon {
+  flex-shrink: 0;
+  width: 41px;
+  height: 41px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #eaf3fb;
+  color: #1e5c91;
+}
+
+.rwbot-document-info {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rwbot-document-info strong {
+  overflow: hidden;
+  color: #34495d;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rwbot-document-info > span {
+  overflow: hidden;
+  color: #84919e;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rwbot-document-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.rwbot-document-badges span {
+  padding: 3px 7px;
+  border-radius: 20px;
+  background: #edf3f7;
+  color: #607487;
+  font-size: 9px;
+}
+
+.rwbot-document-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.rwbot-document-actions button {
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d8e0e7;
+  border-radius: 9px;
+  background: white;
+  color: #557086;
+  cursor: pointer;
+}
+
+.rwbot-document-actions button:hover {
+  background: #f0f5f8;
+}
+
+.rwbot-document-actions .rwbot-delete-button {
+  color: #a54b4b;
+}
+
+.rwbot-spin {
+  animation: rwbot-spin 0.9s linear infinite;
+}
+
+@keyframes rwbot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .rwbot-documents-main {
+    padding: 16px 12px 35px;
+  }
+
+  .rwbot-upload-card,
+  .rwbot-document-list-card {
+    padding: 17px;
+  }
+
+  .rwbot-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rwbot-document-row {
+    align-items: flex-start;
+  }
+
+  .rwbot-document-actions {
+    flex-direction: column;
+  }
+}

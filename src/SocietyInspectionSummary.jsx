@@ -1,0 +1,754 @@
+import { useEffect, useMemo, useState } from 'react'
+import { supabase } from './supabase'
+import './SocietyInspection.css'
+
+function getIndiaDate() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+
+  const value = (type) => parts.find((part) => part.type === type)?.value
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+function getIndiaDateOffset(days) {
+  const target = new Date(Date.now() + days * 86400000)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(target)
+
+  const value = (type) => parts.find((part) => part.type === type)?.value
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+function getIndiaDateFromTimestamp(value) {
+  if (!value) return null
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(value))
+
+  const part = (type) => parts.find((item) => item.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+function formatDate(value) {
+  const [year, month, day] = String(value || '').split('-')
+  return year && month && day ? `${day}-${month}-${year}` : value
+}
+
+function statusText(status, required = true) {
+  if (!required) return 'Not Required'
+  if (status === 'DONE') return 'Done'
+  if (status === 'SENT') return 'Sent'
+  if (status === 'WHATSAPP_OPENED' || status === 'COMPOSER_OPENED') {
+    return 'WhatsApp Opened'
+  }
+  if (status === 'FAILED') return 'Failed'
+  return 'Pending'
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = String(text || '').split(/\s+/)
+  let line = ''
+  let currentY = y
+
+  words.forEach((word) => {
+    const test = line ? `${line} ${word}` : word
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, currentY)
+      currentY += lineHeight
+      line = word
+    } else {
+      line = test
+    }
+  })
+
+  if (line) {
+    ctx.fillText(line, x, currentY)
+    currentY += lineHeight
+  }
+
+  return currentY
+}
+
+async function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob)
+      else reject(new Error('Unable to create report image.'))
+    }, 'image/png')
+  })
+}
+
+export default function SocietyInspectionSummary({ onBack }) {
+  const today = useMemo(() => getIndiaDate(), [])
+  const yesterday = useMemo(() => getIndiaDateOffset(-1), [])
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState(null)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    loadSummary()
+  }, [])
+
+  const loadSummary = async () => {
+    setLoading(true)
+    setMessage('')
+
+    const [
+      towerResult,
+      parkResult,
+      towerInspectionResult,
+      parkInspectionResult,
+      societyResult,
+      serviceComplaintResult,
+      agencyResult,
+      streetInspectionResult,
+      residentComplaintResult,
+    ] = await Promise.all([
+      supabase
+        .from('towers')
+        .select('id,tower_name,display_order')
+        .eq('active', true)
+        .order('display_order'),
+      supabase
+        .from('parks')
+        .select('id,park_name,display_order')
+        .eq('active', true)
+        .order('display_order'),
+      supabase
+        .from('tower_daily_inspections')
+        .select('*')
+        .eq('inspection_date', today),
+      supabase
+        .from('park_daily_inspections')
+        .select('*')
+        .eq('inspection_date', today),
+      supabase
+        .from('society_daily_inspections')
+        .select('garbage_collected,garbage_disposed,saved_at')
+        .eq('inspection_date', today)
+        .maybeSingle(),
+      supabase
+        .from('society_service_complaints')
+        .select('*')
+        .eq('complaint_date', today),
+      supabase
+        .from('society_service_agencies')
+        .select('id,agency_name,service_type')
+        .eq('active', true),
+      supabase
+        .from('street_light_agency_daily_inspections')
+        .select(
+          'id,inspection_date,agency_id,faulty_count,saved_at,complaint_status,resolved_at'
+        )
+        .in('inspection_date', [today, yesterday]),
+      supabase
+        .from('complaints')
+        .select('id,complaint_no,category_id,flat_no,location_text,status,resident_rating,created_at,service_categories(id,name)')
+        .gte('created_at', `${today}T00:00:00+05:30`)
+        .lt('created_at', `${getIndiaDateOffset(1)}T00:00:00+05:30`)
+        .order('created_at', { ascending: true }),
+    ])
+
+    const error =
+      towerResult.error ||
+      parkResult.error ||
+      towerInspectionResult.error ||
+      parkInspectionResult.error ||
+      societyResult.error ||
+      serviceComplaintResult.error ||
+      agencyResult.error ||
+      streetInspectionResult.error ||
+      residentComplaintResult.error
+
+    if (error) {
+      setMessage(error.message)
+      setLoading(false)
+      return
+    }
+
+    const allStreetInspections = streetInspectionResult.data || []
+    const streetInspections = allStreetInspections.filter(
+      (item) => item.inspection_date === today
+    )
+    const resolvedStreetFollowUps = allStreetInspections.filter(
+      (item) =>
+        item.inspection_date === yesterday &&
+        item.complaint_status === 'DONE' &&
+        getIndiaDateFromTimestamp(item.resolved_at) === today
+    )
+    const streetIds = streetInspections.map((item) => item.id)
+
+    let streetNotifications = []
+
+    if (streetIds.length > 0) {
+      const notificationResult = await supabase
+        .from('street_light_notifications')
+        .select('id,inspection_id,agency_id,delivery_status,created_at')
+        .in('inspection_id', streetIds)
+        .eq('channel', 'WHATSAPP')
+        .order('created_at', { ascending: false })
+
+      if (notificationResult.error) {
+        setMessage(notificationResult.error.message)
+        setLoading(false)
+        return
+      }
+
+      streetNotifications = notificationResult.data || []
+    }
+
+    setData({
+      towers: towerResult.data || [],
+      parks: parkResult.data || [],
+      towerInspections: towerInspectionResult.data || [],
+      parkInspections: parkInspectionResult.data || [],
+      society: societyResult.data || null,
+      serviceComplaints: serviceComplaintResult.data || [],
+      agencies: agencyResult.data || [],
+      streetInspections,
+      resolvedStreetFollowUps,
+      streetNotifications,
+      residentComplaints: residentComplaintResult.data || [],
+    })
+
+    setLoading(false)
+  }
+
+  const summary = useMemo(() => {
+    if (!data) return null
+
+    const towerById = new Map(
+      data.towerInspections.map((item) => [Number(item.tower_id), item])
+    )
+    const parkById = new Map(
+      data.parkInspections.map((item) => [String(item.park_id), item])
+    )
+
+    const cameraIssues = []
+    const ledIssues = []
+    const sweepingIssues = []
+    const moppingIssues = []
+    const waterLeakageIssues = []
+    const otherIssues = []
+
+    data.towers.forEach((tower) => {
+      const inspection = towerById.get(Number(tower.id))
+      if (!inspection?.saved_at) return
+
+      const camera =
+        inspection.camera_working ??
+        inspection.camera_led_working
+
+      const led =
+        inspection.led_screen_working ??
+        inspection.camera_led_working
+
+      if (camera === false) cameraIssues.push(tower.tower_name)
+      if (led === false) ledIssues.push(tower.tower_name)
+      if (inspection.sweeping_done === false) sweepingIssues.push(tower.tower_name)
+      if (inspection.mopping_done === false) moppingIssues.push(tower.tower_name)
+      if (inspection.water_leakage === true) waterLeakageIssues.push(tower.tower_name)
+      if (inspection.other_issue === true) {
+        otherIssues.push(
+          `${tower.tower_name}: ${inspection.other_issue_details || 'Other issue'}`
+        )
+      }
+    })
+
+    data.parks.forEach((park) => {
+      const inspection = parkById.get(String(park.id))
+      if (!inspection?.saved_at) return
+
+      if (inspection.sweeping_done === false) sweepingIssues.push(park.park_name)
+      if (inspection.other_issue === true) {
+        otherIssues.push(
+          `${park.park_name}: ${inspection.other_issue_details || 'Other issue'}`
+        )
+      }
+    })
+
+    const cameraComplaint = data.serviceComplaints.find(
+      (item) => item.service_type === 'CAMERA_AMC'
+    )
+    const ledComplaint = data.serviceComplaints.find(
+      (item) => item.service_type === 'LED_AMC'
+    )
+
+    const agencyById = new Map(
+      data.agencies.map((agency) => [Number(agency.id), agency])
+    )
+
+    const streetAgencies = data.agencies.filter(
+      (agency) => agency.service_type === 'STREET_LIGHT'
+    )
+
+    const streetRows = streetAgencies.map((agency) => {
+      const inspection = data.streetInspections.find(
+        (item) => Number(item.agency_id) === Number(agency.id)
+      )
+
+      if (!inspection?.saved_at) {
+        return {
+          agency: agency.agency_name,
+          faultyCount: null,
+          inspectionStatus: 'Pending',
+          complaintStatus: 'Pending Inspection',
+        }
+      }
+
+      return {
+        agency: agency.agency_name,
+        faultyCount: inspection.faulty_count || 0,
+        inspectionStatus: 'Done',
+        complaintStatus:
+          inspection.faulty_count > 0
+            ? statusText(inspection.complaint_status, true)
+            : 'Not Required',
+      }
+    })
+
+    const resolvedStreetFollowUps = (
+      data.resolvedStreetFollowUps || []
+    ).map((inspection) => {
+      const agency = agencyById.get(Number(inspection.agency_id))
+
+      return {
+        agency: agency?.agency_name || 'Street Light Agency',
+        faultyCount: Number(inspection.faulty_count || 0),
+        inspectionDate: inspection.inspection_date,
+        status: 'Done',
+      }
+    })
+
+    const complaintGroup = (item) => {
+      const name = String(item.service_categories?.name || '').toUpperCase()
+      if (Number(item.category_id) === 1 || ['PLUMBER', 'PLUMBING'].includes(name)) return 'plumber'
+      if (Number(item.category_id) === 2 || ['ELECTRICIAN', 'ELECTRICAL'].includes(name)) return 'electrician'
+      return 'others'
+    }
+    const complaintStatus = (status) => {
+      const value = String(status || 'OPEN').toUpperCase()
+      if (value === 'OPEN') return 'Pending'
+      if (value === 'REOPENED') return 'Reopened'
+      if (value === 'IN_PROGRESS') return 'In Progress'
+      if (value === 'WORK_DONE') return 'Work Done'
+      if (value === 'CLOSED') return 'Closed'
+      return value.replaceAll('_', ' ')
+    }
+    const residentComplaints = (data.residentComplaints || []).map((item) => ({
+      ...item,
+      group: complaintGroup(item),
+      categoryLabel: String(item.service_categories?.name || 'Other').replaceAll('_', ' '),
+      statusLabel: complaintStatus(item.status),
+      location: item.flat_no || item.location_text || 'Common Area',
+      ratingLabel: item.resident_rating ? `${item.resident_rating}/5` : (item.status === 'WORK_DONE' ? 'Pending' : '—'),
+    }))
+    const complaintSummary = {
+      total: residentComplaints.length,
+      closed: residentComplaints.filter((item) => item.status === 'CLOSED').length,
+      workDone: residentComplaints.filter((item) => item.status === 'WORK_DONE').length,
+      pending: residentComplaints.filter((item) => ['OPEN', 'REOPENED', 'IN_PROGRESS'].includes(item.status)).length,
+      plumber: residentComplaints.filter((item) => item.group === 'plumber'),
+      electrician: residentComplaints.filter((item) => item.group === 'electrician'),
+      others: residentComplaints.filter((item) => item.group === 'others'),
+    }
+
+    const allRequiredComplaintsSent =
+      (cameraIssues.length === 0 || cameraComplaint?.status === 'SENT') &&
+      (ledIssues.length === 0 || ledComplaint?.status === 'SENT') &&
+      streetRows.every(
+        (row) =>
+          row.faultyCount === 0 ||
+          ['Sent', 'Done'].includes(row.complaintStatus)
+      )
+
+    return {
+      completedTowers: data.towerInspections.filter((item) => item.saved_at).length,
+      totalTowers: data.towers.length,
+      completedParks: data.parkInspections.filter((item) => item.saved_at).length,
+      totalParks: data.parks.length,
+      cameraIssues,
+      ledIssues,
+      sweepingIssues,
+      moppingIssues,
+      waterLeakageIssues,
+      otherIssues,
+      cameraComplaintStatus: statusText(
+        cameraComplaint?.status,
+        cameraIssues.length > 0
+      ),
+      ledComplaintStatus: statusText(
+        ledComplaint?.status,
+        ledIssues.length > 0
+      ),
+      garbageCollectedStatus:
+        data.society?.garbage_collected === true
+          ? 'Collected'
+          : data.society?.garbage_collected === false
+          ? 'Not Collected'
+          : 'Pending',
+      garbageStatus:
+        data.society?.garbage_disposed === true
+          ? 'Disposed'
+          : data.society?.garbage_disposed === false
+          ? 'Not Disposed'
+          : 'Pending',
+      streetRows,
+      resolvedStreetFollowUps,
+      allRequiredComplaintsSent,
+      complaintSummary,
+    }
+  }, [data])
+
+  const shareReport = async () => {
+    if (!summary) return
+
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 1080
+      canvas.height = Math.max(1500, 1500 + summary.complaintSummary.total * 46)
+
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      const margin = 70
+      let y = 85
+
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#173f67'
+      ctx.font = '700 34px Arial'
+      ctx.fillText('RWA POCKET-A', canvas.width / 2, y)
+
+      y += 50
+      ctx.font = '700 30px Arial'
+      ctx.fillText('DAILY SOCIETY INSPECTION SUMMARY', canvas.width / 2, y)
+
+      y += 42
+      ctx.font = '500 22px Arial'
+      ctx.fillText(formatDate(today), canvas.width / 2, y)
+
+      y += 55
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#172033'
+
+      const lines = [
+        `Towers Inspected: ${summary.completedTowers}/${summary.totalTowers}`,
+        `Parks Inspected: ${summary.completedParks}/${summary.totalParks}`,
+        `Camera: ${summary.cameraIssues.length ? summary.cameraIssues.join(', ') + ' not working' : 'All working'}`,
+        `Camera Complaint: ${summary.cameraComplaintStatus}`,
+        `LED Screen: ${summary.ledIssues.length ? summary.ledIssues.join(', ') + ' not working' : 'All working'}`,
+        `LED Complaint: ${summary.ledComplaintStatus}`,
+        `Garbage Collected: ${summary.garbageCollectedStatus}`,
+        `Garbage Disposed: ${summary.garbageStatus}`,
+        `Sweeping Issues: ${summary.sweepingIssues.length ? summary.sweepingIssues.join(', ') : 'None'}`,
+        `Mopping Issues: ${summary.moppingIssues.length ? summary.moppingIssues.join(', ') : 'None'}`,
+        `Water Leakage: ${summary.waterLeakageIssues.length ? summary.waterLeakageIssues.join(', ') : 'None'}`,
+      ]
+
+      summary.streetRows.forEach((row) => {
+        lines.push(
+          row.faultyCount === null
+            ? `${row.agency} Street Lights: Inspection Pending`
+            : `${row.agency} Street Lights: ${row.faultyCount} faulty • Complaint: ${row.complaintStatus}`
+        )
+      })
+
+      summary.resolvedStreetFollowUps.forEach((row) => {
+        lines.push(
+          `Resolved Follow-up: ${row.agency} street-light complaint from ${formatDate(row.inspectionDate)} • ${row.faultyCount} faulty • Done today`
+        )
+      })
+
+      if (summary.otherIssues.length > 0) {
+        lines.push(`Other Issues: ${summary.otherIssues.join(' | ')}`)
+      }
+
+      lines.push(`Complaints: ${summary.complaintSummary.total} Registered • ${summary.complaintSummary.closed} Closed • ${summary.complaintSummary.workDone} Work Done • ${summary.complaintSummary.pending} Pending/Reopened`)
+      ;[['Plumber', summary.complaintSummary.plumber], ['Electrician', summary.complaintSummary.electrician], ['Others', summary.complaintSummary.others]].forEach(([group, rows]) => {
+        if (!rows.length) return
+        lines.push(`${group} Complaints:`)
+        rows.forEach((item) => lines.push(
+          group === 'Others'
+            ? `${item.complaint_no} • ${item.categoryLabel} • ${item.location} • ${item.statusLabel} • Rating: ${item.ratingLabel}`
+            : `${item.complaint_no} • ${item.location} • ${item.statusLabel} • Rating: ${item.ratingLabel}`
+        ))
+      })
+
+      ctx.font = '600 25px Arial'
+      lines.forEach((line) => {
+        y = wrapText(ctx, line, margin, y, canvas.width - margin * 2, 38)
+        y += 16
+      })
+
+      ctx.fillStyle = '#6a7688'
+      ctx.font = '500 19px Arial'
+      y += 20
+      y = wrapText(
+        ctx,
+        'Note: The same report has also been shared with the RWA for information and further action, wherever required.',
+        margin,
+        y,
+        canvas.width - margin * 2,
+        30
+      )
+
+      y += 35
+      ctx.fillStyle = '#173f67'
+      ctx.font = '600 18px Arial'
+      wrapText(
+        ctx,
+        'Report digitally generated by the RWA Pocket-A in-house App.',
+        margin,
+        y,
+        canvas.width - margin * 2,
+        28
+      )
+
+      const blob = await canvasToBlob(canvas)
+      const file = new File(
+        [blob],
+        `rwa-pocket-a-final-inspection-${today}.png`,
+        { type: 'image/png' }
+      )
+
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] })
+      ) {
+        await navigator.share({
+          title: 'RWA Pocket-A Daily Society Inspection Summary',
+          files: [file],
+        })
+        return
+      }
+
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = file.name
+      anchor.click()
+      URL.revokeObjectURL(url)
+      setMessage('Final summary image downloaded.')
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      console.error(error)
+      setMessage('Unable to generate the final summary image.')
+    }
+  }
+
+  if (loading || !summary) {
+    return (
+      <div className="street-light-page">
+        <div className="society-loading">Loading final inspection summary…</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="street-light-page">
+      <header className="society-subpage-header">
+        <button type="button" onClick={onBack}>←</button>
+        <div>
+          <span>RWA POCKET-A</span>
+          <h1>Final Society Summary</h1>
+          <p>{formatDate(today)} • Inspection + complaint status</p>
+        </div>
+      </header>
+
+      <main className="street-light-content">
+        <section className="final-summary-progress">
+          <div>
+            <strong>{summary.completedTowers}/{summary.totalTowers}</strong>
+            <span>Towers Inspected</span>
+          </div>
+          <div>
+            <strong>{summary.completedParks}/{summary.totalParks}</strong>
+            <span>Parks Inspected</span>
+          </div>
+        </section>
+
+        <section className="final-summary-card">
+          <h2>Action & Complaint Status</h2>
+
+          <div className="final-summary-row">
+            <span>📷 Camera</span>
+            <strong>
+              {summary.cameraIssues.length
+                ? summary.cameraIssues.join(', ')
+                : 'All Working'}
+            </strong>
+            <b>{summary.cameraComplaintStatus}</b>
+          </div>
+
+          <div className="final-summary-row">
+            <span>🖥️ LED Screen</span>
+            <strong>
+              {summary.ledIssues.length
+                ? summary.ledIssues.join(', ')
+                : 'All Working'}
+            </strong>
+            <b>{summary.ledComplaintStatus}</b>
+          </div>
+
+          {summary.streetRows.map((row) => (
+            <div className="final-summary-row" key={row.agency}>
+              <span>💡 {row.agency}</span>
+              <strong>
+                {row.faultyCount === null
+                  ? 'Inspection Pending'
+                  : `${row.faultyCount} faulty`}
+              </strong>
+              <b>{row.complaintStatus}</b>
+            </div>
+          ))}
+        </section>
+
+        {summary.resolvedStreetFollowUps.length > 0 && (
+          <section className="final-summary-card">
+            <h2>Resolved Follow-ups Today</h2>
+
+            {summary.resolvedStreetFollowUps.map((row) => (
+              <div
+                className="final-summary-row"
+                key={`${row.inspectionDate}-${row.agency}`}
+              >
+                <span>✅ 💡 {row.agency}</span>
+                <strong>
+                  Yesterday: {row.faultyCount} faulty
+                </strong>
+                <b>Done Today</b>
+              </div>
+            ))}
+          </section>
+        )}
+
+        <section className="final-summary-card complaint-report-section">
+          <h2>Resident Complaints</h2>
+          <div className="complaint-report-summary">
+            <strong>{summary.complaintSummary.total} Registered</strong>
+            <span>{summary.complaintSummary.closed} Closed</span>
+            <span>{summary.complaintSummary.workDone} Work Done</span>
+            <span>{summary.complaintSummary.pending} Pending/Reopened</span>
+          </div>
+
+          {[
+            ['Plumber', summary.complaintSummary.plumber],
+            ['Electrician', summary.complaintSummary.electrician],
+            ['Others', summary.complaintSummary.others],
+          ].map(([title, rows]) => rows.length > 0 && (
+            <div className="complaint-report-group" key={title}>
+              <h3>{title}</h3>
+              <div className="complaint-report-table">
+                <div className="complaint-report-row complaint-report-head">
+                  <span>Complaint</span>
+                  {title === 'Others' && <span>Category</span>}
+                  <span>Flat/Location</span>
+                  <span>Status</span>
+                  <span>Rating</span>
+                </div>
+                {rows.map((item) => (
+                  <div className="complaint-report-row" key={item.id}>
+                    <strong>{item.complaint_no}</strong>
+                    {title === 'Others' && <span>{item.categoryLabel}</span>}
+                    <span>{item.location}</span>
+                    <span>{item.statusLabel}</span>
+                    <span>{item.ratingLabel}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {summary.complaintSummary.total === 0 && (
+            <div className="final-summary-line">
+              <span>No resident complaints registered today.</span>
+            </div>
+          )}
+        </section>
+
+        <section className="final-summary-card">
+          <h2>Inspection Status</h2>
+
+          <div className="final-summary-line">
+            <span>Garbage Collected</span>
+            <strong>{summary.garbageCollectedStatus}</strong>
+          </div>
+          <div className="final-summary-line">
+            <span>Garbage Disposed</span>
+            <strong>{summary.garbageStatus}</strong>
+          </div>
+          <div className="final-summary-line">
+            <span>Sweeping</span>
+            <strong>
+              {summary.sweepingIssues.length
+                ? summary.sweepingIssues.join(', ')
+                : 'All Done'}
+            </strong>
+          </div>
+          <div className="final-summary-line">
+            <span>Mopping</span>
+            <strong>
+              {summary.moppingIssues.length
+                ? summary.moppingIssues.join(', ')
+                : 'All Done'}
+            </strong>
+          </div>
+          <div className="final-summary-line">
+            <span>Water Leakage</span>
+            <strong>
+              {summary.waterLeakageIssues.length
+                ? summary.waterLeakageIssues.join(', ')
+                : 'None'}
+            </strong>
+          </div>
+          <div className="final-summary-line">
+            <span>Other Issues</span>
+            <strong>
+              {summary.otherIssues.length
+                ? summary.otherIssues.join(' • ')
+                : 'None'}
+            </strong>
+          </div>
+        </section>
+
+        <div className="final-summary-note">
+          Note: The same report has also been shared with the RWA for information
+          and further action, wherever required.
+        </div>
+
+        {!summary.allRequiredComplaintsSent && (
+          <div className="inspection-workflow-warning">
+            ⚠️ Final report can be shared after all required complaints are
+            marked Sent.
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="share-summary-button"
+          style={{ width: '100%' }}
+          disabled={!summary.allRequiredComplaintsSent}
+          onClick={shareReport}
+        >
+          🖼️ Share Final Summary Report
+        </button>
+
+        {message && <div className="street-light-message">{message}</div>}
+      </main>
+    </div>
+  )
+}

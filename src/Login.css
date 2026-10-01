@@ -1,0 +1,943 @@
+/* =========================================================
+   RWBOT + SUPERVISOR LOGIN
+   ========================================================= */
+
+.rwa-login-page {
+  width: 100%;
+  max-width: 540px;
+
+  min-height: 100vh;
+
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+
+  background:
+    linear-gradient(
+      180deg,
+      #f5fafe 0%,
+      #eef6fb 100%
+    );
+
+  color: #173451;
+}
+
+
+/* =========================================================
+   HERO
+   ========================================================= */
+
+.rwa-login-hero {
+  position: relative;
+
+  min-height: 190px;
+
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+
+  padding: 28px 28px;
+
+  border-radius:
+    0 0 30px 30px;
+
+  color: #ffffff;
+
+  box-shadow:
+    0 12px 30px
+    rgba(18, 67, 105, 0.15);
+}
+
+
+/* RWBOT */
+
+.rwa-login-hero-rwbot {
+  background:
+    radial-gradient(
+      circle at 93% 15%,
+      rgba(55, 218, 210, 0.36),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      #123f68 0%,
+      #126b9d 58%,
+      #139a96 100%
+    );
+}
+
+
+/* Supervisor */
+
+.rwa-login-hero-supervisor {
+  background:
+    radial-gradient(
+      circle at 93% 15%,
+      rgba(68, 158, 235, 0.30),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      #173b70 0%,
+      #155eb2 62%,
+      #1487cc 100%
+    );
+}
+
+
+.rwa-login-hero-copy {
+  position: relative;
+
+  z-index: 3;
+
+  width: 65%;
+}
+
+
+/* =========================================================
+   HERO BRAND
+   ========================================================= */
+
+.rwa-login-brand-row {
+  display: flex;
+
+  align-items: center;
+
+  gap: 13px;
+}
+
+
+.rwa-login-brand-icon {
+  width: 60px;
+  height: 60px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  border-radius: 18px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.16
+    );
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.14
+    );
+}
+
+
+.rwa-login-brand-icon img {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  object-position:
+    50% 25%;
+
+  transform:
+    scale(1.72);
+}
+
+
+.rwa-login-brand-row h1 {
+  margin: 0;
+
+  font-size: 29px;
+
+  line-height: 1;
+
+  letter-spacing:
+    -0.035em;
+}
+
+
+.rwa-login-brand-row p {
+  margin:
+    6px 0 0;
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.88
+    );
+
+  font-size: 12px;
+}
+
+
+.rwa-login-tagline {
+  margin-top: 19px;
+
+  color: #d9f7fa;
+
+  font-size: 9px;
+
+  font-weight: 800;
+
+  letter-spacing: 0.13em;
+}
+
+
+/* =========================================================
+   RWBOT MASCOT
+   ========================================================= */
+
+.rwa-login-hero-mascot {
+  position: absolute;
+
+  right: -5px;
+  bottom: -2px;
+
+  width: 42%;
+  height: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  pointer-events: none;
+}
+
+
+.rwa-login-mascot-glow {
+  position: absolute;
+
+  width: 165px;
+  height: 165px;
+
+  border-radius: 50%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(
+        255,
+        255,
+        255,
+        0.98
+      ) 0%,
+      rgba(
+        210,
+        249,
+        250,
+        0.62
+      ) 42%,
+      transparent 75%
+    );
+}
+
+
+.rwa-login-mascot-frame {
+  width: 165px;
+  height: 180px;
+
+  position: relative;
+
+  z-index: 2;
+
+  overflow: hidden;
+
+  border-radius:
+    45% 45% 30% 30%;
+
+  filter:
+    drop-shadow(
+      0 14px 17px
+      rgba(
+        0,
+        46,
+        77,
+        0.20
+      )
+    );
+}
+
+
+.rwa-login-mascot-frame img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+
+  object-position:
+    50% 20%;
+
+  transform:
+    scale(1.39);
+
+  transform-origin:
+    center 30%;
+}
+
+
+/* =========================================================
+   SUPERVISOR HERO ART
+   ========================================================= */
+
+.rwa-login-supervisor-art {
+  position: absolute;
+
+  right: 20px;
+
+  width: 35%;
+
+  display: flex;
+
+  justify-content: center;
+  align-items: center;
+}
+
+
+.rwa-login-supervisor-art-circle {
+  width: 125px;
+  height: 125px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.11
+    );
+
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.94
+    );
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.13
+    );
+}
+
+
+/* =========================================================
+   MAIN
+   ========================================================= */
+
+.rwa-login-main {
+  flex: 1;
+
+  padding:
+    24px 20px 14px;
+}
+
+
+/* =========================================================
+   LOGIN CARD
+   ========================================================= */
+
+.rwa-login-card {
+  padding: 24px;
+
+  border:
+    1px solid #dce7ee;
+
+  border-radius: 25px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 14px 32px
+    rgba(
+      27,
+      67,
+      94,
+      0.08
+    );
+}
+
+
+/* =========================================================
+   MODE SWITCH
+   ========================================================= */
+
+.rwa-login-mode-switch {
+  padding: 5px;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 5px;
+
+  border-radius: 16px;
+
+  background: #edf3f7;
+}
+
+
+.rwa-login-mode {
+  min-height: 48px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  border: 0;
+
+  border-radius: 12px;
+
+  background: transparent;
+
+  color: #61788a;
+
+  font-size: 13px;
+
+  font-weight: 750;
+
+  cursor: pointer;
+}
+
+
+.rwa-login-mode.active {
+  background: #ffffff;
+
+  color: #126398;
+
+  box-shadow:
+    0 5px 13px
+    rgba(
+      24,
+      71,
+      101,
+      0.11
+    );
+}
+
+
+/* =========================================================
+   LOGIN HEADING
+   ========================================================= */
+
+.rwa-login-heading {
+  margin:
+    28px 0 25px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  text-align: center;
+}
+
+
+.rwa-login-heading-icon {
+  width: 72px;
+  height: 72px;
+
+  margin-bottom: 13px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  border-radius: 50%;
+
+  background:
+    linear-gradient(
+      145deg,
+      #e3f5fa,
+      #e9f1fd
+    );
+
+  color: #176ca4;
+}
+
+
+.rwa-login-heading-icon img {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  object-position:
+    50% 24%;
+
+  transform:
+    scale(1.68);
+}
+
+
+.rwa-login-heading h2 {
+  margin: 0;
+
+  color: #113b61;
+
+  font-size: 25px;
+
+  letter-spacing:
+    -0.025em;
+}
+
+
+/* =========================================================
+   FORM
+   ========================================================= */
+
+.rwa-login-form {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 20px;
+}
+
+
+.rwa-login-field {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+}
+
+
+.rwa-login-field label {
+  color: #173e61;
+
+  font-size: 13px;
+
+  font-weight: 800;
+}
+
+
+/* =========================================================
+   LARGE CREDENTIAL INPUTS
+   ========================================================= */
+
+.rwa-login-input {
+  min-height: 62px;
+
+  display: flex;
+
+  align-items: center;
+
+  overflow: hidden;
+
+  border:
+    2px solid #cbddea;
+
+  border-radius: 16px;
+
+  background: #f9fcff;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+
+.rwa-login-input:focus-within {
+  border-color: #278fca;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 0 0 4px
+    rgba(
+      39,
+      143,
+      202,
+      0.11
+    );
+}
+
+
+.rwa-login-input-icon {
+  width: 58px;
+
+  align-self: stretch;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  color: #71879a;
+
+  background:
+    #f5f9fc;
+
+  border-right:
+    1px solid #e0eaf0;
+}
+
+
+.rwa-login-input input {
+  min-width: 0;
+
+  flex: 1;
+
+  padding:
+    17px 14px;
+
+  border: 0;
+
+  outline: 0;
+
+  background: transparent;
+
+  color: #17334d;
+
+  font-family: inherit;
+
+  font-size: 17px;
+
+  font-weight: 500;
+}
+
+
+.rwa-login-input input::placeholder {
+  color: #97a7b4;
+
+  font-weight: 400;
+}
+
+
+/* =========================================================
+   PASSWORD EYE
+   ========================================================= */
+
+.rwa-login-password-toggle {
+  width: 54px;
+
+  align-self: stretch;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #6d8497;
+
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.rwa-login-error {
+  margin-top: -4px;
+
+  padding: 11px 13px;
+
+  border:
+    1px solid #f2c6c6;
+
+  border-radius: 11px;
+
+  background: #fff5f5;
+
+  color: #a43f3f;
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   SIGN IN
+   ========================================================= */
+
+.rwa-login-submit {
+  width: 100%;
+
+  min-height: 60px;
+
+  margin-top: 1px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  border: 0;
+
+  border-radius: 16px;
+
+  background:
+    linear-gradient(
+      100deg,
+      #1679b8 0%,
+      #1176ad 53%,
+      #149b99 115%
+    );
+
+  color: #ffffff;
+
+  font-size: 17px;
+
+  font-weight: 800;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 9px 21px
+    rgba(
+      17,
+      108,
+      162,
+      0.23
+    );
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.rwa-login-submit:hover:not(:disabled) {
+  transform:
+    translateY(-1px);
+
+  box-shadow:
+    0 12px 24px
+    rgba(
+      17,
+      108,
+      162,
+      0.28
+    );
+}
+
+
+.rwa-login-submit:disabled {
+  opacity: 0.62;
+
+  cursor: default;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.rwa-login-footer {
+  padding:
+    17px 16px 22px;
+
+  display: flex;
+
+  justify-content: center;
+
+  gap: 6px;
+
+  color: #74899b;
+
+  font-size: 10px;
+}
+
+
+.rwa-login-footer strong {
+  color: #4d677c;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 420px) {
+
+  .rwa-login-hero {
+    min-height: 168px;
+
+    padding:
+      23px 20px;
+
+    border-radius:
+      0 0 25px 25px;
+  }
+
+
+  .rwa-login-brand-icon {
+    width: 50px;
+    height: 50px;
+
+    border-radius: 15px;
+  }
+
+
+  .rwa-login-brand-row {
+    gap: 10px;
+  }
+
+
+  .rwa-login-brand-row h1 {
+    font-size: 25px;
+  }
+
+
+  .rwa-login-brand-row p {
+    font-size: 10px;
+  }
+
+
+  .rwa-login-tagline {
+    margin-top: 14px;
+
+    font-size: 8px;
+  }
+
+
+  .rwa-login-hero-copy {
+    width: 70%;
+  }
+
+
+  .rwa-login-hero-mascot {
+    width: 39%;
+
+    right: -14px;
+  }
+
+
+  .rwa-login-mascot-frame {
+    width: 132px;
+    height: 148px;
+  }
+
+
+  .rwa-login-mascot-glow {
+    width: 125px;
+    height: 125px;
+  }
+
+
+  .rwa-login-supervisor-art {
+    right: 5px;
+
+    width: 35%;
+  }
+
+
+  .rwa-login-supervisor-art-circle {
+    width: 95px;
+    height: 95px;
+  }
+
+
+  .rwa-login-main {
+    padding:
+      18px 14px 10px;
+  }
+
+
+  .rwa-login-card {
+    padding: 18px;
+
+    border-radius: 22px;
+  }
+
+
+  .rwa-login-mode {
+    min-height: 45px;
+
+    font-size: 12px;
+  }
+
+
+  .rwa-login-heading {
+    margin:
+      23px 0 21px;
+  }
+
+
+  .rwa-login-heading-icon {
+    width: 64px;
+    height: 64px;
+  }
+
+
+  .rwa-login-heading h2 {
+    font-size: 23px;
+  }
+
+
+  .rwa-login-form {
+    gap: 18px;
+  }
+
+
+  .rwa-login-input {
+    min-height: 60px;
+  }
+
+
+  .rwa-login-input-icon {
+    width: 54px;
+  }
+
+
+  .rwa-login-input input {
+    padding:
+      16px 12px;
+
+    font-size: 16px;
+  }
+
+
+  .rwa-login-submit {
+    min-height: 58px;
+
+    font-size: 16px;
+  }
+
+}

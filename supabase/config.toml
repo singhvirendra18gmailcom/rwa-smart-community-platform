@@ -1,0 +1,7 @@
+project_id = "rwa-ai"
+
+[functions.rwbot-process-document]
+verify_jwt = false
+
+[functions.rwbot-ask]
+verify_jwt = false
