@@ -441,24 +441,303 @@
 }
 
 @media (max-width: 620px) {
-  .accounts-topbar-left > svg,
-  .accounts-topbar-left > div { display:none; }
-  .accounts-user > div:last-child { display:none; }
-  .accounts-content { padding:12px; }
-  .acc-page-header { flex-direction:column; }
-  .acc-page-actions { width:100%;justify-content:flex-start; }
-  .acc-page-header h1 { font-size:22px; }
-  .acc-stat-grid-4,.acc-stat-grid-5,.acc-quick-grid,.acc-form-grid,.settings-form,.acc-report-grid,.acc-master-tabs,.acc-recon-summary,.acc-balance-3 { grid-template-columns:1fr; }
-  .span-2 { grid-column:span 1; }
-  .acc-stat-card > strong { font-size:19px; }
-  .acc-section-head { align-items:flex-start;flex-direction:column; }
-  .acc-section-actions { width:100%;justify-content:flex-start; }
-  .acc-search { width:100%;min-width:0; }
-  .acc-filter-row { width:100%; }
-  .acc-filter-row select { flex:1;min-width:0; }
-  .acc-statement-title { grid-template-columns:1fr;text-align:center; }
-  .acc-statement-title > div:last-child { justify-self:center; }
-  .acc-close-panel { flex-direction:column;align-items:stretch; }
-  .acc-close-panel > div { align-items:flex-start; }
-  .accounts-footer { flex-direction:column;justify-content:center;padding:8px 12px; }
+  /* Mobile-first Accounts layout */
+  .accounts-topbar {
+    height: 58px;
+    padding: 0 10px;
+  }
+
+  .accounts-topbar-left {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .accounts-topbar-left > svg {
+    display: none;
+  }
+
+  .accounts-topbar-left > div {
+    display: block;
+    min-width: 0;
+  }
+
+  .accounts-topbar-left > div strong {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .accounts-topbar-left > div span {
+    display: none;
+  }
+
+  .accounts-menu-mobile {
+    width: 40px;
+    height: 40px;
+  }
+
+  .accounts-user {
+    gap: 0;
+  }
+
+  .accounts-user > div:last-child {
+    display: none;
+  }
+
+  .accounts-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 12px;
+  }
+
+  .accounts-content {
+    padding: 12px 10px 24px;
+  }
+
+  .acc-page-header {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .acc-page-header h1 {
+    font-size: 23px;
+    line-height: 1.15;
+  }
+
+  .acc-page-header p {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .acc-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .acc-page-actions > .acc-date-picker,
+  .acc-page-actions > .acc-month-picker {
+    width: 100%;
+  }
+
+  .acc-month-picker input,
+  .acc-date-picker input {
+    width: 100%;
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  /* Keep summary information visible without four full-width cards. */
+  .acc-stat-grid-4,
+  .acc-stat-grid-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .acc-stat-card {
+    padding: 11px 10px;
+    border-radius: 12px;
+  }
+
+  .acc-stat-top {
+    align-items: flex-start;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .acc-stat-top svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+  }
+
+  .acc-stat-card > strong {
+    margin-top: 7px;
+    font-size: 18px;
+  }
+
+  .acc-stat-card > small {
+    margin-top: 5px;
+    font-size: 8.5px;
+  }
+
+  .acc-quick-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .acc-quick-card {
+    min-height: 70px;
+    padding: 10px 11px;
+    gap: 9px;
+  }
+
+  .acc-quick-card > svg:first-child {
+    width: 38px;
+    height: 38px;
+    padding: 8px;
+  }
+
+  .acc-quick-card strong {
+    font-size: 12px;
+  }
+
+  .acc-quick-card small {
+    margin-top: 2px;
+    font-size: 8.5px;
+  }
+
+  .acc-form-grid,
+  .settings-form,
+  .acc-balance-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .acc-report-grid,
+  .acc-master-tabs,
+  .acc-recon-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .span-2 {
+    grid-column: span 1;
+  }
+
+  .acc-section {
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+
+  .acc-section-head {
+    min-height: 0;
+    padding: 10px 12px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .acc-section-head h2 {
+    font-size: 15px;
+  }
+
+  .acc-section-head p {
+    font-size: 9.5px;
+  }
+
+  .acc-section-body {
+    padding: 12px;
+  }
+
+  .acc-section-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .acc-section-actions > .acc-date-picker {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .acc-form-grid {
+    gap: 10px;
+  }
+
+  .acc-label {
+    font-size: 11px;
+  }
+
+  .acc-field input,
+  .acc-field select,
+  .acc-search input,
+  .acc-filter-row select,
+  .acc-match-actions select {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .acc-file-input {
+    min-height: 44px;
+  }
+
+  .acc-form-actions {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .acc-form-actions .acc-button {
+    flex: 1 1 0;
+    min-height: 44px;
+    padding: 0 10px;
+  }
+
+  .acc-search {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .acc-filter-row {
+    width: 100%;
+  }
+
+  .acc-filter-row select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .acc-table-wrap {
+    margin: 0 -2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .acc-table {
+    font-size: 10px;
+  }
+
+  .acc-statement-title {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .acc-statement-title > div:last-child {
+    justify-self: center;
+  }
+
+  .acc-close-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acc-close-panel > div {
+    align-items: flex-start;
+  }
+
+  .accounts-footer {
+    display: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .accounts-content {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .acc-stat-grid-4,
+  .acc-stat-grid-5 {
+    gap: 6px;
+  }
+
+  .acc-stat-card {
+    padding: 10px 8px;
+  }
+
+  .acc-stat-card > strong {
+    font-size: 16px;
+  }
+
+  .acc-stat-top {
+    font-size: 9px;
+  }
 }
