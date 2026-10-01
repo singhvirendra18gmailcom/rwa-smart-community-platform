@@ -621,6 +621,213 @@ button {
 
 
 /* =========================================================
+   SUPERVISOR HOME MODULE GRID
+   ========================================================= */
+
+.dashboard-module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-module-card {
+  position: relative;
+  min-width: 0;
+  min-height: 142px;
+  padding: 16px 14px 14px;
+
+  border: 1px solid rgba(203, 213, 225, 0.55);
+  border-radius: 18px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  text-align: left;
+  color: #173451;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 5px 16px rgba(15, 23, 42, 0.055);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.dashboard-module-card:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 9px 22px rgba(15, 23, 42, 0.09);
+}
+
+.dashboard-module-card:active {
+  transform: scale(0.985);
+}
+
+.dashboard-module-card.module-patrol {
+  background:
+    linear-gradient(
+      145deg,
+      #f5f2ff 0%,
+      #ece9ff 100%
+    );
+
+  border-color: #e3dcff;
+}
+
+.dashboard-module-card.module-attendance {
+  background:
+    linear-gradient(
+      145deg,
+      #effdf6 0%,
+      #e4f9ef 100%
+    );
+
+  border-color: #d7f2e5;
+}
+
+.dashboard-module-card.module-inspection {
+  background:
+    linear-gradient(
+      145deg,
+      #f1f7ff 0%,
+      #e7f1fd 100%
+    );
+
+  border-color: #d9e9fa;
+}
+
+.dashboard-module-card.module-complaints {
+  background:
+    linear-gradient(
+      145deg,
+      #f7f3ff 0%,
+      #efeaff 100%
+    );
+
+  border-color: #e6dcff;
+}
+
+.dashboard-module-card.module-accounts {
+  background:
+    linear-gradient(
+      135deg,
+      #eefbf8 0%,
+      #e2f6f1 100%
+    );
+
+  border-color: #cfece4;
+}
+
+.dashboard-module-wide {
+  grid-column: 1 / -1;
+
+  min-height: 98px;
+
+  padding: 16px 18px;
+
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 14px;
+}
+
+.dashboard-module-icon {
+  width: 44px;
+  height: 44px;
+
+  margin-bottom: 13px;
+
+  border-radius: 13px;
+
+  display: grid;
+  place-items: center;
+
+  color: white;
+
+  box-shadow:
+    0 5px 12px rgba(15, 23, 42, 0.10);
+}
+
+.dashboard-module-wide .dashboard-module-icon {
+  margin-bottom: 0;
+}
+
+.module-icon-purple {
+  background:
+    linear-gradient(135deg, #6d56d8, #5540bd);
+}
+
+.module-icon-green {
+  background:
+    linear-gradient(135deg, #1fb779, #10915e);
+}
+
+.module-icon-blue {
+  background:
+    linear-gradient(135deg, #3186d2, #1767af);
+}
+
+.module-icon-violet {
+  background:
+    linear-gradient(135deg, #7359dc, #5d43c8);
+}
+
+.module-icon-teal {
+  background:
+    linear-gradient(135deg, #18a47b, #0b7f64);
+}
+
+.dashboard-module-copy {
+  min-width: 0;
+}
+
+.dashboard-module-copy h3 {
+  margin: 0;
+
+  color: #163656;
+
+  font-size: 15px;
+  line-height: 1.22;
+  font-weight: 750;
+}
+
+.dashboard-module-copy p {
+  margin: 5px 0 0;
+
+  color: #60738a;
+
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.dashboard-module-arrow {
+  position: absolute;
+  right: 13px;
+  bottom: 13px;
+
+  color: #55708b;
+}
+
+.dashboard-module-wide .dashboard-module-arrow {
+  position: static;
+
+  justify-self: end;
+}
+
+.dashboard-module-wide .dashboard-module-copy h3 {
+  font-size: 17px;
+}
+
+.dashboard-module-wide .dashboard-module-copy p {
+  font-size: 11.5px;
+}
+
+/* =========================================================
    INTERNAL SCREEN HEADER
    ========================================================= */
 
@@ -1221,6 +1428,69 @@ footer {
   .feature-icon {
     width: 44px;
     height: 44px;
+  }
+
+  .dashboard-welcome {
+    margin-bottom: 18px;
+  }
+
+  .dashboard-welcome h2 {
+    font-size: 21px;
+  }
+
+  .dashboard-welcome p {
+    font-size: 13px;
+  }
+
+  .dashboard-module-grid {
+    gap: 11px;
+  }
+
+  .dashboard-module-card {
+    min-height: 132px;
+    padding: 14px 12px 12px;
+
+    border-radius: 16px;
+  }
+
+  .dashboard-module-icon {
+    width: 41px;
+    height: 41px;
+
+    margin-bottom: 11px;
+
+    border-radius: 12px;
+  }
+
+  .dashboard-module-copy h3 {
+    font-size: 14px;
+  }
+
+  .dashboard-module-copy p {
+    margin-top: 4px;
+
+    font-size: 10px;
+  }
+
+  .dashboard-module-arrow {
+    right: 11px;
+    bottom: 11px;
+  }
+
+  .dashboard-module-wide {
+    min-height: 92px;
+    padding: 14px;
+
+    grid-template-columns: 44px minmax(0, 1fr) 20px;
+    gap: 12px;
+  }
+
+  .dashboard-module-wide .dashboard-module-copy h3 {
+    font-size: 16px;
+  }
+
+  .dashboard-module-wide .dashboard-module-copy p {
+    font-size: 10.5px;
   }
 
   .attendance-row {
