@@ -98,7 +98,7 @@ export async function getMaintenanceRates(activeOnly = false) {
   const result = await query
 
   // Keep the rest of Accounts usable before the new migration is applied.
-  if (result.error?.code === '42P01') return []
+  if (result.error && ['42P01', 'PGRST205'].includes(result.error.code)) return []
 
   return throwIfError(result)
 }
