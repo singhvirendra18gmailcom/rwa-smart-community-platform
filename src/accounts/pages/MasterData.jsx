@@ -6,14 +6,17 @@ import {
   Plus,
   Search,
   Tags,
+  WalletCards,
 } from 'lucide-react'
 import {
   getBankAccounts,
   getExpenseHeads,
   getIncomeHeads,
+  getMaintenanceRates,
   saveBankAccount,
   saveExpenseHead,
-  saveIncomeHead
+  saveIncomeHead,
+  saveMaintenanceRate
 } from '../api'
 import { deriveFlatDetails, getFlatMaster, saveFlat } from '../flatMasterApi'
 import { EmptyState, Field, LoadingBlock, Message, PageHeader, Section, StatusBadge } from '../components/Common'
@@ -31,27 +34,31 @@ export default function MasterData() {
   const [expenseHeads, setExpenseHeads] = useState([])
   const [flats, setFlats] = useState([])
   const [banks, setBanks] = useState([])
+  const [rates, setRates] = useState([])
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState(null)
   const [search, setSearch] = useState('')
   const [headForm, setHeadForm] = useState({ id: null, name: '', display_order: 100, active: true })
   const [bankForm, setBankForm] = useState({ id: null, bank_name: '', account_name: 'RWA Pocket-A', account_no_last4: '', ifsc: '', active: true })
   const [flatForm, setFlatForm] = useState(emptyFlatForm())
+  const [rateForm, setRateForm] = useState({ id: null, effective_from: '', monthly_amount: '', notes: '', active: true })
   const [savingFlat, setSavingFlat] = useState(false)
 
   async function refresh() {
     setLoading(true)
     try {
-      const [i, e, f, b] = await Promise.all([
+      const [i, e, f, b, r] = await Promise.all([
         getIncomeHeads(false),
         getExpenseHeads(false),
         getFlatMaster(),
-        getBankAccounts()
+        getBankAccounts(),
+        getMaintenanceRates(false)
       ])
       setIncomeHeads(i)
       setExpenseHeads(e)
       setFlats(f)
       setBanks(b)
+      setRates(r)
     } catch (e) {
       setMessage({ type: 'error', text: e.message || 'Unable to load master data.' })
     } finally {
@@ -77,6 +84,7 @@ export default function MasterData() {
     setHeadForm({ id: null, name: '', display_order: 100, active: true })
     setBankForm({ id: null, bank_name: '', account_name: 'RWA Pocket-A', account_no_last4: '', ifsc: '', active: true })
     setFlatForm(emptyFlatForm())
+    setRateForm({ id: null, effective_from: '', monthly_amount: '', notes: '', active: true })
   }
 
   async function saveHead(e) {
@@ -143,6 +151,45 @@ export default function MasterData() {
     })
   }
 
+  async function submitRate(e) {
+    e.preventDefault()
+
+    if (!rateForm.effective_from || Number(rateForm.monthly_amount || 0) <= 0) {
+      setMessage({ type: 'error', text: 'Effective month and monthly maintenance amount are required.' })
+      return
+    }
+
+    try {
+      await saveMaintenanceRate({
+        ...rateForm,
+        effective_from: rateForm.effective_from + '-01',
+        monthly_amount: Number(rateForm.monthly_amount)
+      })
+
+      setMessage({ type: 'success', text: rateForm.id ? 'Maintenance rate updated.' : 'Maintenance rate added.' })
+      setRateForm({ id: null, effective_from: '', monthly_amount: '', notes: '', active: true })
+      await refresh()
+    } catch (e2) {
+      const duplicate = e2.code === '23505'
+      setMessage({
+        type: 'error',
+        text: duplicate
+          ? 'A maintenance rate already exists for this effective month. Edit the existing rate.'
+          : (e2.message || 'Unable to save maintenance rate.')
+      })
+    }
+  }
+
+  function editRate(row) {
+    setRateForm({
+      id: row.id,
+      effective_from: row.effective_from ? row.effective_from.slice(0, 7) : '',
+      monthly_amount: row.monthly_amount ?? '',
+      notes: row.notes || '',
+      active: row.active !== false
+    })
+  }
+
   async function submitBank(e) {
     e.preventDefault()
     if (!bankForm.bank_name.trim()) return
@@ -166,6 +213,7 @@ export default function MasterData() {
         <button className={tab === 'expense' ? 'active' : ''} onClick={() => changeTab('expense')}><Tags size={20} /><span>Expense Heads</span><small>{expenseHeads.length}</small></button>
         <button className={tab === 'flats' ? 'active' : ''} onClick={() => changeTab('flats')}><Building2 size={20} /><span>Flats & Residents</span><small>{flats.length}</small></button>
         <button className={tab === 'banks' ? 'active' : ''} onClick={() => changeTab('banks')}><Landmark size={20} /><span>Bank Accounts</span><small>{banks.length}</small></button>
+        <button className={tab === 'rates' ? 'active' : ''} onClick={() => changeTab('rates')}><WalletCards size={20} /><span>Maintenance Rates</span><small>{rates.length}</small></button>
       </div>
 
       {loading ? <LoadingBlock text="Loading master data..." /> : null}
@@ -234,6 +282,83 @@ export default function MasterData() {
               <div className="acc-form-actions-inline">
                 {flatForm.id ? <button type="button" className="acc-button secondary" onClick={() => setFlatForm(emptyFlatForm())}>Cancel</button> : null}
                 <button className="acc-button primary" disabled={savingFlat}><Plus size={16} /> {savingFlat ? 'Saving...' : (flatForm.id ? 'Update Flat / Resident' : 'Add Flat / Resident')}</button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      ) : null}
+
+      {!loading && tab === 'rates' ? (
+        <div className="acc-master-layout">
+          <Section
+            title="Maintenance Rate History"
+            subtitle="Dues are calculated month-by-month using the rate effective for each month"
+          >
+            {rates.length ? (
+              <div className="acc-table-wrap">
+                <table className="acc-table compact">
+                  <thead><tr><th>#</th><th>Effective From</th><th className="num">Monthly Amount</th><th>Notes</th><th>Status</th><th>Action</th></tr></thead>
+                  <tbody>
+                    {rates.map((row, i) => (
+                      <tr key={row.id}>
+                        <td>{i + 1}</td>
+                        <td><strong>{row.effective_from ? row.effective_from.slice(0, 7) : '—'}</strong></td>
+                        <td className="num"><strong>₹ {Number(row.monthly_amount || 0).toLocaleString('en-IN')}</strong></td>
+                        <td>{row.notes || '—'}</td>
+                        <td><StatusBadge status={row.active ? 'ACTIVE' : 'INACTIVE'} /></td>
+                        <td><button className="acc-mini-button secondary" onClick={() => editRate(row)}><Pencil size={14} /> Edit</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <EmptyState>No maintenance rate configured yet.</EmptyState>}
+          </Section>
+
+          <Section
+            title={rateForm.id ? 'Edit Maintenance Rate' : 'Add Maintenance Rate'}
+            subtitle="The earliest active rate becomes the start month for dues tracking"
+          >
+            <form className="acc-stack-form" onSubmit={submitRate}>
+              <Field label="Effective From" required>
+                <input
+                  type="month"
+                  value={rateForm.effective_from}
+                  onChange={(e) => setRateForm({ ...rateForm, effective_from: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Monthly Maintenance Amount" required>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={rateForm.monthly_amount}
+                  onChange={(e) => setRateForm({ ...rateForm, monthly_amount: e.target.value })}
+                  placeholder="e.g. 1300"
+                />
+              </Field>
+
+              <Field label="Notes">
+                <input
+                  value={rateForm.notes}
+                  onChange={(e) => setRateForm({ ...rateForm, notes: e.target.value })}
+                  placeholder="Optional reason / GBM reference"
+                />
+              </Field>
+
+              <label className="acc-toggle-row">
+                <input
+                  type="checkbox"
+                  checked={rateForm.active}
+                  onChange={(e) => setRateForm({ ...rateForm, active: e.target.checked })}
+                />
+                <span><strong>Active rate</strong><small>Use this rate in dues calculations</small></span>
+              </label>
+
+              <div className="acc-form-actions-inline">
+                {rateForm.id ? <button type="button" className="acc-button secondary" onClick={() => setRateForm({ id: null, effective_from: '', monthly_amount: '', notes: '', active: true })}>Cancel</button> : null}
+                <button className="acc-button primary"><Plus size={16} /> {rateForm.id ? 'Update Rate' : 'Add Rate'}</button>
               </div>
             </form>
           </Section>
