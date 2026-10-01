@@ -204,10 +204,10 @@ export default function MaintenanceDues({ month, setMonth }) {
       {tab === 'defaulters' ? (
         <>
           <div className="acc-stat-grid acc-stat-grid-4">
-            <StatCard label="Defaulter Flats" value={dues.filter((row) => row.due_month_count > 0).length} tone="red" helper={monthLabel(month)} />
+            <StatCard label="Defaulter Flats" value={String(dues.filter((row) => row.due_month_count > 0).length)} tone="red" helper={monthLabel(month)} />
             <StatCard label="Filtered Dues" value={totalDue} tone="sand" helper={defaulters.length + ' flats'} />
-            <StatCard label={'More Than ' + Number(monthThreshold || 0) + ' Months'} value={moreThanMonthsCount} tone="purple" helper="Flat count" />
-            <StatCard label={'Above ₹' + Number(amountThreshold || 0).toLocaleString('en-IN')} value={moreThanAmountCount} tone="blue" helper="Flat count" />
+            <StatCard label={'More Than ' + Number(monthThreshold || 0) + ' Months'} value={String(moreThanMonthsCount)} tone="purple" helper="Flat count" />
+            <StatCard label={'Above ₹' + Number(amountThreshold || 0).toLocaleString('en-IN')} value={String(moreThanAmountCount)} tone="blue" helper="Flat count" />
           </div>
 
           <Section
