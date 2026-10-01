@@ -77,10 +77,11 @@ function App() {
       (event, newSession) => {
         setSession(newSession)
 
-        if (
-          event === 'SIGNED_IN' ||
-          event === 'SIGNED_OUT'
-        ) {
+        // Do not reset the active module on SIGNED_IN.
+        // Supabase can emit SIGNED_IN again when the browser/tab regains focus
+        // (for example after returning from the mobile file picker). Resetting
+        // here used to kick users out of Accounts back to the home dashboard.
+        if (event === 'SIGNED_OUT') {
           setScreen('dashboard')
         }
 
