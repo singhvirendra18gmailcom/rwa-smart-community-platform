@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
 import {
   Building2,
@@ -28,7 +28,7 @@ import RwbotChangePassword from './rwbot/RwbotChangePassword'
 import RwbotChat from './rwbot/RwbotChat'
 import RwbotDocuments from './rwbot/RwbotDocuments'
 
-import AccountsApp from './accounts/AccountsApp'
+const AccountsApp = lazy(() => import('./accounts/AccountsApp'))
 
 function App() {
   const [session, setSession] = useState(null)
@@ -373,11 +373,21 @@ function App() {
 
   if (screen === 'accounts') {
     return (
-      <AccountsApp
-        onBack={() =>
-          setScreen('dashboard')
+      <Suspense
+        fallback={
+          <div className="app-shell">
+            <main className="page-content">
+              <p>Loading Income & Expense...</p>
+            </main>
+          </div>
         }
-      />
+      >
+        <AccountsApp
+          onBack={() =>
+            setScreen('dashboard')
+          }
+        />
+      </Suspense>
     )
   }
 
