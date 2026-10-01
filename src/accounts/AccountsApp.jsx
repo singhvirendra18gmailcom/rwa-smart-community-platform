@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Menu,
+  ReceiptText,
   Settings2,
   WalletCards,
   X
@@ -26,6 +27,7 @@ import Transactions from './pages/Transactions'
 import BankStatement from './pages/BankStatement'
 import MonthlyStatement from './pages/MonthlyStatement'
 import Reports from './pages/Reports'
+import MaintenanceDues from './pages/MaintenanceDues'
 import MasterData from './pages/MasterData'
 import Settings from './pages/Settings'
 import { currentMonthKey } from './utils'
@@ -38,6 +40,7 @@ const nav = [
   { id: 'bank', label: 'Bank Statement', icon: Landmark },
   { id: 'statement', label: 'Monthly Statement', icon: FileText },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'dues', label: 'Maintenance Dues', icon: ReceiptText },
   { id: 'master', label: 'Master Data', icon: Building2 },
   { id: 'settings', label: 'Settings', icon: Settings2 }
 ]
@@ -70,6 +73,7 @@ export default function AccountsApp({ onBack }) {
   if (screen === 'bank') content = <BankStatement month={month} setMonth={setMonth} />
   if (screen === 'statement') content = <MonthlyStatement month={month} setMonth={setMonth} />
   if (screen === 'reports') content = <Reports month={month} setMonth={setMonth} />
+  if (screen === 'dues') content = <MaintenanceDues month={month} setMonth={setMonth} />
   if (screen === 'master') content = <MasterData />
   if (screen === 'settings') content = <Settings />
 
@@ -108,7 +112,7 @@ export default function AccountsApp({ onBack }) {
             <button className="accounts-menu-mobile" onClick={() => setMobileOpen(true)}><Menu size={22} /></button>
             <button className="accounts-collapse" onClick={() => setCollapsed((x) => !x)}>{collapsed ? <ChevronRight size={19} /> : <ChevronLeft size={19} />}</button>
             <WalletCards size={22} />
-            <div><strong>RWA Pocket-A</strong><span>Income & Expense Management</span></div>
+            <div><strong>RWA Pocket-A</strong><span>Accounts & Finance</span></div>
           </div>
           <div className="accounts-user">
             <div className="accounts-avatar">{userLabel.slice(0, 2).toUpperCase()}</div>
@@ -117,7 +121,7 @@ export default function AccountsApp({ onBack }) {
         </header>
 
         <main className="accounts-content">{content}</main>
-        <footer className="accounts-footer"><span>RWA Pocket-A · Accounts Management</span><span>Cash + Bank · Reconciled · Transparent</span></footer>
+        <footer className="accounts-footer"><span>RWA Pocket-A · Accounts & Finance</span><span>Cash + Bank · Reconciled · Transparent</span></footer>
       </div>
     </div>
   )
