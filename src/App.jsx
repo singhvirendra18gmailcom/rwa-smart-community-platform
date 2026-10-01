@@ -377,7 +377,7 @@ function App() {
         fallback={
           <div className="app-shell">
             <main className="page-content">
-              <p>Loading Income & Expense...</p>
+              <p>Loading Accounts & Finance...</p>
             </main>
           </div>
         }
@@ -465,126 +465,96 @@ function App() {
           </p>
         </div>
 
-        <button
-          className="feature-card feature-patrol"
-          onClick={() => {
-            window.location.href =
-              'https://rwa-pocket-a.singh-virendra18.workers.dev/?view=report'
-          }}
-        >
-          <div className="feature-icon feature-icon-purple">
-            <Moon
-              size={27}
-              strokeWidth={1.8}
-            />
-          </div>
+        <div className="dashboard-module-grid">
+          <button
+            className="dashboard-module-card module-patrol"
+            onClick={() => {
+              window.location.href =
+                'https://rwa-pocket-a.singh-virendra18.workers.dev/?view=report'
+            }}
+          >
+            <div className="dashboard-module-icon module-icon-purple">
+              <Moon size={24} strokeWidth={1.9} />
+            </div>
 
-          <div className="feature-text">
-            <h3>
-              Night Patrol Report
-            </h3>
+            <div className="dashboard-module-copy">
+              <h3>Night Patrol</h3>
+              <p>View night patrol report</p>
+            </div>
 
-            <p>
-              View and share last night's patrol report
-            </p>
-          </div>
+            <ArrowRight className="dashboard-module-arrow" size={18} />
+          </button>
 
-          <ArrowRight size={20} />
-        </button>
+          <button
+            className="dashboard-module-card module-attendance"
+            onClick={() =>
+              setScreen('attendance')
+            }
+          >
+            <div className="dashboard-module-icon module-icon-green">
+              <Users size={24} strokeWidth={1.9} />
+            </div>
 
-        <button
-          className="feature-card feature-attendance"
-          onClick={() =>
-            setScreen('attendance')
-          }
-        >
-          <div className="feature-icon feature-icon-green">
-            <Users
-              size={27}
-              strokeWidth={1.8}
-            />
-          </div>
+            <div className="dashboard-module-copy">
+              <h3>Staff Attendance</h3>
+              <p>Mark daily attendance</p>
+            </div>
 
-          <div className="feature-text">
-            <h3>
-              Staff Attendance
-            </h3>
+            <ArrowRight className="dashboard-module-arrow" size={18} />
+          </button>
 
-            <p>
-              Mark today's attendance and share on WhatsApp
-            </p>
-          </div>
+          <button
+            className="dashboard-module-card module-inspection"
+            onClick={() =>
+              setScreen('society-inspection')
+            }
+          >
+            <div className="dashboard-module-icon module-icon-blue">
+              <ClipboardCheck size={24} strokeWidth={1.9} />
+            </div>
 
-          <ArrowRight size={20} />
-        </button>
+            <div className="dashboard-module-copy">
+              <h3>{inspectionConfig.module_name}</h3>
+              <p>Society inspection</p>
+            </div>
 
-        <button
-          className="feature-card feature-manage"
-          onClick={() =>
-            setScreen('society-inspection')
-          }
-        >
-          <div className="feature-icon feature-icon-blue">
-            <ClipboardCheck
-              size={27}
-              strokeWidth={1.8}
-            />
-          </div>
+            <ArrowRight className="dashboard-module-arrow" size={18} />
+          </button>
 
-          <div className="feature-text">
-            <h3>
-              {inspectionConfig.module_name}
-            </h3>
+          <button
+            className="dashboard-module-card module-complaints"
+            onClick={() =>
+              setScreen('complaint-live')
+            }
+          >
+            <div className="dashboard-module-icon module-icon-violet">
+              <MessageSquareWarning size={24} strokeWidth={1.9} />
+            </div>
 
-            <p>
-              Inspect towers, parks and street lights across the society
-            </p>
-          </div>
+            <div className="dashboard-module-copy">
+              <h3>Complaint Center</h3>
+              <p>Track resident complaints</p>
+            </div>
 
-          <ArrowRight size={20} />
-        </button>
+            <ArrowRight className="dashboard-module-arrow" size={18} />
+          </button>
 
-        <button
-          className="feature-card feature-attendance"
-          onClick={() => setScreen('accounts')}
-        >
-          <div className="feature-icon feature-icon-green">
-            <WalletCards
-              size={27}
-              strokeWidth={1.8}
-            />
-          </div>
+          <button
+            className="dashboard-module-card dashboard-module-wide module-accounts"
+            onClick={() => setScreen('accounts')}
+          >
+            <div className="dashboard-module-icon module-icon-teal">
+              <WalletCards size={25} strokeWidth={1.9} />
+            </div>
 
-          <div className="feature-text">
-            <h3>
-              Income & Expense
-            </h3>
+            <div className="dashboard-module-copy">
+              <h3>Accounts &amp; Finance</h3>
+              <p>Income · Expenses · Bank · Reports</p>
+            </div>
 
-            <p>
-              Daily accounts, bank reconciliation and monthly statement
-            </p>
-          </div>
-
-          <ArrowRight size={20} />
-        </button>
-
-        <button
-          className="feature-card feature-patrol"
-          onClick={() =>
-            setScreen('complaint-live')
-          }
-        >
-          <div className="feature-icon feature-icon-purple">
-            <MessageSquareWarning size={27} strokeWidth={1.8} />
-          </div>
-
-          <div className="feature-text">
-            <h3>Complaint Center</h3>
-            <p>Track and manage resident complaints</p>
-          </div>
-
-          <ArrowRight size={20} />
-        </button>
+            <ArrowRight className="dashboard-module-arrow" size={19} />
+          </button>
+        </div>
       </main>
 
       <footer className="app-footer">
