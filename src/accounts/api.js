@@ -85,3 +85,49 @@ export async function getFlatsWithResidents() { const result=await supabase.from
 export async function reopenMonth(month) { return throwIfError(await supabase.from('accounts_month_closings').update({is_closed:false,closed_by:null,closed_at:null}).eq('statement_month',monthStartFromKey(month)).select().single()) }
 export async function getBankAccounts() { return throwIfError(await supabase.from('accounts_bank_accounts').select('*').order('created_at')) }
 export async function saveBankAccount(payload) { const {id,data}=splitId(payload); const q=id?supabase.from('accounts_bank_accounts').update(data).eq('id',id):supabase.from('accounts_bank_accounts').insert(data); return throwIfError(await q.select().single()) }
+
+
+export async function getMaintenanceRates(activeOnly = false) {
+  let query = supabase
+    .from('accounts_maintenance_rates')
+    .select('*')
+    .order('effective_from', { ascending: true })
+
+  if (activeOnly) query = query.eq('active', true)
+
+  const result = await query
+
+  // Keep the rest of Accounts usable before the new migration is applied.
+  if (result.error?.code === '42P01') return []
+
+  return throwIfError(result)
+}
+
+export async function saveMaintenanceRate(payload) {
+  const { id, data } = splitId(payload)
+  const normalized = {
+    ...data,
+    effective_from: data.effective_from
+      ? `${String(data.effective_from).slice(0, 7)}-01`
+      : null,
+    monthly_amount: Number(data.monthly_amount || 0)
+  }
+
+  const query = id
+    ? supabase.from('accounts_maintenance_rates').update(normalized).eq('id', id)
+    : supabase.from('accounts_maintenance_rates').insert(normalized)
+
+  return throwIfError(await query.select().single())
+}
+
+export async function getMaintenanceIncomeEntries() {
+  const result = await supabase
+    .from('accounts_income_entries')
+    .select('*')
+    .ilike('income_head_name', '%maintenance%')
+    .neq('status', 'VOID')
+    .order('receipt_date', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  return throwIfError(result)
+}
