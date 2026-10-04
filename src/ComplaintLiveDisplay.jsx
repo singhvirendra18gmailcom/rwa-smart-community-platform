@@ -295,7 +295,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                 : category === 'STREET_LIGHT' ? 'streetlight'
                 : 'other'
               return (
-                <article className={`live-card ${type}`} key={c.id}>
+                <article className={`live-card ${type}${workerMode ? '' : ' supervisor-card'}`} key={c.id}>
                   <div className="live-card-top">
                     <span className="live-number">{c.complaint_no}</span>
                     <span className="live-category">{label}</span>
@@ -359,12 +359,12 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                         </span>
                       )}
                       {c.status !== 'CLOSED' && (
-                        <button disabled={workingId === c.id} onClick={() => {
+                        <button className="live-close-button" disabled={workingId === c.id} onClick={() => {
                           if (window.confirm(`Close complaint ${c.complaint_no}? Resident confirmation is not required.`)) {
                             complaintAction(c, 'close')
                           }
                         }}>
-                          {workingId === c.id ? 'Saving...' : 'CLOSE COMPLAINT'}
+                          {workingId === c.id ? 'Closing...' : 'Close Complaint'}
                         </button>
                       )}
                     </>

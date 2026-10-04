@@ -251,3 +251,30 @@
   border-color: #0f4c81;
   color: #fff;
 }
+
+/* Keep the supervisor close action compact and at the bottom-right. */
+.live-card.supervisor-card {
+  height: auto;
+  min-height: 178px;
+}
+.supervisor-card .live-flat,
+.supervisor-card .live-current-status {
+  flex-shrink: 0;
+}
+.live-card > .live-close-button {
+  width: auto;
+  align-self: flex-end;
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: 8px 10px;
+  min-height: 36px;
+  font-size: 11px;
+  border-radius: 8px;
+}
+.supervisor-card .live-current-status {
+  margin-bottom: 8px;
+}
+@media (max-width: 420px) {
+  .live-card.supervisor-card { min-height: 166px; }
+  .live-card > .live-close-button { font-size: 10px; padding: 8px; }
+}
