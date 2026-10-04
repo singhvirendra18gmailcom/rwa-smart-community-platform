@@ -278,3 +278,76 @@
   .live-card.supervisor-card { min-height: 166px; }
   .live-card > .live-close-button { font-size: 10px; padding: 8px; }
 }
+
+
+/* Compact complaint hierarchy: header, flat, then aligned actions. */
+.supervisor-card .live-card-top {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.live-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 7px;
+  min-width: 0;
+}
+.live-heading .urgent-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 6px;
+  border-radius: 999px;
+}
+.supervisor-card .live-time {
+  white-space: normal;
+  max-width: 100px;
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: right;
+}
+.supervisor-card .live-flat {
+  margin: 14px 0;
+  line-height: 1.1;
+}
+.live-card-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.live-card-footer .live-current-status { margin: 0; font-size: 10px; }
+.live-card-footer button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 36px;
+  background: #111827;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.live-card-footer .live-close-button { margin-left: auto; }
+.live-card-footer button:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 420px) {
+  .supervisor-card .live-card-top { grid-template-columns: 1fr; gap: 4px; }
+  .supervisor-card .live-time { max-width: none; text-align: left; font-size: 9px; }
+  .supervisor-card .live-flat { margin: 12px 0; }
+  .live-card-footer { gap: 6px; }
+  .live-card-footer button { font-size: 10px; padding: 8px; }
+  .live-card-footer .live-current-status { font-size: 9px; }
+}
+
+@media (max-width: 420px) {
+  .live-card-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .live-card-footer .live-current-status {
+    justify-self: start;
+    white-space: normal;
+    padding: 4px 6px;
+    font-size: 8px;
+    line-height: 1.3;
+  }
+  .live-card-footer button { max-width: 76px; line-height: 1.2; }
+}
