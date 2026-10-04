@@ -351,3 +351,81 @@
   }
   .live-card-footer button { max-width: 76px; line-height: 1.2; }
 }
+
+
+/* Mobile filters and cards stay compact without changing the desktop board. */
+@media (max-width: 680px) {
+  .complaint-filters {
+    padding: 10px;
+    gap: 10px;
+    margin: 8px 0 10px;
+  }
+  .complaint-date-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+  }
+  .complaint-date-filters .default-filter {
+    grid-column: 1 / -1;
+    justify-self: start;
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+  .complaint-date-filters > span { display: none; }
+  .complaint-date-filters label {
+    min-width: 0;
+    font-size: 10px;
+    gap: 3px;
+  }
+  .complaint-date-filters input {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 34px;
+    padding: 5px 6px;
+    font-size: 11px;
+  }
+  .complaint-status-filters { gap: 5px; }
+  .complaint-status-filters > strong {
+    width: 100%;
+    font-size: 10px;
+    margin: 0;
+  }
+  .status-filter {
+    min-height: 32px;
+    padding: 5px 7px;
+    gap: 4px;
+    font-size: 10px;
+  }
+  .status-filter input { width: 12px; height: 12px; margin: 0; }
+  .status-filter-action {
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+  .live-card.supervisor-card {
+    min-height: 150px;
+    padding: 9px;
+  }
+  .supervisor-card .live-flat {
+    margin: 9px 0;
+    font-size: 34px;
+  }
+  .supervisor-card .live-work-result {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    margin: 2px 0 8px;
+  }
+  .supervisor-card .live-work-result span {
+    font-size: 10px;
+    line-height: 1.4;
+    text-transform: none;
+    letter-spacing: normal;
+    opacity: 1;
+  }
+  .supervisor-card .live-work-result strong {
+    font-size: 10px;
+    white-space: normal;
+  }
+}
