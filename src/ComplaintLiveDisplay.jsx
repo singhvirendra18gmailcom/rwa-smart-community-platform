@@ -193,7 +193,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
       setError('')
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(
-        `https://rwa-complaint-bot.singh-virendra18.workers.dev/api/complaints/${action}`,
+        `${__COMPLAINT_API_BASE_URL__}/api/complaints/${action}`,
         {
           method: 'POST',
           headers: {
