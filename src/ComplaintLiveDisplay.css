@@ -429,3 +429,14 @@
     white-space: normal;
   }
 }
+
+
+/* Water-blue plumbing cards with readable details. */
+.live-card.plumber {
+  background: #d9f2fc;
+  border-color: #7dd3fc;
+  color: #0c4a6e;
+}
+.live-card.plumber .live-time,
+.live-card.plumber p { color: #155e75; opacity: 1; }
+.live-card.plumber .live-work-result { color: #0c4a6e; }
