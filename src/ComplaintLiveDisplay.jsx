@@ -358,6 +358,15 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                            c.status.replaceAll('_', ' ')}
                         </span>
                       )}
+                      {c.status !== 'CLOSED' && (
+                        <button disabled={workingId === c.id} onClick={() => {
+                          if (window.confirm(`Close complaint ${c.complaint_no}? Resident confirmation is not required.`)) {
+                            complaintAction(c, 'close')
+                          }
+                        }}>
+                          {workingId === c.id ? 'Saving...' : 'CLOSE COMPLAINT'}
+                        </button>
+                      )}
                     </>
                   )}
                 </article>
