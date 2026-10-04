@@ -193,7 +193,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
       setError('')
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(
-        `https://rwa-complaint-bot.singh-virendra18.workers.dev/api/complaints/${action}`,
+        `${__COMPLAINT_API_BASE_URL__}/api/complaints/${action}`,
         {
           method: 'POST',
           headers: {
@@ -225,6 +225,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   }
 
   const formatTime = value => new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata',
     hour: '2-digit', minute: '2-digit', hour12: true
   }).format(new Date(value))
 
@@ -295,19 +296,20 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                 : category === 'STREET_LIGHT' ? 'streetlight'
                 : 'other'
               return (
-                <article className={`live-card ${type}`} key={c.id}>
+                <article className={`live-card ${type}${workerMode ? '' : ' supervisor-card'}`} key={c.id}>
                   <div className="live-card-top">
-                    <span className="live-number">{c.complaint_no}</span>
-                    <span className="live-category">{label}</span>
+                    <div className="live-heading">
+                      <span className="live-number">{c.complaint_no}</span>
+                      <span className="live-category">{label}</span>
+                      {c.is_urgent && <span className="urgent-badge">URGENT</span>}
+                    </div>
                     <span className="live-time"><Clock size={13}/>{formatTime(c.created_at)}</span>
                   </div>
                   <div className="live-flat">{c.flat_no || c.location_text || 'Common Area'}</div>
-                  <div className="live-badges">
-                    {c.is_urgent && <span className="urgent-badge">URGENT</span>}
-                    
-                  </div>
-                  {!['WORK_DONE', 'CLOSED'].includes(c.status) && (
-                    <p>{c.description || c.issue_type?.replaceAll('_', ' ') || ''}</p>
+                  {!['WORK_DONE', 'CLOSED'].includes(c.status) &&
+                    (c.description || c.issue_type) &&
+                    ![label, category].includes(String(c.description || c.issue_type).trim()) && (
+                    <p>{c.description || c.issue_type?.replaceAll('_', ' ')}</p>
                   )}
                   {!workerMode && ['WORK_DONE', 'CLOSED'].includes(c.status) && (
                     <div className="live-work-result">
@@ -342,7 +344,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                       )}
                     </>
                   ) : (
-                    <>
+                    <div className="live-card-footer">
                       {Number(c.category_id) !== 1 && ['OPEN', 'REOPENED'].includes(c.status) && (
                         <button disabled={workingId === c.id} onClick={() => complaintAction(c, 'supervisor-done')}>
                           {workingId === c.id ? 'Saving...' : 'WORK DONE'}
@@ -358,7 +360,16 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
                            c.status.replaceAll('_', ' ')}
                         </span>
                       )}
-                    </>
+                      {c.status !== 'CLOSED' && (
+                        <button className="live-close-button" disabled={workingId === c.id} onClick={() => {
+                          if (window.confirm(`Close complaint ${c.complaint_no}? Resident confirmation is not required.`)) {
+                            complaintAction(c, 'close')
+                          }
+                        }}>
+                          {workingId === c.id ? 'Closing...' : 'Close Complaint'}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </article>
               )

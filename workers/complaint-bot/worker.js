@@ -51,6 +51,10 @@ export default {
       return handleWorkerDone(request, env)
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/complaints/close') {
+      return handleSupervisorClose(request, env)
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/complaints/supervisor-done') {
       return handleSupervisorDone(request, env)
     }
@@ -650,6 +654,41 @@ async function handleWorkerStart(request, env) {
   }
 }
 
+async function handleSupervisorClose(request, env) {
+  try {
+    const user = await getAuthenticatedUser(request, env)
+    if (!user?.id) return apiResponse({ ok: false, error: 'Authentication required.' }, 401)
+
+    const profiles = await supabaseRequest(env,
+      `/rest/v1/app_users?auth_user_id=eq.${user.id}&active=eq.true&select=role`,
+      { method: 'GET' })
+    if (!Array.isArray(profiles) || String(profiles[0]?.role || '').toUpperCase() !== 'SUPERVISOR') {
+      return apiResponse({ ok: false, error: 'Supervisor access required.' }, 403)
+    }
+
+    const body = await request.json()
+    const complaintId = Number(body?.complaint_id)
+    if (!Number.isInteger(complaintId) || complaintId <= 0) {
+      return apiResponse({ ok: false, error: 'Invalid complaint id.' }, 400)
+    }
+    const rows = await supabaseRequest(env,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,status`, { method: 'GET' })
+    if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
+    if (rows[0].status === 'CLOSED') return apiResponse({ ok: true, status: 'CLOSED' }, 200)
+
+    const now = new Date().toISOString()
+    // Supervisor closure does not imply resident confirmation or completed work.
+    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaintId}&status=neq.CLOSED`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'CLOSED', closed_at: now, updated_at: now })
+    })
+    return apiResponse({ ok: true, status: 'CLOSED' }, 200)
+  } catch (error) {
+    console.error('Supervisor close error:', error)
+    return apiResponse({ ok: false, error: 'Unable to close complaint.' }, 500)
+  }
+}
+
 async function handleSupervisorDone(request, env) {
   try {
     const user = await getAuthenticatedUser(request, env)
@@ -877,7 +916,7 @@ async function handleResidentWorkDoneReply(env, mobile, originalText) {
   const text = String(originalText || '').trim()
   const rows = await supabaseRequest(
     env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&status=in.(WORK_DONE,CLOSED)&order=updated_at.desc&limit=1&select=id,complaint_no,status,preferred_language,resident_rating`,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&or=(status.eq.WORK_DONE,and(status.eq.CLOSED,resident_confirmation.eq.true))&order=updated_at.desc&limit=1&select=id,complaint_no,status,preferred_language,resident_rating`,
     { method: 'GET' }
   )
 
