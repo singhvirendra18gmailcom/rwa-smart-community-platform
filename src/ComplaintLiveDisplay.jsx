@@ -29,6 +29,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   const [toDate, setToDate] = useState(today)
   const [selectedStatuses, setSelectedStatuses] = useState(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED']))
   const [defaultView, setDefaultView] = useState(true)
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
 
   const load = async () => {
     setError('')
@@ -239,11 +240,14 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
   }).format(new Date(value))
 
   return (
-    <div className="live-page">
+    <div className={`live-page${workerMode ? '' : ' compact-supervisor'}`}>
       <header className="live-header">
         <button onClick={onBack}><ArrowLeft size={18}/> Back</button>
-        <div><h1>{workerMode ? 'Plumber Complaints' : 'Complaint Center'}</h1><p>{workerMode ? 'Plumbing Work Queue' : 'Supervisor Complaint Dashboard'}</p></div>
-        <button className="live-refresh" onClick={load}><RefreshCw size={18}/></button>
+        <div><h1>{workerMode ? 'Plumber Complaints' : 'Complaint Center'}</h1>{workerMode && <p>Plumbing Work Queue</p>}</div>
+        <div className="live-header-actions">
+          {!workerMode && <button onClick={onOpenComplaints}>Dashboard</button>}
+          <button className="live-refresh" onClick={load} aria-label="Refresh complaints"><RefreshCw size={18}/></button>
+        </div>
       </header>
 
       <main className="live-content">
@@ -258,11 +262,16 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
               <span className="summary-closed"><strong>{statusCounts.closed}</strong><small>Closed</small></span>
             </div>
           )}
-          {!workerMode && <button onClick={onOpenComplaints}>Dashboard →</button>}
+
         </div>
 
         {!workerMode && (
-          <section className="complaint-filters">
+          <details className="complaint-filter-panel" open={filtersExpanded} onToggle={e => setFiltersExpanded(e.currentTarget.open)}>
+            <summary className="complaint-filter-toggle">
+              <span>{defaultView ? 'Default view' : 'Custom filters'}{!defaultView && ` · ${selectedStatuses.size} statuses`}</span>
+              <strong>{filtersExpanded ? 'Hide filters' : 'Filters'} {filtersExpanded ? '▴' : '▾'}</strong>
+            </summary>
+            <section className="complaint-filters">
             <div className="complaint-date-filters">
               <button type="button" className={`default-filter ${defaultView ? 'selected' : ''}`} onClick={() => setDefaultView(true)}>Default</button>
               <label>From Date<input type="date" value={fromDate} max={toDate || undefined} onChange={e => { setFromDate(e.target.value); setDefaultView(false) }} /></label>
@@ -286,7 +295,8 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
               <button type="button" className="status-filter-action" onClick={() => { setDefaultView(false); setSelectedStatuses(new Set(['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED'])) }}>All</button>
               <button type="button" className="status-filter-action" onClick={() => { setDefaultView(false); setSelectedStatuses(new Set()) }}>Clear</button>
             </div>
-          </section>
+            </section>
+          </details>
         )}
 
         {error && <div className="live-error">{error}</div>}

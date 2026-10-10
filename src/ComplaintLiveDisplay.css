@@ -351,3 +351,44 @@
   }
   .live-card-footer button { max-width: 76px; line-height: 1.2; }
 }
+
+
+/* Keep the supervisor's complaints above the fold. */
+.live-header-actions { display: flex; align-items: center; gap: 6px; }
+.live-header-actions button {
+  border: 0; border-radius: 9px; background: #ffffff20; color: #fff;
+  min-height: 36px; padding: 8px 10px; cursor: pointer;
+}
+.live-header-actions .live-refresh { display: flex; align-items: center; justify-content: center; }
+.compact-supervisor .live-summary { margin-bottom: 6px; min-height: 0; }
+.compact-supervisor .live-status-summary {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%; gap: 6px;
+}
+.compact-supervisor .live-status-summary > span {
+  display: flex; align-items: center; justify-content: center;
+  gap: 5px; min-width: 0; padding: 6px; border-radius: 9px;
+}
+.compact-supervisor .live-status-summary strong { font-size: 18px; }
+.compact-supervisor .live-status-summary small { font-size: 10px; }
+.complaint-filter-panel { margin: 6px 0 10px; border: 1px solid #dbe3ec; border-radius: 10px; background: #fff; }
+.complaint-filter-toggle {
+  list-style: none; display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 10px 12px; font-size: 12px; color: #334155; cursor: pointer;
+}
+.complaint-filter-toggle::-webkit-details-marker { display: none; }
+.complaint-filter-toggle strong { color: #0f4c81; white-space: nowrap; }
+.complaint-filter-toggle:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.complaint-filter-panel .complaint-filters { margin: 0; border: 0; border-top: 1px solid #e2e8f0; border-radius: 0 0 10px 10px; }
+@media (max-width: 680px) {
+  .compact-supervisor .live-header { padding: 8px; gap: 6px; }
+  .compact-supervisor .live-header h1 { font-size: 16px; }
+  .compact-supervisor .live-header > button { font-size: 11px; padding: 8px 6px; }
+  .compact-supervisor .live-header-actions { gap: 4px; }
+  .compact-supervisor .live-header-actions button { padding: 7px 6px; font-size: 10px; }
+  .compact-supervisor .live-header-actions .live-refresh { width: 30px; }
+  .compact-supervisor .live-status-summary { gap: 4px; }
+  .compact-supervisor .live-status-summary > span { padding: 5px 3px; gap: 3px; }
+  .compact-supervisor .live-status-summary strong { font-size: 16px; }
+  .compact-supervisor .live-status-summary small { font-size: 9px; }
+}
