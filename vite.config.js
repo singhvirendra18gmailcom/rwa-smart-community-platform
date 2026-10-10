@@ -1,10 +1,14 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// The supervisor-close preview must use its matching Worker until merged.
-const complaintApiBaseUrl = process.env.CF_PAGES_BRANCH === 'feature/supervisor-close-any-stage'
-  ? 'https://feature-supervisor-close-any-stage-rwa-complaint-bot.singh-virendra18.workers.dev'
-  : 'https://rwa-complaint-bot.singh-virendra18.workers.dev'
+// Preview apps must call the corresponding deployed Worker preview.
+const previewWorkers = {
+  'feature/supervisor-close-any-stage': 'https://feature-supervisor-close-any-stage-rwa-complaint-bot.singh-virendra18.workers.dev',
+  'fix/complaint-queue-status-alignment': 'https://fix-complaint-queue-status-alignment-rwa-complaint-bot.singh-virendra18.workers.dev'
+}
+const complaintApiBaseUrl = process.env.VITE_COMPLAINT_API_BASE_URL ||
+  previewWorkers[process.env.CF_PAGES_BRANCH] ||
+  'https://rwa-complaint-bot.singh-virendra18.workers.dev'
 
 export default defineConfig({
   plugins: [react()],
