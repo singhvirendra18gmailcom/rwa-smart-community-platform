@@ -35,11 +35,20 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
     const { data, error: loadError } = await supabase
       .from('complaints')
       .select('*, service_categories(id,name)')
-      .in('status', workerMode ? ['OPEN', 'REOPENED', 'IN_PROGRESS'] : ['OPEN', 'REOPENED', 'IN_PROGRESS', 'WORK_DONE', 'CLOSED'])
+      .in('status', workerMode ? ['OPEN', 'REOPENED', 'ACKNOWLEDGED', 'ASSIGNED', 'IN_PROGRESS'] : ['OPEN', 'REOPENED', 'ACKNOWLEDGED', 'ASSIGNED', 'IN_PROGRESS', 'WORK_DONE', 'RESOLVED', 'CLOSED'])
       .order('created_at', { ascending: true })
 
     if (loadError) setError(loadError.message)
-    else setComplaints(workerMode ? (data || []).filter(c => Number(c.category_id) === 1) : (data || []))
+    else {
+      // Legacy acknowledgement/assignment means waiting; resolved means work done.
+      const visible = (data || []).map(c => ({
+        ...c,
+        original_status: c.status,
+        status: ['ACKNOWLEDGED', 'ASSIGNED'].includes(c.status) ? 'OPEN'
+          : c.status === 'RESOLVED' ? 'WORK_DONE' : c.status
+      }))
+      setComplaints(workerMode ? visible.filter(c => Number(c.category_id) === 1) : visible)
+    }
     setLoading(false)
   }
 

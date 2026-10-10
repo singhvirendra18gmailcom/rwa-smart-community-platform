@@ -626,7 +626,7 @@ async function handleWorkerStart(request, env) {
       { method: 'GET' })
     if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
     const complaint = rows[0]
-    if (!['OPEN', 'REOPENED'].includes(String(complaint.status || '').toUpperCase())) {
+    if (!['OPEN', 'REOPENED', 'ACKNOWLEDGED', 'ASSIGNED'].includes(String(complaint.status || '').toUpperCase())) {
       return apiResponse({ ok: false, error: 'This complaint cannot be started in its current status.' }, 409)
     }
     if (Number(complaint.category_id) !== 1) {
@@ -709,7 +709,7 @@ async function handleSupervisorDone(request, env) {
     if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
     const complaint = rows[0]
     if (Number(complaint.category_id) === 1) return apiResponse({ ok: false, error: 'Plumber complaints are completed by the plumber workflow.' }, 409)
-    if (!['OPEN', 'REOPENED'].includes(String(complaint.status || '').toUpperCase())) {
+    if (!['OPEN', 'REOPENED', 'ACKNOWLEDGED', 'ASSIGNED'].includes(String(complaint.status || '').toUpperCase())) {
       return apiResponse({ ok: false, error: 'Complaint cannot be marked done in its current status.' }, 409)
     }
 
@@ -1387,12 +1387,23 @@ function buildDefaultDescription(session) {
 
 async function getComplaintsAhead(env, complaintId) {
   try {
-    const result = await supabaseRequest(env, '/rest/v1/rpc/get_complaints_ahead', {
-      method: 'POST',
-      body: JSON.stringify({ p_complaint_id: complaintId })
-    })
-    const value = Number(result)
-    return Number.isFinite(value) ? value : 0
+    const rows = await supabaseRequest(env,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,category_id,created_at,is_urgent,elderly_citizen_70_plus`,
+      { method: 'GET' })
+    const target = rows?.[0]
+    if (!target) return 0
+    // Waiting and work in progress consume the worker queue, not completed work.
+    const candidates = await supabaseRequest(env,
+      `/rest/v1/complaints?category_id=eq.${target.category_id}&status=in.(OPEN,REOPENED,ACKNOWLEDGED,ASSIGNED,IN_PROGRESS)&select=id,created_at,is_urgent,elderly_citizen_70_plus`,
+      { method: 'GET' })
+    const priority = c => c.is_urgent ? 0 : c.elderly_citizen_70_plus ? 1 : 2
+    return (candidates || []).filter(c => c.id !== target.id && (
+      priority(c) < priority(target) ||
+      (priority(c) === priority(target) && (
+        new Date(c.created_at) < new Date(target.created_at) ||
+        (new Date(c.created_at).getTime() === new Date(target.created_at).getTime() && c.id < target.id)
+      ))
+    )).length
   } catch (error) {
     console.error('Queue-ahead calculation error:', error)
     return 0
