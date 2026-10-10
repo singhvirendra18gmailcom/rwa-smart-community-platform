@@ -1171,7 +1171,8 @@ const STREET_LIGHT_COMPLAINTS_ENABLED = false
 function categoryMenu(lang) {
   const menu = fullCategoryMenu(lang)
   return STREET_LIGHT_COMPLAINTS_ENABLED ? menu
-    : menu.split('\n').filter(line => !line.startsWith('*6.*')).join('\n')
+    : menu.split('\n').filter(line => !line.startsWith('*6.*'))
+      .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
 }
 
 function fullCategoryMenu(lang) {
@@ -1192,8 +1193,11 @@ const CATEGORIES = {
   8: { id: 8, label: 'Other', hi: 'अन्य' }
 }
 function getCategory(text) {
-  const category = CATEGORIES[Number(text)] || null
-  return category?.id === 6 && !STREET_LIGHT_COMPLAINTS_ENABLED ? null : category
+  const option = Number(text)
+  const availableIds = STREET_LIGHT_COMPLAINTS_ENABLED
+    ? [1, 2, 3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 7, 8]
+  const categoryId = Number.isInteger(option) ? availableIds[option - 1] : null
+  return CATEGORIES[categoryId] || null
 }
 function getCategoryById(id) { return CATEGORIES[id] || null }
 
