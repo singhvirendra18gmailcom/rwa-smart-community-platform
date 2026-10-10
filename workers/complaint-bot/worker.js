@@ -1019,7 +1019,7 @@ async function processConversation(env, mobile, originalText, session) {
       return
     }
 
-    const nextStep = [1, 2].includes(category.id) ? 'FLAT_NO' : 'LOCATION'
+    const nextStep = 'FLAT_NO'
     await updateSession(env, mobile, {
       category_id: category.id,
       flat_no: null,
@@ -1035,10 +1035,7 @@ async function processConversation(env, mobile, originalText, session) {
       step: nextStep
     })
 
-    await sendWhatsAppMessage(env, mobile,
-      nextStep === 'FLAT_NO'
-        ? flatNumberQuestion(lang, category)
-        : locationQuestion(lang, category))
+    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, category))
     return
   }
 
@@ -1050,23 +1047,21 @@ async function processConversation(env, mobile, originalText, session) {
         : 'Please enter a valid Flat Number.\nExample: *36-D*')
       return
     }
-    await updateSession(env, mobile, { flat_no: flatNo, step: 'URGENT' })
-    await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
+    const nextStep = [1, 2, 3].includes(categoryId) ? 'URGENT'
+      : categoryId === 4 ? 'INCIDENT_DATETIME'
+      : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'CONFIRM'
+    await updateSession(env, mobile, { flat_no: flatNo, location_text: null, step: nextStep })
+    if (nextStep === 'URGENT') await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
+    if (nextStep === 'INCIDENT_DATETIME') await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
+    if (nextStep === 'ISSUE_TYPE') await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
+    if (nextStep === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
     return
   }
 
+  // Move conversations started before this change to the flat-number question.
   if (step === 'LOCATION') {
-    const location = text.slice(0, 150)
-    if (location.length < 2) {
-      await sendWhatsAppMessage(env, mobile, locationQuestion(lang, getCategoryById(categoryId)))
-      return
-    }
-    const next = categoryId === 3 ? 'URGENT' : categoryId === 4 ? 'INCIDENT_DATETIME' : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'CONFIRM'
-    await updateSession(env, mobile, { location_text: location, step: next })
-    if (next === 'URGENT') await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-    if (next === 'INCIDENT_DATETIME') await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
-    if (next === 'ISSUE_TYPE') await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
-    if (next === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
+    await updateSession(env, mobile, { location_text: null, step: 'FLAT_NO' })
+    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, getCategoryById(categoryId)))
     return
   }
 
@@ -1186,12 +1181,6 @@ function flatNumberQuestion(lang, category) {
   return lang === 'HI'
     ? `आपने *${category.hi}* चुना है।\n\nकृपया अपना *फ्लैट नंबर* भेजें।\nउदाहरण: *36-D*`
     : `You selected *${category.label}*.\n\nPlease enter your *Flat Number*.\nExample: *36-D*`
-}
-
-function locationQuestion(lang, category) {
-  return lang === 'HI'
-    ? `आपने *${category?.hi || ''}* चुना है।\n\nकृपया समस्या का *स्थान* बताएं।\nउदाहरण: टावर 4 के पास, पार्क-1, गेट-2`
-    : `You selected *${category?.label || ''}*.\n\nPlease enter the *location*.\nExample: Near Tower 4, Park-1, Gate-2`
 }
 
 function urgentQuestion(categoryId, lang) {
