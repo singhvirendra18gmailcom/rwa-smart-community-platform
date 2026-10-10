@@ -1019,7 +1019,7 @@ async function processConversation(env, mobile, originalText, session) {
       return
     }
 
-    const nextStep = [1, 2].includes(category.id) ? 'FLAT_NO' : 'LOCATION'
+    const nextStep = 'FLAT_NO'
     await updateSession(env, mobile, {
       category_id: category.id,
       flat_no: null,
@@ -1035,10 +1035,7 @@ async function processConversation(env, mobile, originalText, session) {
       step: nextStep
     })
 
-    await sendWhatsAppMessage(env, mobile,
-      nextStep === 'FLAT_NO'
-        ? flatNumberQuestion(lang, category)
-        : locationQuestion(lang, category))
+    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, category))
     return
   }
 
@@ -1050,8 +1047,11 @@ async function processConversation(env, mobile, originalText, session) {
         : 'Please enter a valid Flat Number.\nExample: *36-D*')
       return
     }
-    await updateSession(env, mobile, { flat_no: flatNo, step: 'URGENT' })
-    await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
+    const nextStep = [1, 2].includes(categoryId) ? 'URGENT' : 'LOCATION'
+    await updateSession(env, mobile, { flat_no: flatNo, step: nextStep })
+    await sendWhatsAppMessage(env, mobile, nextStep === 'URGENT'
+      ? urgentQuestion(categoryId, lang)
+      : locationQuestion(lang, getCategoryById(categoryId)))
     return
   }
 
