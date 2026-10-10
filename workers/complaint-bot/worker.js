@@ -1001,6 +1001,14 @@ async function processConversation(env, mobile, originalText, session) {
   const lang = session.preferred_language || 'EN'
   const categoryId = Number(session.category_id)
 
+  if (categoryId === 6 && !STREET_LIGHT_COMPLAINTS_ENABLED && !['LANGUAGE', 'CATEGORY'].includes(step)) {
+    await updateSession(env, mobile, { category_id: null, step: 'CATEGORY' })
+    await sendWhatsAppMessage(env, mobile, (lang === 'HI'
+      ? 'स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है। कृपया दूसरी श्रेणी चुनें।'
+      : 'Street Light complaints are currently unavailable. Please choose another category.') + '\n\n' + categoryMenu(lang))
+    return
+  }
+
   if (step === 'LANGUAGE') {
     if (!['1', '2'].includes(text)) {
       await sendWhatsAppMessage(env, mobile, languageMenu())
@@ -1157,7 +1165,16 @@ function languageMenu() {
   return '*Welcome to RWA Pocket-A Complaint Service* 🙏\n\nPlease select your preferred language.\nकृपया अपनी भाषा चुनें।\n\n*1.* English\n*2.* हिंदी\n\nPlease send only the option number.'
 }
 
+// Set to true to restore Street Light complaint registration.
+const STREET_LIGHT_COMPLAINTS_ENABLED = false
+
 function categoryMenu(lang) {
+  const menu = fullCategoryMenu(lang)
+  return STREET_LIGHT_COMPLAINTS_ENABLED ? menu
+    : menu.split('\n').filter(line => !line.startsWith('*6.*')).join('\n')
+}
+
+function fullCategoryMenu(lang) {
   if (lang === 'HI') {
     return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 प्लंबर\n*2.* ⚡ इलेक्ट्रीशियन\n*3.* 🚰 सीवरेज समस्या\n*4.* 📹 कैमरा रिकॉर्डिंग\n*5.* 🌿 हॉर्टिकल्चर\n*6.* 💡 स्ट्रीट लाइट\n*7.* 🧹 हाउसकीपिंग/कचरा\n*8.* 📋 अन्य\n\nकृपया केवल विकल्प संख्या भेजें।'
   }
@@ -1174,7 +1191,10 @@ const CATEGORIES = {
   7: { id: 7, label: 'Housekeeping/Garbage', hi: 'हाउसकीपिंग/कचरा' },
   8: { id: 8, label: 'Other', hi: 'अन्य' }
 }
-function getCategory(text) { return CATEGORIES[Number(text)] || null }
+function getCategory(text) {
+  const category = CATEGORIES[Number(text)] || null
+  return category?.id === 6 && !STREET_LIGHT_COMPLAINTS_ENABLED ? null : category
+}
 function getCategoryById(id) { return CATEGORIES[id] || null }
 
 function flatNumberQuestion(lang, category) {
