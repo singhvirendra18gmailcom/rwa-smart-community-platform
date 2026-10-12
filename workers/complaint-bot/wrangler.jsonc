@@ -3,5 +3,10 @@
   "name": "rwa-complaint-bot",
   "main": "worker.js",
   "compatibility_date": "2026-09-20",
-  "workers_dev": true
+  "workers_dev": true,
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }
