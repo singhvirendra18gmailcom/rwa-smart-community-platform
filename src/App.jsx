@@ -16,6 +16,7 @@ import './App.css'
 import { supabase } from './supabase'
 
 import Login from './Login'
+import ExecutiveNotices from './ExecutiveNotices'
 import Attendance from './Attendance'
 import ManageStaff from './ManageStaff'
 import SocietyInspection from './SocietyInspection'
@@ -159,16 +160,21 @@ function App() {
 
       setRwbotProfile(data)
 
-      const { data: appUser } = await supabase
+      const { data: appUser, error: appUserError } = await supabase
         .from('app_users')
         .select('role, active')
         .eq('auth_user_id', userId)
         .maybeSingle()
 
+      if (cancelled) return
+      if (appUserError) {
+        setProfileError('Unable to verify account permissions.')
+        setProfileCheckedForUser(userId)
+        return
+      }
+
       setOperationsRole(
-        appUser?.active === false
-          ? null
-          : (appUser?.role || null)
+        appUser?.active === true ? appUser.role : null
       )
 
       setProfileCheckedForUser(userId)
@@ -249,6 +255,10 @@ function App() {
    * RWBOT USER
    * ======================================================
    */
+
+  if (operationsRole === 'RWA_EXECUTIVE') {
+    return <ExecutiveNotices onLogout={handleLogout} />
+  }
 
   if (rwbotProfile) {
     if (!rwbotProfile.active) {
@@ -331,6 +341,10 @@ function App() {
         onBack={handleLogout}
       />
     )
+  }
+
+  if (!['SUPERVISOR', 'GUARD'].includes(operationsRole)) {
+    return <div className="app-shell"><main className="page-content"><h2>Account access unavailable</h2><p>Please contact RWA to activate your account.</p><button onClick={handleLogout}>Logout</button></main></div>
   }
 
   /*

@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 
 // Preview apps must call the corresponding deployed Worker preview.
 const previewWorkers = {
+  'feature/rwa-executive-notices': 'https://feature-rwa-executive-notices-rwa-complaint-bot.singh-virendra18.workers.dev',
   'feature/supervisor-close-any-stage': 'https://feature-supervisor-close-any-stage-rwa-complaint-bot.singh-virendra18.workers.dev',
   'fix/complaint-queue-status-alignment': 'https://fix-complaint-queue-status-alignment-rwa-complaint-bot.singh-virendra18.workers.dev'
 }

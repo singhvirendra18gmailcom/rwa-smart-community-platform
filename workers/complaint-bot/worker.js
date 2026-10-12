@@ -1,3 +1,4 @@
+import { noticeService } from './notices.js'
 // RWA Pocket-A WhatsApp Complaint Bot
 // Source-controlled Cloudflare Worker. Secrets are configured in Cloudflare, never in this file.
 // Deployment is managed from GitHub through Cloudflare Builds.
@@ -5,8 +6,19 @@
 const GRAPH_API_VERSION = 'v26.0'
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url)
+
+    if (url.pathname.startsWith('/api/notices/')) {
+      if (request.method === 'OPTIONS') return apiResponse({ ok: true }, 200)
+      if (request.method !== 'POST') return apiResponse({ ok: false, error: 'Method not allowed.' }, 405)
+      try {
+        const result = await notices().api(request, env, ctx, url.pathname.split('/').pop())
+        return apiResponse({ ok: true, ...result }, 200)
+      } catch (error) {
+        return apiResponse({ ok: false, error: error.status ? error.message : 'Unable to process notice. Please contact the administrator.' }, error.status || 500)
+      }
+    }
 
     if (request.method === 'GET' && url.pathname === '/privacy') {
       return htmlResponse(privacyPolicyHtml())
@@ -69,12 +81,18 @@ export default {
 
     if (request.method === 'POST') {
       try {
-        const body = await request.json()
+        const rawBody = await request.text()
+        const body = JSON.parse(rawBody)
         const value = body?.entry?.[0]?.changes?.[0]?.value
         const status = value?.statuses?.[0]
 
+        const noticeWebhookVerified = env.ENABLE_NOTICE_DISPATCH === 'true' && await notices().verifyWebhook(request, env, rawBody)
+
         if (status) {
           await handleWhatsAppStatusUpdate(env, status)
+          if (noticeWebhookVerified) {
+            for (const update of value.statuses || []) await notices().delivery(env, update)
+          }
           return webhookResponse()
         }
 
@@ -95,6 +113,8 @@ export default {
 
         const originalText = message.text?.body?.trim() || ''
         const command = originalText.toLowerCase()
+
+        if (noticeWebhookVerified && await notices().subscription(env, from, originalText)) return webhookResponse()
 
         if (isStartCommand(command)) {
           await startComplaint(env, from)
@@ -131,7 +151,14 @@ export default {
     }
 
     return new Response('RWA Pocket-A Complaint Bot', { status: 200 })
+  },
+  async scheduled(event, env, ctx) {
+    if (env.ENABLE_NOTICE_DISPATCH === 'true') ctx.waitUntil(notices().process(env))
   }
+}
+
+function notices() {
+  return noticeService({ db: supabaseRequest, auth: getAuthenticatedUser, sendText: sendWhatsAppMessage })
 }
 
 function apiResponse(payload, status = 200) {

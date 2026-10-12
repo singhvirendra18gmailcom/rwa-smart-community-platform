@@ -53,10 +53,13 @@ function Login() {
 
   const isRwbot = loginMode === 'rwbot'
   const isWorker = loginMode === 'worker'
+  const isExecutive = loginMode === 'executive'
 
 
   const selectMode = (mode) => {
     setLoginMode(mode)
+    if (mode === 'executive') setEmail('')
+    if (mode === 'supervisor') setEmail('supervisor@rwapocketa.local')
 
     setPassword('')
     setError('')
@@ -221,7 +224,7 @@ function Login() {
 
                 {isRwbot
                   ? 'RWA Transparency Assistant'
-                  : 'Supervisor Operations'
+                  : isExecutive ? 'RWA Executive' : 'Supervisor Operations'
                 }
 
               </p>
@@ -303,12 +306,13 @@ function Login() {
               ================================================= */}
 
           <div className="rwa-login-mode-switch">
+            <button type="button" className={isExecutive ? 'rwa-login-mode active' : 'rwa-login-mode'} onClick={() => selectMode('executive')}><Building2 size={18} />RWA Executive</button>
 
 
             <button
               type="button"
               className={
-                !isRwbot
+                loginMode === 'supervisor'
                   ? 'rwa-login-mode active'
                   : 'rwa-login-mode'
               }
@@ -393,7 +397,7 @@ function Login() {
                 ? 'Resident Login'
                 : isWorker
                   ? 'Plumber Login'
-                  : 'Supervisor Login'
+                  : isExecutive ? 'RWA Executive Login' : 'Supervisor Login'
               }
 
             </h2>
@@ -494,7 +498,7 @@ function Login() {
                         event.target.value
                       )
                     }
-                    placeholder="Supervisor email"
+                    placeholder={isExecutive ? "Executive email" : "Supervisor email"}
                     autoComplete="username"
                     required
                   />
