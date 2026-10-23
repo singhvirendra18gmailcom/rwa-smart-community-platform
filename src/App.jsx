@@ -374,7 +374,7 @@ function App() {
     )
   }
 
-  if (screen === 'sponsor-management' && ['ADMIN', 'RWA_EXECUTIVE'].includes(String(operationsRole || '').toUpperCase().replace(/\s+/g, '_'))) {
+  if (screen === 'sponsor-management' && ['ADMIN', 'RWA_EXECUTIVE', 'SUPERVISOR'].includes(String(operationsRole || '').toUpperCase().replace(/\s+/g, '_'))) {
     return <SponsorManagement onBack={() => setScreen('dashboard')} />
   }
 
@@ -546,7 +546,7 @@ function App() {
             <ArrowRight className="dashboard-module-arrow" size={18} />
           </button>
 
-          {['ADMIN', 'RWA_EXECUTIVE'].includes(String(operationsRole || '').toUpperCase().replace(/\s+/g, '_')) && (
+          {['ADMIN', 'RWA_EXECUTIVE', 'SUPERVISOR'].includes(String(operationsRole || '').toUpperCase().replace(/\s+/g, '_')) && (
             <button className="dashboard-module-card module-sponsor" onClick={() => setScreen('sponsor-management')}>
               <div className="dashboard-module-icon module-icon-teal"><BadgeCheck size={24} strokeWidth={1.9} /></div>
               <div className="dashboard-module-copy"><h3>Sponsor Management</h3><p>Manage complaint chatbot acknowledgement</p></div>
