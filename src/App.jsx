@@ -8,7 +8,8 @@ import {
   ArrowRight,
   ClipboardCheck,
   MessageSquareWarning,
-  WalletCards
+  WalletCards,
+  BadgeCheck
 } from 'lucide-react'
 
 import './App.css'
@@ -21,6 +22,7 @@ import ManageStaff from './ManageStaff'
 import SocietyInspection from './SocietyInspection'
 import { useInspectionConfig } from './inspectionConfig'
 import Complaints from './Complaints'
+import SponsorManagement from './SponsorManagement'
 import ComplaintLiveDisplay from './ComplaintLiveDisplay'
 
 import RwbotHome from './rwbot/RwbotHome'
@@ -372,6 +374,10 @@ function App() {
     )
   }
 
+  if (screen === 'sponsor-management' && ['ADMIN', 'RWA_EXECUTIVE'].includes(String(operationsRole || '').toUpperCase().replace(/\s+/g, '_'))) {
+    return <SponsorManagement onBack={() => setScreen('dashboard')} />
+  }
+
   if (screen === 'accounts') {
     return (
       <Suspense
@@ -539,6 +545,14 @@ function App() {
 
             <ArrowRight className="dashboard-module-arrow" size={18} />
           </button>
+
+          {['ADMIN', 'RWA_EXECUTIVE'].includes(String(operationsRole || '').toUpperCase().replace(/\s+/g, '_')) && (
+            <button className="dashboard-module-card module-sponsor" onClick={() => setScreen('sponsor-management')}>
+              <div className="dashboard-module-icon module-icon-teal"><BadgeCheck size={24} strokeWidth={1.9} /></div>
+              <div className="dashboard-module-copy"><h3>Sponsor Management</h3><p>Manage complaint chatbot acknowledgement</p></div>
+              <ArrowRight className="dashboard-module-arrow" size={18} />
+            </button>
+          )}
 
           <button
             className="dashboard-module-card dashboard-module-wide module-accounts"
