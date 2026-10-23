@@ -1437,12 +1437,12 @@ async function getActiveSponsorFooter(env, lang) {
       { method: 'GET' })
     const sponsor = Array.isArray(rows) ? rows[0] : null
     if (!sponsor || sponsor.start_date > today || sponsor.end_date < today) return ''
-    const name = String(sponsor.company_name || '').replace(/[\\r\\n*~_`]/g, ' ').trim().slice(0, 120)
+    const name = String(sponsor.company_name || '').replace(/[\r\n*~_`]/g, ' ').trim().slice(0, 120)
     const phone = String(sponsor.contact_number || '').trim()
-    if (!name || !/^\\+?[0-9]{10,15}$/.test(phone)) return ''
+    if (!name || !/^\+?[0-9]{10,15}$/.test(phone)) return ''
     return lang === 'HI'
-      ? `\\n\\nसौजन्य से: *${name}*\\nसंपर्क: ${phone}`
-      : `\\n\\nSupported by *${name}*\\nContact: ${phone}`
+      ? `\n\nसौजन्य से: *${name}*\nसंपर्क: ${phone}`
+      : `\n\nSupported by *${name}*\nContact: ${phone}`
   } catch (error) {
     console.warn('Sponsor footer unavailable; sending complaint confirmation without footer.')
     return ''
