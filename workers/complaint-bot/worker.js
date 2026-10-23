@@ -1142,7 +1142,9 @@ async function processConversation(env, mobile, originalText, session) {
     const complaint = await createComplaint(env, mobile, current)
     const complaintsAhead = await getComplaintsAhead(env, complaint.id)
     await deleteSession(env, mobile)
-    await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
+    const registrationMessage = complaintCreatedMessage(complaint, current, complaintsAhead)
+    const sponsorFooter = await getActiveSponsorFooter(env, current.preferred_language || 'EN')
+    await sendWhatsAppMessage(env, mobile, registrationMessage + sponsorFooter)
 
     if (Number(current.category_id) === 1) {
       try {
@@ -1420,6 +1422,30 @@ async function getComplaintsAhead(env, complaintId) {
   } catch (error) {
     console.error('Queue-ahead calculation error:', error)
     return 0
+  }
+}
+
+// Sponsor text is included in the existing registration confirmation only.
+// Fail open: an unavailable configuration must never block complaint registration.
+async function getActiveSponsorFooter(env, lang) {
+  try {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date())
+    const rows = await supabaseRequest(env,
+      '/rest/v1/chatbot_sponsors?id=eq.1&enabled=eq.true&select=company_name,contact_number,start_date,end_date&limit=1',
+      { method: 'GET' })
+    const sponsor = Array.isArray(rows) ? rows[0] : null
+    if (!sponsor || sponsor.start_date > today || sponsor.end_date < today) return ''
+    const name = String(sponsor.company_name || '').replace(/[\\r\\n*~_`]/g, ' ').trim().slice(0, 120)
+    const phone = String(sponsor.contact_number || '').trim()
+    if (!name || !/^\\+?[0-9]{10,15}$/.test(phone)) return ''
+    return lang === 'HI'
+      ? `\\n\\nसौजन्य से: *${name}*\\nसंपर्क: ${phone}`
+      : `\\n\\nSupported by *${name}*\\nContact: ${phone}`
+  } catch (error) {
+    console.warn('Sponsor footer unavailable; sending complaint confirmation without footer.')
+    return ''
   }
 }
 
