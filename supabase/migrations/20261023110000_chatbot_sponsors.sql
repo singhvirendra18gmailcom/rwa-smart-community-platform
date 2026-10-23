@@ -22,26 +22,26 @@ create policy "Sponsor management read" on public.chatbot_sponsors
   using (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ));
 create policy "Sponsor management insert" on public.chatbot_sponsors
   for insert to authenticated
   with check (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ));
 create policy "Sponsor management update" on public.chatbot_sponsors
   for update to authenticated
   using (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ))
   with check (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ));
 ),
   start_date date not null,
@@ -62,24 +62,24 @@ create policy "Sponsor management read" on public.chatbot_sponsors
   using (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ));
 create policy "Sponsor management insert" on public.chatbot_sponsors
   for insert to authenticated
   with check (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ));
 create policy "Sponsor management update" on public.chatbot_sponsors
   for update to authenticated
   using (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ))
   with check (exists (
     select 1 from public.app_users u
     where u.auth_user_id = auth.uid() and u.active = true
-      and upper(replace(u.role, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
+      and upper(replace(u.role::text, ' ', '_')) in ('ADMIN', 'RWA_EXECUTIVE')
   ));
