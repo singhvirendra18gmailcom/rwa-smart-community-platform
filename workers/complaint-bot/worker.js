@@ -153,6 +153,14 @@ async function handleWhatsAppStatusUpdate(env, status) {
 
   const providerStatus = String(status?.status || '').toLowerCase()
 
+  // Diagnostic metadata only: never log recipient numbers, message contents, or full webhook payloads.
+  console.log('WhatsApp delivery status:', JSON.stringify({
+    status: providerStatus,
+    errors: Array.isArray(status?.errors)
+      ? status.errors.map((error) => ({ code: error?.code ?? null, title: String(error?.title || '').slice(0, 100) }))
+      : []
+  }))
+
   let deliveryStatus = 'PENDING'
   if (providerStatus === 'delivered' || providerStatus === 'read') {
     deliveryStatus = 'SENT'
