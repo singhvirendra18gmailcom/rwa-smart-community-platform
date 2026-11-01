@@ -73,7 +73,7 @@ function mock({ captchaHost = 'chat.example.test' } = {}) {
 const endpoint = path => `https://worker.example.test${path}`
 async function post(path, payload, overrideEnv=env) {
   const response = await worker.fetch(new Request(endpoint(path), {
-    method:'POST', headers:{ 'Content-Type':'application/json' },
+    method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer test-user-token' },
     body:JSON.stringify(payload)
   }), overrideEnv)
   return { status:response.status, data:await response.json() }
