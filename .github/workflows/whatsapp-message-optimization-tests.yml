@@ -1,17 +1,26 @@
-name: WhatsApp message optimization tests
+name: WhatsApp complaint Worker and UI tests
 
 on:
   push:
     branches:
       - feature/whatsapp-message-optimization
+      - feature/supervisor-resident-flat-management
     paths:
       - 'workers/complaint-bot/worker.js'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
+      - 'src/ResidentFlatManagement.jsx'
+      - 'src/ResidentFlatManagement.css'
+      - 'src/App.jsx'
+      - 'src/ComplaintLiveDisplay.jsx'
       - '.github/workflows/whatsapp-message-optimization-tests.yml'
   pull_request:
     paths:
       - 'workers/complaint-bot/worker.js'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
+      - 'src/ResidentFlatManagement.jsx'
+      - 'src/ResidentFlatManagement.css'
+      - 'src/App.jsx'
+      - 'src/ComplaintLiveDisplay.jsx'
       - '.github/workflows/whatsapp-message-optimization-tests.yml'
 
 permissions:
@@ -25,5 +34,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run simulated WhatsApp/Supabase webhook tests
+      - name: Run simulated WhatsApp and Supabase tests
         run: node --test workers/complaint-bot/worker.optimization.test.mjs
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify supervisor UI production build
+        run: npm run build
