@@ -111,7 +111,7 @@ function ComplaintReceipt({ receipt, categories }) {
 }
 
 function VerificationArea({ step, configured, widget }) {
-  if (step !== 'VERIFY' && step !== 'RETRY') return null
+  if (step !== 'VERIFY') return null
   return (
     <div className="webchat-verify">
       <div className="webchat-verify-heading"><ShieldCheck size={16} /> Secure verification / सुरक्षित सत्यापन</div>
