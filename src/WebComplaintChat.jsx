@@ -492,15 +492,19 @@ const serviceUnavailable = step === 'UNAVAILABLE'
       </div>
 
       <footer className="webchat-footer">
-        <ChatComposer
-          step={step}
-          entry={entry}
-          setEntry={setEntry}
-          busy={busy}
-          onSend={choose}
-        />
+        {/* Composer and attribution are independent full-width rows.
+            The credit must never share horizontal space with the input. */}
+        <div className="webchat-input-row">
+          <ChatComposer
+            step={step}
+            entry={entry}
+            setEntry={setEntry}
+            busy={busy}
+            onSend={choose}
+          />
+        </div>
         <div className="webchat-credit">
-          Developed and maintained by RWA Pocket-A.
+          <span>Developed and maintained by RWA Pocket-A.</span>
           <span lang="hi">RWA Pocket-A द्वारा विकसित एवं रखरखाव।</span>
         </div>
       </footer>
