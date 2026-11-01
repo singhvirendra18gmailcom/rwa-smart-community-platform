@@ -16,7 +16,7 @@ const LABELS = {
   OTHER: 'Other'
 }
 
-function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) {
+function ComplaintLiveDisplay({ onBack, onOpenComplaints, onManageResidentFlats, workerMode = false }) {
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -245,6 +245,7 @@ function ComplaintLiveDisplay({ onBack, onOpenComplaints, workerMode = false }) 
         <button onClick={onBack}><ArrowLeft size={18}/> Back</button>
         <div><h1>{workerMode ? 'Plumber Complaints' : 'Complaint Center'}</h1>{workerMode && <p>Plumbing Work Queue</p>}</div>
         <div className="live-header-actions">
+          {!workerMode && onManageResidentFlats && <button onClick={onManageResidentFlats}>Manage Flats</button>}
           {!workerMode && <button onClick={onOpenComplaints}>Dashboard</button>}
           <button className="live-refresh" onClick={load} aria-label="Refresh complaints"><RefreshCw size={18}/></button>
         </div>
