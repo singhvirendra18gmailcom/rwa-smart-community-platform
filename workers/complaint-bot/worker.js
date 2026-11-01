@@ -84,12 +84,16 @@ export default {
         const from = normalizeMobile(message.from)
         if (!from) return webhookResponse()
 
+        // WhatsApp can redeliver the same webhook. Claim the provider message ID
+        // before any reply or database side effect to avoid duplicate responses.
+        if (!await claimIncomingWhatsAppMessage(env, message.id)) {
+          return webhookResponse()
+        }
+
         if (message.type !== 'text') {
           const session = await getSession(env, from)
           await sendWhatsAppMessage(env, from,
-            session?.preferred_language === 'EN'
-              ? 'Please send a text message.'
-              : 'कृपया टेक्स्ट संदेश भेजें।')
+            'Please send a text message. / कृपया टेक्स्ट संदेश भेजें।')
           return webhookResponse()
         }
 
@@ -727,10 +731,7 @@ async function handleSupervisorDone(request, env) {
       body: JSON.stringify({ status: 'WORK_DONE', work_done_at: now, updated_at: now })
     })
 
-    const lang = complaint.preferred_language || 'EN'
-    const message = lang === 'HI'
-      ? `शिकायत *${complaint.complaint_no}* पर कार्य पूरा बताया गया है। ✅\n\nक्या आपकी समस्या हल हो गई है?\n\n*1.* हाँ\n*2.* नहीं\n\n— RWA Pocket-A`
-      : `Work has been marked done for complaint *${complaint.complaint_no}*. ✅\n\nIs your problem resolved?\n\n*1.* Yes\n*2.* No\n\n— RWA Pocket-A`
+    const message = workDoneConfirmationMessage(complaint)
     await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
     return apiResponse({ ok: true, status: 'WORK_DONE', whatsapp_sent: true }, 200)
   } catch (error) {
@@ -758,10 +759,7 @@ async function handleWorkerDone(request, env) {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ status: 'WORK_DONE', work_done_at: now, updated_at: now })
     })
-    const lang = complaint.preferred_language || 'EN'
-    const message = lang === 'HI'
-      ? `शिकायत *${complaint.complaint_no}* पर कार्य पूरा बताया गया है। ✅\n\nक्या आपकी समस्या हल हो गई है?\n\n*1.* हाँ\n*2.* नहीं\n\n— RWA Pocket-A`
-      : `Work has been marked done for complaint *${complaint.complaint_no}*. ✅\n\nIs your problem resolved?\n\n*1.* Yes\n*2.* No\n\n— RWA Pocket-A`
+    const message = workDoneConfirmationMessage(complaint)
     await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
     return apiResponse({ ok: true, status: 'WORK_DONE', whatsapp_sent: true }, 200)
   } catch (error) {
@@ -862,183 +860,189 @@ function residentGreeting(complaint, lang) {
 }
 
 function supervisorAcknowledgementMessage(complaint) {
-  const lang = complaint.preferred_language || 'EN'
-  const greeting = residentGreeting(complaint, lang)
-  if (lang === 'HI') {
-    return `${greeting}\n\nआपकी शिकायत *${complaint.complaint_no}* प्राप्त कर ली गई है। ✅\n\nहमारा *${hindiWorkerName(Number(complaint.category_id))}* जल्द ही आपकी शिकायत पर कार्यवाही करेगा।\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nआपके धैर्य एवं सहयोग के लिए धन्यवाद।\n\n*— RWA Pocket-A*`
-  }
-  return `${greeting}\n\nYour complaint *${complaint.complaint_no}* has been acknowledged. ✅\n\nOur team will attend to your complaint shortly.\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you for your patience and cooperation.\n\n*— RWA Pocket-A*`
+  return `*Complaint acknowledged / शिकायत प्राप्त हुई* ✅\n\n*Complaint No / शिकायत संख्या:* ${complaint.complaint_no}\nOur team will attend shortly. / हमारी टीम जल्द कार्यवाही करेगी।\n\n— RWA Pocket-A`
 }
 
-function supervisorResolvedMessage(complaint, resolvedAt) {
-  const lang = complaint.preferred_language || 'EN'
-  const greeting = residentGreeting(complaint, lang)
-  if (lang === 'HI') {
-    return `${greeting}\n\nआपकी शिकायत *${complaint.complaint_no}* का समाधान कर दिया गया है। ✅\n\nयदि समस्या अभी भी बनी हुई है, तो इस संदेश का उत्तर दें:\n*REOPEN ${complaint.complaint_no}*\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
-  }
-  return `${greeting}\n\nYour complaint *${complaint.complaint_no}* has been resolved. ✅\n\nIf the problem is still not resolved, reply:\n*REOPEN ${complaint.complaint_no}*\n\n*Complaint No:* ${complaint.complaint_no}\n\nThank you.\n\n*— RWA Pocket-A*`
+function supervisorResolvedMessage(complaint) {
+  return `*Complaint resolved / शिकायत का समाधान हुआ* ✅\n\n*Complaint No / शिकायत संख्या:* ${complaint.complaint_no}\nIf the issue remains, reply / समस्या बनी रहे तो भेजें:\n*REOPEN ${complaint.complaint_no}*\n\n— RWA Pocket-A`
 }
 
 async function reopenComplaint(env, mobile, complaintNo) {
-  const rows = await supabaseRequest(
-    env,
-    `/rest/v1/complaints?complaint_no=eq.${encodeURIComponent(complaintNo)}&mobile_no=eq.${encodeURIComponent(mobile)}&status=in.(RESOLVED,CLOSED)&order=created_at.desc&limit=1&select=id,complaint_no,preferred_language`,
-    { method: 'GET' }
-  )
+  const rows = await supabaseRequest(env,
+    `/rest/v1/complaints?complaint_no=eq.${encodeURIComponent(complaintNo)}&mobile_no=eq.${encodeURIComponent(mobile)}&status=in.(RESOLVED,CLOSED)&order=created_at.desc&limit=1&select=id,complaint_no`,
+    { method: 'GET' })
 
   if (!Array.isArray(rows) || !rows.length) {
-    await sendWhatsAppMessage(
-      env,
-      mobile,
-      `We could not find a resolved complaint *${complaintNo}* registered with this WhatsApp number.\n\nPlease check the complaint number or send *Hi* for a new complaint.\n\n— RWA Pocket-A`
-    )
+    await sendWhatsAppMessage(env, mobile,
+      `Complaint *${complaintNo}* was not found for this number. / इस नंबर पर शिकायत *${complaintNo}* नहीं मिली।\nPlease check the number or send *Hi*. / नंबर जाँचें या *Hi* भेजें।\n\n— RWA Pocket-A`)
     return
   }
 
-  const complaint = rows[0]
   const now = new Date().toISOString()
-
-  await supabaseRequest(
-    env,
-    `/rest/v1/complaints?id=eq.${complaint.id}`,
-    {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        status: 'REOPENED',
-        reopened_at: now,
-        updated_at: now
-      })
-    }
-  )
-
-  const lang = complaint.preferred_language || 'EN'
-  const message = lang === 'HI'
-    ? `आपकी शिकायत *${complaintNo}* दोबारा खोल दी गई है। 🔄\n\nSupervisor को सूचित कर दिया गया है और शिकायत पर पुनः कार्यवाही की जाएगी।\n\n*— RWA Pocket-A*`
-    : `Your complaint *${complaintNo}* has been reopened. 🔄\n\nThe Supervisor has been notified and the complaint will be attended again.\n\n*— RWA Pocket-A*`
-
-  await sendWhatsAppMessage(env, mobile, message)
+  await supabaseRequest(env, `/rest/v1/complaints?id=eq.${rows[0].id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ status: 'REOPENED', reopened_at: now, updated_at: now })
+  })
+  await sendWhatsAppMessage(env, mobile,
+    `Complaint *${complaintNo}* reopened. / शिकायत *${complaintNo}* दोबारा खोली गई है। 🔄\n\n— RWA Pocket-A`)
 }
 
 async function handleResidentWorkDoneReply(env, mobile, originalText) {
-  const text = String(originalText || '').trim()
-  const rows = await supabaseRequest(
-    env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&or=(status.eq.WORK_DONE,and(status.eq.CLOSED,resident_confirmation.eq.true))&order=updated_at.desc&limit=1&select=id,complaint_no,status,preferred_language,resident_rating`,
-    { method: 'GET' }
-  )
-
+  const reply = String(originalText || '').trim()
+  // Rating is no longer requested or collected.
+  const rows = await supabaseRequest(env,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&status=eq.WORK_DONE&order=updated_at.desc&limit=1&select=id,complaint_no,status`,
+    { method: 'GET' })
   if (!Array.isArray(rows) || !rows.length) return false
+
   const complaint = rows[0]
-  const lang = complaint.preferred_language || 'EN'
   const now = new Date().toISOString()
+  if (!['1', '2'].includes(reply)) {
+    await sendWhatsAppMessage(env, mobile, workDoneConfirmationMessage(complaint))
+    return true
+  }
 
-  if (complaint.status === 'WORK_DONE') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, lang === 'HI'
-        ? `क्या आपकी शिकायत *${complaint.complaint_no}* हल हो गई है?\n\n*1.* हाँ\n*2.* नहीं`
-        : `Is complaint *${complaint.complaint_no}* resolved?\n\n*1.* Yes\n*2.* No`)
-      return true
-    }
-
-    if (text === '2') {
-      await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          status: 'REOPENED',
-          resident_confirmation: false,
-          resident_confirmed_at: now,
-          reopened_at: now,
-          updated_at: now
-        })
-      })
-      await sendWhatsAppMessage(env, mobile, lang === 'HI'
-        ? `आपकी शिकायत *${complaint.complaint_no}* दोबारा खोल दी गई है। 🔄\n\nप्लंबर को यह शिकायत फिर से दिखाई देगी।\n\n— RWA Pocket-A`
-        : `Your complaint *${complaint.complaint_no}* has been reopened. 🔄\n\nIt will appear again in the plumber's work queue.\n\n— RWA Pocket-A`)
-      return true
-    }
-
+  if (reply === '2') {
     await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({
-        status: 'CLOSED',
-        resident_confirmation: true,
-        resident_confirmed_at: now,
-        closed_at: now,
-        updated_at: now
+        status: 'REOPENED', resident_confirmation: false,
+        resident_confirmed_at: now, reopened_at: now, updated_at: now
       })
     })
-    await sendWhatsAppMessage(env, mobile, lang === 'HI'
-      ? `धन्यवाद। शिकायत *${complaint.complaint_no}* बंद कर दी गई है। ✅\n\nकृपया किए गए कार्य को *1 से 5* तक रेट करें।\n*5 = उत्कृष्ट, 1 = खराब*\n\n— RWA Pocket-A`
-      : `Thank you. Complaint *${complaint.complaint_no}* is now closed. ✅\n\nPlease rate the work from *1 to 5*.\n*5 = Excellent, 1 = Poor*\n\n— RWA Pocket-A`)
+    await sendWhatsAppMessage(env, mobile,
+      `Complaint *${complaint.complaint_no}* reopened. / शिकायत *${complaint.complaint_no}* दोबारा खोली गई है। 🔄\n\n— RWA Pocket-A`)
     return true
   }
 
-  if (complaint.status === 'CLOSED' && complaint.resident_rating == null) {
-    if (!/^[1-5]$/.test(text)) {
-      await sendWhatsAppMessage(env, mobile, lang === 'HI'
-        ? 'कृपया *1 से 5* के बीच रेटिंग भेजें।'
-        : 'Please send a rating from *1 to 5*.')
-      return true
-    }
-    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ resident_rating: Number(text), rated_at: now, updated_at: now })
+  await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      status: 'CLOSED', resident_confirmation: true, resident_confirmed_at: now,
+      closed_at: now, updated_at: now
     })
-    await sendWhatsAppMessage(env, mobile, lang === 'HI'
-      ? `आपकी *${text}/5* रेटिंग के लिए धन्यवाद। ⭐\n\n— RWA Pocket-A`
-      : `Thank you for your *${text}/5* rating. ⭐\n\n— RWA Pocket-A`)
-    return true
-  }
+  })
+  // No rating question, no closure thank-you, no extra outgoing message.
+  return true
+}
 
-  return false
+function workDoneConfirmationMessage(complaint) {
+  return `*Work completed / कार्य पूरा हुआ* ✅\n*Complaint / शिकायत:* ${complaint.complaint_no}\n\nIs your problem resolved? / क्या समस्या हल हो गई है?\n*1.* Yes / हाँ\n*2.* No / नहीं\n\n— RWA Pocket-A`
 }
 
 async function startComplaint(env, mobile) {
+  // Only reuse flats from registered complaints. Returning residents can
+  // optionally change the remembered flat from the category menu before
+  // selecting a category, because selection may complete registration.
+  const flatNo = await getRememberedFlat(env, mobile)
   await deleteSession(env, mobile)
-  await createSession(env, mobile)
-  await sendWhatsAppMessage(env, mobile, languageMenu())
+  await createSession(env, mobile, flatNo)
+  await sendWhatsAppMessage(env, mobile, categoryMenu(flatNo))
+}
+
+async function getRememberedFlat(env, mobile) {
+  const rows = await supabaseRequest(env,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
+    { method: 'GET' })
+  const match = Array.isArray(rows) ? rows.find(row => isUsableFlat(row.flat_no)) : null
+  return match ? String(match.flat_no).trim().toUpperCase() : null
+}
+
+function isUsableFlat(flatNo) {
+  const flat = String(flatNo || '').trim().toUpperCase()
+  return flat.length >= 2 && flat.length <= 25
+    && /^[A-Z0-9][A-Z0-9 \/-]*$/.test(flat)
+    && !['COMMON AREA', 'UNKNOWN', 'N/A', 'NA', 'NONE', 'NOT GIVEN'].includes(flat)
+}
+
+function nextStepForCategory(categoryId) {
+  if (categoryId === 4) return 'INCIDENT_DATETIME'
+  if ([5, 6, 7].includes(categoryId)) return 'ISSUE_TYPE'
+  return 'REGISTER'
+}
+
+async function registerComplaintImmediately(env, mobile) {
+  const current = await getSession(env, mobile)
+  if (!current || !getCategoryById(Number(current.category_id)) || !isUsableFlat(current.flat_no)) {
+    throw new Error('Complaint registration is missing a valid category or flat.')
+  }
+  const complaint = await createComplaint(env, mobile, current)
+  const complaintsAhead = await getComplaintsAhead(env, complaint.id)
+  await deleteSession(env, mobile)
+  await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
+
+  if (Number(current.category_id) === 1) {
+    try {
+      await notifyPlumberOfNewComplaint(env, complaint, current)
+    } catch (error) {
+      // Plumber notification failure must never undo an already-created complaint.
+      console.error('Plumber WhatsApp notification failed:', error)
+    }
+  }
+}
+
+async function askComplaintStep(env, mobile, step, categoryId) {
+  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(getCategoryById(categoryId)))
+  } else if (step === 'INCIDENT_DATETIME') {
+    await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
+  } else if (step === 'ISSUE_TYPE') {
+    await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId))
+  } else if (step === 'REGISTER') {
+    await registerComplaintImmediately(env, mobile)
+  } else if (step === 'CONFIRM') {
+    // Only for older sessions that already received a review prompt.
+    await sendConfirmation(env, mobile, await getSession(env, mobile))
+  }
 }
 
 async function processConversation(env, mobile, originalText, session) {
   const text = originalText.trim()
   const step = session.step
-  const lang = session.preferred_language || 'EN'
   const categoryId = Number(session.category_id)
 
   if (categoryId === 6 && !STREET_LIGHT_COMPLAINTS_ENABLED && !['LANGUAGE', 'CATEGORY'].includes(step)) {
     await updateSession(env, mobile, { category_id: null, step: 'CATEGORY' })
-    await sendWhatsAppMessage(env, mobile, (lang === 'HI'
-      ? 'स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है। कृपया दूसरी श्रेणी चुनें।'
-      : 'Street Light complaints are currently unavailable. Please choose another category.') + '\n\n' + categoryMenu(lang))
+    await sendWhatsAppMessage(env, mobile,
+      'Street Light complaints are currently unavailable. / स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है।\n\n' +
+      categoryMenu(session.flat_no))
     return
   }
 
+  // Let an in-flight old session move safely to the new bilingual workflow.
   if (step === 'LANGUAGE') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, languageMenu())
-      return
-    }
-    const language = text === '1' ? 'EN' : 'HI'
-    await updateSession(env, mobile, { preferred_language: language, step: 'CATEGORY' })
-    await sendWhatsAppMessage(env, mobile, categoryMenu(language))
+    await updateSession(env, mobile, { preferred_language: 'EN', step: 'CATEGORY' })
+    await sendWhatsAppMessage(env, mobile, categoryMenu(session.flat_no))
     return
   }
 
   if (step === 'CATEGORY') {
-    const category = getCategory(text)
-    if (!category) {
-      await sendWhatsAppMessage(env, mobile, invalidChoice(lang) + '\n\n' + categoryMenu(lang))
+    // Optional flat correction BEFORE selecting a category. This never
+    // modifies prior complaints; the corrected flat is stored on the next one.
+    const flatChange = text.match(/^flat\s+(.+)$/i)
+    if (flatChange) {
+      const corrected = flatChange[1].trim().toUpperCase()
+      if (!isUsableFlat(corrected)) {
+        await sendWhatsAppMessage(env, mobile,
+          'Invalid flat. Try *FLAT 36-D*. / फ्लैट नंबर गलत है। *FLAT 36-D* भेजें।')
+        return
+      }
+      await updateSession(env, mobile, { flat_no: corrected })
+      await sendWhatsAppMessage(env, mobile, categoryMenu(corrected))
       return
     }
 
-    const nextStep = 'FLAT_NO'
+    const category = getCategory(text)
+    if (!category) {
+      await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no))
+      return
+    }
+
+    const rememberedFlat = isUsableFlat(session.flat_no) ? String(session.flat_no).trim().toUpperCase() : null
+    const next = rememberedFlat ? nextStepForCategory(category.id) : 'FLAT_NO'
     await updateSession(env, mobile, {
       category_id: category.id,
-      flat_no: null,
+      flat_no: rememberedFlat,
       location_text: null,
       issue_type: null,
       incident_datetime_text: null,
@@ -1048,146 +1052,123 @@ async function processConversation(env, mobile, originalText, session) {
       urgency_code: null,
       urgency_reason: null,
       elderly_citizen_70_plus: false,
-      step: nextStep
+      step: next
     })
-
-    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, category))
+    await askComplaintStep(env, mobile, next, category.id)
     return
   }
 
-  if (step === 'FLAT_NO') {
-    const flatNo = text.toUpperCase().slice(0, 50)
-    if (flatNo.length < 2) {
-      await sendWhatsAppMessage(env, mobile, lang === 'HI'
-        ? 'कृपया सही Flat Number भेजें।\nउदाहरण: *36-D*'
-        : 'Please enter a valid Flat Number.\nExample: *36-D*')
-      return
-    }
-    const nextStep = [1, 2, 3].includes(categoryId) ? 'URGENT'
-      : categoryId === 4 ? 'INCIDENT_DATETIME'
-      : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'CONFIRM'
-    await updateSession(env, mobile, { flat_no: flatNo, location_text: null, step: nextStep })
-    if (nextStep === 'URGENT') await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-    if (nextStep === 'INCIDENT_DATETIME') await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
-    if (nextStep === 'ISSUE_TYPE') await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
-    if (nextStep === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
-    return
-  }
-
-  // Move conversations started before this change to the flat-number question.
   if (step === 'LOCATION') {
     await updateSession(env, mobile, { location_text: null, step: 'FLAT_NO' })
-    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, getCategoryById(categoryId)))
+    await askComplaintStep(env, mobile, 'FLAT_NO', categoryId)
+    return
+  }
+
+  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+    const flatNo = text.toUpperCase().slice(0, 25)
+    if (!isUsableFlat(flatNo)) {
+      await sendWhatsAppMessage(env, mobile,
+        'Please enter a valid flat number, e.g. *36-D*. / कृपया सही फ्लैट नंबर भेजें, जैसे *36-D*।')
+      return
+    }
+    const next = nextStepForCategory(categoryId)
+    await updateSession(env, mobile, { flat_no: flatNo, location_text: null, step: next })
+    await askComplaintStep(env, mobile, next, categoryId)
     return
   }
 
   if (step === 'INCIDENT_DATETIME') {
     if (text.length < 3) {
-      await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
+      await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
       return
     }
-    await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'CONFIRM' })
-    await sendConfirmation(env, mobile, await getSession(env, mobile))
+    await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'REGISTER' })
+    await askComplaintStep(env, mobile, 'REGISTER', categoryId)
     return
   }
 
   if (step === 'ISSUE_TYPE') {
     const issue = getIssueType(categoryId, text)
     if (!issue) {
-      await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
+      await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId))
       return
     }
-    const next = categoryId === 6 ? 'URGENT' : 'CONFIRM'
-    await updateSession(env, mobile, { issue_type: issue, step: next })
-    if (next === 'URGENT') {
-      await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-    } else {
-      await sendConfirmation(env, mobile, await getSession(env, mobile))
-    }
+    await updateSession(env, mobile, { issue_type: issue, step: 'REGISTER' })
+    await askComplaintStep(env, mobile, 'REGISTER', categoryId)
     return
   }
 
+  // Legacy sessions created before removal of the urgency prompt proceed
+  // without a further review/confirmation.
   if (step === 'URGENT') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-      return
-    }
-
-    if (text === '2') {
-      const urgent = defaultUrgency(categoryId)
-      const next = 'CONFIRM'
-      await updateSession(env, mobile, {
-        is_urgent: true,
-        urgency_code: urgent.code,
-        urgency_reason: urgent.reason,
-        step: next
-      })
-      await sendConfirmation(env, mobile, await getSession(env, mobile))
-      return
-    }
-
-    const next = 'CONFIRM'
     await updateSession(env, mobile, {
-      is_urgent: false, urgency_code: null, urgency_reason: null, step: next
+      is_urgent: false, urgency_code: null, urgency_reason: null, step: 'REGISTER'
     })
-    await sendConfirmation(env, mobile, await getSession(env, mobile))
+    await askComplaintStep(env, mobile, 'REGISTER', categoryId)
+    return
+  }
+
+  // A partially completed session can resume safely after a transient failure.
+  if (step === 'REGISTER') {
+    await registerComplaintImmediately(env, mobile)
     return
   }
 
   if (step === 'CONFIRM') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, confirmChoiceMessage(lang))
+    if (!['1', '2', '3'].includes(text)) {
+      await sendWhatsAppMessage(env, mobile, confirmChoiceMessage())
+      return
+    }
+    if (text === '3') {
+      await updateSession(env, mobile, { step: 'FLAT_CORRECTION' })
+      await askComplaintStep(env, mobile, 'FLAT_CORRECTION', categoryId)
       return
     }
     if (text === '2') {
       await deleteSession(env, mobile)
-      await sendWhatsAppMessage(env, mobile, cancelMessage(lang))
+      await sendWhatsAppMessage(env, mobile, cancelMessage())
       return
     }
 
-    const current = await getSession(env, mobile)
-    if (!current) throw new Error('Complaint session not found.')
-    const complaint = await createComplaint(env, mobile, current)
-    const complaintsAhead = await getComplaintsAhead(env, complaint.id)
-    await deleteSession(env, mobile)
-    await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
-
-    if (Number(current.category_id) === 1) {
-      try {
-        await notifyPlumberOfNewComplaint(env, complaint, current)
-      } catch (error) {
-        // Resident registration must still succeed if the plumber notification fails.
-        console.error('Plumber WhatsApp notification failed:', error)
-      }
-    }
+    // Compatibility only: confirm actions from sessions started on an older
+    // Worker. New sessions do not enter the CONFIRM step.
+    await registerComplaintImmediately(env, mobile)
     return
   }
 
   await deleteSession(env, mobile)
-  await sendWhatsAppMessage(env, mobile, lang === 'HI'
-    ? 'शिकायत प्रक्रिया दोबारा शुरू करने के लिए *Hi* भेजें।\n\n— RWA Pocket-A'
-    : 'Please send *Hi* to restart the complaint process.\n\n— RWA Pocket-A')
+  await sendWhatsAppMessage(env, mobile,
+    'Please send *Hi* to restart. / दोबारा शुरू करने के लिए *Hi* भेजें।\n\n— RWA Pocket-A')
 }
 
-function languageMenu() {
-  return '*Welcome to RWA Pocket-A Complaint Service* 🙏\n\nPlease select your preferred language.\nकृपया अपनी भाषा चुनें।\n\n*1.* English\n*2.* हिंदी\n\nPlease send only the option number.'
-}
-
-// Set to true to restore Street Light complaint registration.
+// The category numbers remain stable when Street Light is disabled.
+ // Set to true only to restore Street Light complaint registration.
 const STREET_LIGHT_COMPLAINTS_ENABLED = false
 
-function categoryMenu(lang) {
-  const menu = fullCategoryMenu(lang)
-  return STREET_LIGHT_COMPLAINTS_ENABLED ? menu
+function categoryMenu(flatNo = null) {
+  const menu = fullCategoryMenu()
+  const visibleMenu = STREET_LIGHT_COMPLAINTS_ENABLED ? menu
     : menu.split('\n').filter(line => !line.startsWith('*6.*'))
       .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
+  const saved = isUsableFlat(flatNo)
+    ? `\n\nSaved Flat / दर्ज फ्लैट: *${flatNo}*\nTo change BEFORE selecting, send *FLAT 36-D*. / बदलने के लिए श्रेणी चुनने से पहले *FLAT 36-D* भेजें।`
+    : ''
+  return visibleMenu + saved +
+    '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
 }
 
-function fullCategoryMenu(lang) {
-  if (lang === 'HI') {
-    return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 प्लंबर\n*2.* ⚡ इलेक्ट्रीशियन\n*3.* 🚰 सीवरेज समस्या\n*4.* 📹 कैमरा रिकॉर्डिंग\n*5.* 🌿 हॉर्टिकल्चर\n*6.* 💡 स्ट्रीट लाइट\n*7.* 🧹 हाउसकीपिंग/कचरा\n*8.* 📋 अन्य\n\nकृपया केवल विकल्प संख्या भेजें।'
-  }
-  return '*Please select the complaint category:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n*7.* 🧹 Housekeeping/Garbage\n*8.* 📋 Other\n\nPlease send only the option number.'
+function fullCategoryMenu() {
+  return '*RWA Pocket-A | Complaint / शिकायत*\n' +
+    '*Select category / शिकायत का प्रकार चुनें:*\n\n' +
+    '*1.* 🔧 Plumber / प्लंबर\n' +
+    '*2.* ⚡ Electrician / इलेक्ट्रीशियन\n' +
+    '*3.* 🚰 Sewerage / सीवरेज\n' +
+    '*4.* 📹 Camera Recording / कैमरा रिकॉर्डिंग\n' +
+    '*5.* 🌿 Horticulture / हॉर्टिकल्चर\n' +
+    '*6.* 💡 Street Light / स्ट्रीट लाइट\n' +
+    '*7.* 🧹 Housekeeping / हाउसकीपिंग-कचरा\n' +
+    '*8.* 📋 Other / अन्य\n\n' +
+    'Reply with option number / विकल्प संख्या भेजें।'
 }
 
 const CATEGORIES = {
@@ -1209,65 +1190,22 @@ function getCategory(text) {
 }
 function getCategoryById(id) { return CATEGORIES[id] || null }
 
-function flatNumberQuestion(lang, category) {
-  return lang === 'HI'
-    ? `आपने *${category.hi}* चुना है।\n\nकृपया अपना *फ्लैट नंबर* भेजें।\nउदाहरण: *36-D*`
-    : `You selected *${category.label}*.\n\nPlease enter your *Flat Number*.\nExample: *36-D*`
+function flatNumberQuestion(category) {
+  return `Selected / चुनी गई श्रेणी: *${category?.label || 'Complaint'} / ${category?.hi || 'शिकायत'}*\n\nPlease enter your flat number / अपना फ्लैट नंबर भेजें।\nExample / उदाहरण: *36-D*`
 }
 
-function urgentQuestion(categoryId, lang) {
-  return lang === 'HI'
-    ? 'शिकायत की प्राथमिकता चुनें:\n\n*1.* सामान्य\n*2.* अत्यावश्यक'
-    : 'Select complaint priority:\n\n*1.* Normal\n*2.* Urgent'
+function incidentDateTimeQuestion() {
+  return 'Please provide the approximate date and time for camera recording.\nकैमरा रिकॉर्डिंग के लिए अनुमानित दिनांक और समय भेजें।\nExample / उदाहरण: *20 Sep, 8:30 PM*'
 }
 
-function defaultUrgency(categoryId) {
-  return {
-    1: { code: 'PLUMBING_URGENT', reason: 'Urgent plumbing condition confirmed by resident' },
-    2: { code: 'ELECTRICAL_URGENT', reason: 'Urgent electrical condition confirmed by resident' },
-    3: { code: 'SEWERAGE_URGENT', reason: 'Urgent sewerage condition confirmed by resident' },
-    6: { code: 'STREET_LIGHT_HAZARD', reason: 'Hazardous street-light electrical condition confirmed by resident' }
-  }[categoryId] || { code: 'URGENT', reason: 'Urgent condition confirmed by resident' }
-}
-
-function elderlyQuestion(lang) {
-  return lang === 'HI'
-    ? 'क्या आपकी आयु *70 वर्ष या उससे अधिक* है?\n\n*1.* नहीं\n*2.* हाँ'
-    : 'Are you an *Elderly Citizen (70 years or above)*?\n\n*1.* No\n*2.* Yes'
-}
-
-function addNoteQuestion(lang) {
-  return lang === 'HI'
-    ? 'क्या आप समस्या के बारे में कोई *टिप्पणी/विवरण* जोड़ना चाहते हैं?\n\n*1.* नहीं\n*2.* हाँ'
-    : 'Would you like to add any *note/description* about the problem?\n\n*1.* No\n*2.* Yes'
-}
-
-function descriptionQuestion(lang) {
-  return lang === 'HI'
-    ? `कृपया संक्षिप्त विवरण भेजें। अधिकतम *${MAX_DESCRIPTION} अक्षर*।`
-    : `Please enter a short description. Maximum *${MAX_DESCRIPTION} characters*.`
-}
-
-function incidentDateTimeQuestion(lang) {
-  return lang === 'HI'
-    ? 'कृपया कैमरा रिकॉर्डिंग के लिए अनुमानित *दिनांक और समय* बताएं।\nउदाहरण: *20 सितम्बर, रात लगभग 8:30 बजे*'
-    : 'Please enter the approximate *Date & Time* for the camera recording.\nExample: *20 Sep, around 8:30 PM*'
-}
-
-function issueTypeMenu(categoryId, lang) {
+function issueTypeMenu(categoryId) {
   if (categoryId === 7) {
-    return lang === 'HI'
-      ? '*हाउसकीपिंग/कचरा समस्या चुनें:*\n\n*1.* कचरा नहीं उठाया गया\n*2.* कॉमन एरिया की सफाई\n*3.* झाड़ू/सफाई की समस्या\n*4.* कचरा फेंकने की समस्या\n*5.* अन्य'
-      : '*Select Housekeeping/Garbage issue:*\n\n*1.* Garbage Not Collected\n*2.* Common Area Cleaning\n*3.* Sweeping/Cleaning Issue\n*4.* Garbage Dumping\n*5.* Other'
+    return '*Housekeeping / हाउसकीपिंग:*\n\n*1.* Garbage not collected / कचरा नहीं उठाया\n*2.* Common area cleaning / कॉमन एरिया सफाई\n*3.* Sweeping issue / झाड़ू-सफाई\n*4.* Garbage dumping / कचरा फेंकना\n*5.* Other / अन्य'
   }
   if (categoryId === 5) {
-    return lang === 'HI'
-      ? '*हॉर्टिकल्चर समस्या चुनें:*\n\n*1.* पेड़/शाखा की कटाई\n*2.* घास/पौधों का रखरखाव\n*3.* पानी देने की समस्या\n*4.* गिरा/क्षतिग्रस्त पेड़ या शाखा\n*5.* अन्य'
-      : '*Select Horticulture issue:*\n\n*1.* Tree/Branch Cutting\n*2.* Grass/Plant Maintenance\n*3.* Watering Issue\n*4.* Fallen/Damaged Tree or Branch\n*5.* Other'
+    return '*Horticulture / हॉर्टिकल्चर:*\n\n*1.* Tree/branch cutting / पेड़-शाखा कटाई\n*2.* Grass/plants / घास-पौधे\n*3.* Watering / पानी देना\n*4.* Fallen/damaged tree / गिरा-क्षतिग्रस्त पेड़\n*5.* Other / अन्य'
   }
-  return lang === 'HI'
-    ? '*स्ट्रीट लाइट समस्या चुनें:*\n\n*1.* लाइट काम नहीं कर रही\n*2.* लाइट झपक रही है\n*3.* दिन में लाइट चालू है\n*4.* पोल/वायरिंग की समस्या\n*5.* अन्य'
-    : '*Select Street Light issue:*\n\n*1.* Light Not Working\n*2.* Light Blinking/Flickering\n*3.* Light ON During Daytime\n*4.* Pole/Wiring Issue\n*5.* Other'
+  return '*Street Light / स्ट्रीट लाइट:*\n\n*1.* Not working / बंद\n*2.* Flickering / झपकना\n*3.* On in daytime / दिन में चालू\n*4.* Pole or wiring / पोल-वायरिंग\n*5.* Other / अन्य'
 }
 
 function getIssueType(categoryId, text) {
@@ -1300,26 +1238,21 @@ function getIssueTypeLabel(categoryId, issueType, lang) {
 }
 
 async function sendConfirmation(env, mobile, session) {
-  const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
-  const rows = []
-  rows.push(lang === 'HI' ? '*कृपया जानकारी जाँच लें:*' : '*Please review the complaint:*')
-  rows.push('')
-  rows.push(`${lang === 'HI' ? '*श्रेणी:*' : '*Category:*'} ${lang === 'HI' ? c?.hi : c?.label}`)
-  if (session.flat_no) rows.push(`${lang === 'HI' ? '*फ्लैट:*' : '*Flat:*'} ${session.flat_no}`)
-  if (session.location_text) rows.push(`${lang === 'HI' ? '*स्थान:*' : '*Location:*'} ${session.location_text}`)
-  if (session.issue_type) rows.push(`${lang === 'HI' ? '*समस्या:*' : '*Issue:*'} ${getIssueTypeLabel(Number(session.category_id), session.issue_type, lang)}`)
-  if (session.incident_datetime_text) rows.push(`${lang === 'HI' ? '*दिनांक/समय:*' : '*Date/Time:*'} ${session.incident_datetime_text}`)
-  if (session.description) rows.push(`${lang === 'HI' ? '*विवरण:*' : '*Note:*'} ${session.description}`)
-  if ([1,2,3,6].includes(Number(session.category_id))) rows.push(`${lang === 'HI' ? '*अत्यावश्यक:*' : '*Urgent:*'} ${lang === 'HI' ? (session.is_urgent ? 'हाँ' : 'नहीं') : (session.is_urgent ? 'Yes' : 'No')}`)
-  rows.push(`${lang === 'HI' ? '*प्राथमिकता:*' : '*Priority:*'} ${getPriorityLabel(session, lang)}`)
-  rows.push('')
-  rows.push(lang === 'HI' ? '*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : '*1.* Register Complaint\n*2.* Cancel')
+  const rows = ['*Review complaint / शिकायत की पुष्टि करें:*', '']
+  rows.push(`*Category / श्रेणी:* ${c?.label || 'Other'} / ${c?.hi || 'अन्य'}`)
+  if (session.flat_no) rows.push(`*Flat / फ्लैट:* ${session.flat_no}`)
+  if (session.issue_type) {
+    rows.push(`*Issue / समस्या:* ${getIssueTypeLabel(Number(session.category_id), session.issue_type, 'EN')} / ${getIssueTypeLabel(Number(session.category_id), session.issue_type, 'HI')}`)
+  }
+  if (session.incident_datetime_text) rows.push(`*Date & Time / दिनांक-समय:* ${session.incident_datetime_text}`)
+  if (session.description) rows.push(`*Details / विवरण:* ${session.description}`)
+  rows.push('', confirmChoiceMessage())
   await sendWhatsAppMessage(env, mobile, rows.join('\n'))
 }
 
-function confirmChoiceMessage(lang) {
-  return lang === 'HI' ? 'कृपया चुनें:\n\n*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : 'Please choose:\n\n*1.* Register Complaint\n*2.* Cancel'
+function confirmChoiceMessage() {
+  return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें\n*3.* Change flat / फ्लैट बदलें'
 }
 
 async function createComplaint(env, mobile, session) {
@@ -1383,12 +1316,12 @@ async function notifyPlumberOfNewComplaint(env, complaint, session) {
 
   const message =
     '*RWA POCKET-A*\n\n' +
-    '🔧 *New Plumber Complaint*\n\n' +
-    `*Complaint No.:* ${complaint.complaint_no}\n` +
-    `*Flat No.:* ${flat}\n` +
-    `*Time:* ${time}\n` +
-    `*Priority:* ${priority}\n\n` +
-    'Please check the RWA Pocket-A App for details.'
+    '🔧 *New Plumber Complaint / नई प्लंबर शिकायत*\n\n' +
+    `*Complaint No / शिकायत संख्या:* ${complaint.complaint_no}\n` +
+    `*Flat / फ्लैट:* ${flat}\n` +
+    `*Time / समय:* ${time}\n` +
+    `*Priority / प्राथमिकता:* ${priority === 'URGENT' ? 'URGENT / अत्यावश्यक' : 'NORMAL / सामान्य'}\n\n` +
+    'Please check the RWA Pocket-A App. / कृपया RWA Pocket-A ऐप देखें।'
 
   await sendWhatsAppMessage(env, mobile, message)
 }
@@ -1432,42 +1365,23 @@ async function getComplaintsAhead(env, complaintId) {
 }
 
 function complaintCreatedMessage(complaint, session, complaintsAhead = 0) {
-  const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
-  const location = session.flat_no || session.location_text || ''
-  const priority = getPriorityLabel(session, lang)
-  const isPlumber = Number(session.category_id) === 1
-  const otpHi = isPlumber
-    ? `\n*कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\n\nप्लंबर के आपके पास पहुँचने पर ही यह OTP साझा करें। OTP सत्यापित होने के बाद कार्य प्रारंभ होगा।`
+  const otp = Number(session.category_id) === 1
+    ? `\n*Work Start OTP / कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\nShare only when the plumber arrives. / प्लंबर पहुँचने पर ही OTP दें।`
     : ''
-  const otpEn = isPlumber
-    ? `\n*Work Start OTP:* *${complaint.work_start_otp}*\n\nShare this OTP only when the plumber reaches you. Work will start after OTP verification.`
-    : ''
-
-  if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*कतार में आपका क्रम:* ${complaintsAhead + 1}${otpHi}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
-  }
-  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Your sequence in queue:* ${complaintsAhead + 1}${otpEn}\n\nThank you.\n\n*— RWA Pocket-A*`
+  return `*Complaint registered / शिकायत दर्ज हुई* ✅\n\n*No / संख्या:* ${complaint.complaint_no}\n*Category / श्रेणी:* ${c?.label} / ${c?.hi}\n*Flat / फ्लैट:* ${session.flat_no}\n*Queue position / कतार क्रम:* ${complaintsAhead + 1}${otp}\n\n— RWA Pocket-A`
 }
 
-function getPriorityLabel(session, lang = 'EN') {
-  if (lang === 'HI') {
-    if (session.is_urgent) return 'अत्यावश्यक'
-    return 'सामान्य'
-  }
-  if (session.is_urgent) return 'URGENT'
-  return 'NORMAL'
-}
-async function createSession(env, mobile) {
+async function createSession(env, mobile, flatNo = null) {
   await supabaseRequest(env, '/rest/v1/whatsapp_complaint_sessions', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({
       mobile_no: mobile,
-      step: 'LANGUAGE',
-      preferred_language: null,
+      step: 'CATEGORY',
+      preferred_language: 'EN', // Legacy database value; WhatsApp messages are bilingual.
       category_id: null,
-      flat_no: null,
+      flat_no: flatNo,
       location_text: null,
       issue_type: null,
       incident_datetime_text: null,
@@ -1504,6 +1418,24 @@ async function deleteSession(env, mobile) {
   await supabaseRequest(env,
     `/rest/v1/whatsapp_complaint_sessions?mobile_no=eq.${encodeURIComponent(mobile)}`,
     { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}
+
+async function claimIncomingWhatsAppMessage(env, messageId) {
+  if (!messageId || typeof messageId !== 'string') {
+    // Do not silently discard unusual webhook deliveries without an ID.
+    console.warn('Incoming WhatsApp message has no provider ID; dedupe skipped.')
+    return true
+  }
+  // Ignore conflicts atomically on the message_id primary key. A second
+  // delivery returns [] and does not initiate any additional WhatsApp sends.
+  const rows = await supabaseRequest(env,
+    '/rest/v1/whatsapp_inbound_message_dedupe?on_conflict=message_id',
+    {
+      method: 'POST',
+      headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ message_id: messageId })
+    })
+  return Array.isArray(rows) && rows.length === 1
 }
 
 async function supabaseRequest(env, path, options = {}) {
@@ -1723,14 +1655,14 @@ async function sendWhatsAppMessage(env, to, message) {
   }
 }
 
-function invalidChoice(lang) {
-  return lang === 'HI' ? 'कृपया सही विकल्प चुनें।' : 'Please select a valid option.'
+function invalidChoice() {
+  return 'Please select a valid option. / कृपया सही विकल्प चुनें।'
 }
-function cancelMessage(lang) {
-  return lang === 'HI'
-    ? 'शिकायत दर्ज नहीं की गई।\n\nनई शिकायत के लिए *Hi* भेजें।\n\n— RWA Pocket-A'
-    : 'The complaint was not registered.\n\nSend *Hi* to start a new complaint.\n\n— RWA Pocket-A'
+
+function cancelMessage() {
+  return 'Complaint not registered. Send *Hi* to start again. / शिकायत दर्ज नहीं हुई। नई शिकायत के लिए *Hi* भेजें।\n\n— RWA Pocket-A'
 }
+
 function normalizeMobile(mobile) { return mobile ? String(mobile).replace(/\D/g, '') : '' }
 function isStartCommand(text) {
   return ['hi', 'hello', 'hello rwa', 'complaint', 'शिकायत'].includes(text)
