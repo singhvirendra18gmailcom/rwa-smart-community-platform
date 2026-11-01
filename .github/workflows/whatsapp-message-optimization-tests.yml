@@ -5,9 +5,15 @@ on:
     branches:
       - feature/whatsapp-message-optimization
       - feature/supervisor-resident-flat-management
+      - feature/web-chat-complaint-backup
     paths:
       - 'workers/complaint-bot/worker.js'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
+      - 'workers/complaint-bot/worker.web-chat.test.mjs'
+      - 'src/WebComplaintChat.jsx'
+      - 'src/WebComplaintChat.css'
+      - 'src/main.jsx'
+      - 'vite.config.js'
       - 'src/ResidentFlatManagement.jsx'
       - 'src/ResidentFlatManagement.css'
       - 'src/App.jsx'
@@ -17,6 +23,11 @@ on:
     paths:
       - 'workers/complaint-bot/worker.js'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
+      - 'workers/complaint-bot/worker.web-chat.test.mjs'
+      - 'src/WebComplaintChat.jsx'
+      - 'src/WebComplaintChat.css'
+      - 'src/main.jsx'
+      - 'vite.config.js'
       - 'src/ResidentFlatManagement.jsx'
       - 'src/ResidentFlatManagement.css'
       - 'src/App.jsx'
@@ -35,7 +46,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run simulated WhatsApp and Supabase tests
-        run: node --test workers/complaint-bot/worker.optimization.test.mjs
+        run: node --test workers/complaint-bot/worker.optimization.test.mjs workers/complaint-bot/worker.web-chat.test.mjs
 
   frontend-build:
     runs-on: ubuntu-latest
