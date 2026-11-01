@@ -239,13 +239,15 @@ function normalizeResidentMobile(value) {
 // precedence over old complaints even if they have a valid flat.
 async function resolveResidentFlat(env, mobile) {
   const mappings = await supabaseRequest(env,
-    `/rest/v1/whatsapp_resident_flat_mappings?mobile_no=eq.${encodeURIComponent(mobile)}&select=flat_no,updated_at&limit=1`,
+    `/rest/v1/whatsapp_resident_flat_mappings?mobile_no=eq.${encodeURIComponent(mobile)}&select=flat_no,updated_at,updated_by&limit=1`,
     { method: 'GET' })
   if (Array.isArray(mappings) && mappings.length) {
     const mapped = mappings[0]
     return {
       flat_no: isUsableFlat(mapped.flat_no) ? mapped.flat_no.trim().toUpperCase() : null,
-      source: isUsableFlat(mapped.flat_no) ? 'SUPERVISOR' : 'CLEARED',
+      source: isUsableFlat(mapped.flat_no)
+        ? (mapped.updated_by ? 'SUPERVISOR' : 'REGISTERED')
+        : 'CLEARED',
       updated_at: mapped.updated_at
     }
   }
@@ -1072,7 +1074,10 @@ async function rememberRegisteredFlat(env, mobile, flatNo) {
     '/rest/v1/whatsapp_resident_flat_mappings?on_conflict=mobile_no', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ mobile_no: mobile, flat_no: flatNo, updated_at: new Date().toISOString() })
+      body: JSON.stringify({
+        mobile_no: mobile, flat_no: flatNo, updated_at: new Date().toISOString(),
+        updated_by: null // A resident-entered flat supersedes a manual override.
+      })
     })
 }
 
