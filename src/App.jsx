@@ -8,6 +8,7 @@ import {
   ArrowRight,
   ClipboardCheck,
   MessageSquareWarning,
+  UserRoundCog,
   WalletCards
 } from 'lucide-react'
 
@@ -22,6 +23,7 @@ import SocietyInspection from './SocietyInspection'
 import { useInspectionConfig } from './inspectionConfig'
 import Complaints from './Complaints'
 import ComplaintLiveDisplay from './ComplaintLiveDisplay'
+import ResidentFlatManagement from './ResidentFlatManagement'
 
 import RwbotHome from './rwbot/RwbotHome'
 import RwbotChangePassword from './rwbot/RwbotChangePassword'
@@ -392,6 +394,10 @@ function App() {
     )
   }
 
+  if (screen === 'resident-flat-management' && operationsRole === 'SUPERVISOR') {
+    return <ResidentFlatManagement onBack={() => setScreen('dashboard')} />
+  }
+
   if (screen === 'plumber-complaints') {
     return (
       <ComplaintLiveDisplay
@@ -406,6 +412,9 @@ function App() {
       <ComplaintLiveDisplay
         onBack={() => setScreen('dashboard')}
         onOpenComplaints={() => setScreen('complaints')}
+        onManageResidentFlats={operationsRole === 'SUPERVISOR'
+          ? () => setScreen('resident-flat-management')
+          : undefined}
       />
     )
   }
@@ -539,6 +548,22 @@ function App() {
 
             <ArrowRight className="dashboard-module-arrow" size={18} />
           </button>
+
+          {operationsRole === 'SUPERVISOR' && (
+            <button
+              className="dashboard-module-card module-resident-flat"
+              onClick={() => setScreen('resident-flat-management')}
+            >
+              <div className="dashboard-module-icon module-icon-blue">
+                <UserRoundCog size={24} strokeWidth={1.9} />
+              </div>
+              <div className="dashboard-module-copy">
+                <h3>Resident Flat Mapping</h3>
+                <p>Update or clear WhatsApp flats</p>
+              </div>
+              <ArrowRight className="dashboard-module-arrow" size={18} />
+            </button>
+          )}
 
           <button
             className="dashboard-module-card dashboard-module-wide module-accounts"

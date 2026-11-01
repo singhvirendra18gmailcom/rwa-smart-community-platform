@@ -15,6 +15,10 @@ export default {
       return htmlResponse(dataDeletionHtml())
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/residents/flat') {
+      return handleSupervisorFlatLookup(request, env, url)
+    }
+
     if (request.method === 'GET') {
       const mode = url.searchParams.get('hub.mode')
       const token = url.searchParams.get('hub.verify_token')
@@ -29,10 +33,15 @@ export default {
       request.method === 'OPTIONS' &&
       (
         url.pathname.startsWith('/api/complaints/') ||
+        url.pathname.startsWith('/api/residents/') ||
         url.pathname.startsWith('/api/street-lights/')
       )
     ) {
       return apiResponse({ ok: true }, 200)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/residents/flat') {
+      return handleSupervisorFlatUpdate(request, env)
     }
 
     if (request.method === 'POST' && url.pathname === '/api/complaints/acknowledge') {
@@ -145,7 +154,7 @@ function apiResponse(payload, status = 200) {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     }
   })
 }
@@ -205,6 +214,127 @@ async function getAuthenticatedUser(request, env) {
 
   if (!response.ok) return null
   return response.json()
+}
+
+
+async function requireSupervisor(request, env) {
+  const user = await getAuthenticatedUser(request, env)
+  if (!user?.id) return { error: apiResponse({ ok: false, error: 'Authentication required.' }, 401) }
+  const profiles = await supabaseRequest(env,
+    `/rest/v1/app_users?auth_user_id=eq.${encodeURIComponent(user.id)}&active=eq.true&select=role&limit=1`,
+    { method: 'GET' })
+  if (!Array.isArray(profiles) || String(profiles[0]?.role || '').toUpperCase() !== 'SUPERVISOR') {
+    return { error: apiResponse({ ok: false, error: 'Supervisor access required.' }, 403) }
+  }
+  return { user }
+}
+
+function normalizeResidentMobile(value) {
+  const digits = normalizeMobile(value)
+  const full = digits.length === 10 ? `91${digits}` : digits
+  return /^91[6-9][0-9]{9}$/.test(full) ? full : null
+}
+
+// A supervisor CLEAR is an existing row with null flat_no. It takes
+// precedence over old complaints even if they have a valid flat.
+async function resolveResidentFlat(env, mobile) {
+  const mappings = await supabaseRequest(env,
+    `/rest/v1/whatsapp_resident_flat_mappings?mobile_no=eq.${encodeURIComponent(mobile)}&select=flat_no,updated_at,updated_by&limit=1`,
+    { method: 'GET' })
+  if (Array.isArray(mappings) && mappings.length) {
+    const mapped = mappings[0]
+    return {
+      flat_no: isUsableFlat(mapped.flat_no) ? mapped.flat_no.trim().toUpperCase() : null,
+      source: isUsableFlat(mapped.flat_no)
+        ? (mapped.updated_by ? 'SUPERVISOR' : 'REGISTERED')
+        : 'CLEARED',
+      updated_at: mapped.updated_at
+    }
+  }
+  const history = await supabaseRequest(env,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
+    { method: 'GET' })
+  const latest = Array.isArray(history) ? history.find(row => isUsableFlat(row.flat_no)) : null
+  return {
+    flat_no: latest ? latest.flat_no.trim().toUpperCase() : null,
+    source: latest ? 'HISTORY' : 'NONE',
+    updated_at: null
+  }
+}
+
+async function handleSupervisorFlatLookup(request, env, url) {
+  try {
+    const auth = await requireSupervisor(request, env)
+    if (auth.error) return auth.error
+    const mobile = normalizeResidentMobile(url.searchParams.get('mobile'))
+    if (!mobile) return apiResponse({ ok: false, error: 'Enter a valid Indian WhatsApp mobile number.' }, 400)
+    const mapping = await resolveResidentFlat(env, mobile)
+    return apiResponse({ ok: true, mobile_no: mobile, ...mapping })
+  } catch (error) {
+    console.error('Supervisor flat lookup failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to load resident flat mapping.' }, 500)
+  }
+}
+
+async function handleSupervisorFlatUpdate(request, env) {
+  try {
+    const auth = await requireSupervisor(request, env)
+    if (auth.error) return auth.error
+    const body = await request.json()
+    const mobile = normalizeResidentMobile(body?.mobile_no)
+    if (!mobile) return apiResponse({ ok: false, error: 'Enter a valid Indian WhatsApp mobile number.' }, 400)
+    const action = String(body?.action || '').toUpperCase()
+    if (!['UPDATE', 'CLEAR'].includes(action)) {
+      return apiResponse({ ok: false, error: 'Action must be UPDATE or CLEAR.' }, 400)
+    }
+    const flatNo = action === 'CLEAR' ? null : String(body?.flat_no || '').trim().toUpperCase()
+    if (action === 'UPDATE' && !isUsableFlat(flatNo)) {
+      return apiResponse({ ok: false, error: 'Enter a valid flat number, e.g. 36-D.' }, 400)
+    }
+
+    const existing = await resolveResidentFlat(env, mobile)
+    if (existing.source === 'NONE') {
+      const sessions = await supabaseRequest(env,
+        `/rest/v1/whatsapp_complaint_sessions?mobile_no=eq.${encodeURIComponent(mobile)}&select=mobile_no&limit=1`,
+        { method: 'GET' })
+      if (!Array.isArray(sessions) || !sessions.length) {
+        return apiResponse({ ok: false, error: 'No prior chatbot record found for this mobile number.' }, 404)
+      }
+    }
+
+    const updatedAt = new Date().toISOString()
+    const updated = await supabaseRequest(env,
+      '/rest/v1/whatsapp_resident_flat_mappings?on_conflict=mobile_no',
+      {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({
+          mobile_no: mobile, flat_no: flatNo,
+          updated_at: updatedAt, updated_by: auth.user.id
+        })
+      })
+    if (!Array.isArray(updated) || !updated.length) {
+      throw new Error('Flat mapping write did not return the updated record.')
+    }
+
+    // Invalidate any active chat carrying an old cached flat. No resident
+    // message is sent: the next Hi starts with the new mapping.
+    let session_reset = true
+    try {
+      await deleteSession(env, mobile)
+    } catch (error) {
+      console.warn('Flat mapping changed but chat session reset failed.')
+      session_reset = false
+    }
+    return apiResponse({
+      ok: true, mobile_no: mobile, flat_no: flatNo,
+      source: action === 'CLEAR' ? 'CLEARED' : 'SUPERVISOR',
+      updated_at: updatedAt, session_reset
+    })
+  } catch (error) {
+    console.error('Supervisor flat update failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to change resident flat mapping.' }, 500)
+  }
 }
 
 function calculateStreetLightIssueDays(firstReportedDate, today) {
@@ -931,21 +1061,24 @@ function workDoneConfirmationMessage(complaint) {
 }
 
 async function startComplaint(env, mobile) {
-  // Only reuse flats from registered complaints. Returning residents can
-  // optionally change the remembered flat from the category menu before
-  // selecting a category, because selection may complete registration.
-  const flatNo = await getRememberedFlat(env, mobile)
+  const mapping = await resolveResidentFlat(env, mobile)
   await deleteSession(env, mobile)
-  await createSession(env, mobile, flatNo)
-  await sendWhatsAppMessage(env, mobile, categoryMenu(flatNo))
+  await createSession(env, mobile, mapping.flat_no)
+  await sendWhatsAppMessage(env, mobile, categoryMenu(mapping.flat_no))
 }
 
-async function getRememberedFlat(env, mobile) {
-  const rows = await supabaseRequest(env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
-    { method: 'GET' })
-  const match = Array.isArray(rows) ? rows.find(row => isUsableFlat(row.flat_no)) : null
-  return match ? String(match.flat_no).trim().toUpperCase() : null
+async function rememberRegisteredFlat(env, mobile, flatNo) {
+  // After a cleared mapping, the next successfully registered complaint
+  // records the new flat so subsequent requests can reuse it.
+  await supabaseRequest(env,
+    '/rest/v1/whatsapp_resident_flat_mappings?on_conflict=mobile_no', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        mobile_no: mobile, flat_no: flatNo, updated_at: new Date().toISOString(),
+        updated_by: null // A resident-entered flat supersedes a manual override.
+      })
+    })
 }
 
 function isUsableFlat(flatNo) {
@@ -967,6 +1100,13 @@ async function registerComplaintImmediately(env, mobile) {
     throw new Error('Complaint registration is missing a valid category or flat.')
   }
   const complaint = await createComplaint(env, mobile, current)
+  try {
+    await rememberRegisteredFlat(env, mobile, current.flat_no)
+  } catch (error) {
+    // The complaint was successfully created; do not hold up registration
+    // merely because caching the flat failed.
+    console.error('Unable to remember registered flat:', error)
+  }
   const complaintsAhead = await getComplaintsAhead(env, complaint.id)
   await deleteSession(env, mobile)
   await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
@@ -982,7 +1122,7 @@ async function registerComplaintImmediately(env, mobile) {
 }
 
 async function askComplaintStep(env, mobile, step, categoryId) {
-  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+  if (step === 'FLAT_NO') {
     await sendWhatsAppMessage(env, mobile, flatNumberQuestion(getCategoryById(categoryId)))
   } else if (step === 'INCIDENT_DATETIME') {
     await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
@@ -1017,21 +1157,6 @@ async function processConversation(env, mobile, originalText, session) {
   }
 
   if (step === 'CATEGORY') {
-    // Optional flat correction BEFORE selecting a category. This never
-    // modifies prior complaints; the corrected flat is stored on the next one.
-    const flatChange = text.match(/^flat\s+(.+)$/i)
-    if (flatChange) {
-      const corrected = flatChange[1].trim().toUpperCase()
-      if (!isUsableFlat(corrected)) {
-        await sendWhatsAppMessage(env, mobile,
-          'Invalid flat. Try *FLAT 36-D*. / फ्लैट नंबर गलत है। *FLAT 36-D* भेजें।')
-        return
-      }
-      await updateSession(env, mobile, { flat_no: corrected })
-      await sendWhatsAppMessage(env, mobile, categoryMenu(corrected))
-      return
-    }
-
     const category = getCategory(text)
     if (!category) {
       await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no))
@@ -1064,7 +1189,7 @@ async function processConversation(env, mobile, originalText, session) {
     return
   }
 
-  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+  if (step === 'FLAT_NO') {
     const flatNo = text.toUpperCase().slice(0, 25)
     if (!isUsableFlat(flatNo)) {
       await sendWhatsAppMessage(env, mobile,
@@ -1114,14 +1239,18 @@ async function processConversation(env, mobile, originalText, session) {
     return
   }
 
+  if (step === 'FLAT_CORRECTION') {
+    // An in-progress session from a previous Worker version must not
+    // retain resident-controlled flat correction.
+    await deleteSession(env, mobile)
+    await sendWhatsAppMessage(env, mobile,
+      'Please contact the RWA supervisor to correct your flat, then send *Hi*. / फ्लैट बदलने के लिए सुपरवाइज़र से संपर्क करें, फिर *Hi* भेजें।')
+    return
+  }
+
   if (step === 'CONFIRM') {
-    if (!['1', '2', '3'].includes(text)) {
+    if (!['1', '2'].includes(text)) {
       await sendWhatsAppMessage(env, mobile, confirmChoiceMessage())
-      return
-    }
-    if (text === '3') {
-      await updateSession(env, mobile, { step: 'FLAT_CORRECTION' })
-      await askComplaintStep(env, mobile, 'FLAT_CORRECTION', categoryId)
       return
     }
     if (text === '2') {
@@ -1151,7 +1280,7 @@ function categoryMenu(flatNo = null) {
     : menu.split('\n').filter(line => !line.startsWith('*6.*'))
       .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
   const saved = isUsableFlat(flatNo)
-    ? `\n\nSaved Flat / दर्ज फ्लैट: *${flatNo}*\nTo change BEFORE selecting, send *FLAT 36-D*. / बदलने के लिए श्रेणी चुनने से पहले *FLAT 36-D* भेजें।`
+    ? `\n\nRegistered Flat / दर्ज फ्लैट: *${flatNo}*`
     : ''
   return visibleMenu + saved +
     '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
@@ -1252,7 +1381,7 @@ async function sendConfirmation(env, mobile, session) {
 }
 
 function confirmChoiceMessage() {
-  return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें\n*3.* Change flat / फ्लैट बदलें'
+  return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें'
 }
 
 async function createComplaint(env, mobile, session) {
