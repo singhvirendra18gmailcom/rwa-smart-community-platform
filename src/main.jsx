@@ -1,6 +1,10 @@
 import { Component, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+// Bundle public chat styling with the main entry instead of relying solely
+// on CSS attached to an asynchronously loaded component. This ensures
+// Cloudflare Pages includes the stylesheet link in index.html.
+import './WebComplaintChat.css'
 
 class AppErrorBoundary extends Component {
   constructor(props) {
