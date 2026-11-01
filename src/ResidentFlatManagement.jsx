@@ -20,7 +20,8 @@ function isValidFlat(value) {
 }
 
 function sourceText(source) {
-  if (source === 'SUPERVISOR') return 'Supervisor-managed'
+  if (source === 'SUPERVISOR') return 'Updated by supervisor'
+  if (source === 'REGISTERED') return 'Saved automatically after a complaint'
   if (source === 'HISTORY') return 'Previous registered complaint'
   if (source === 'CLEARED') return 'Cleared by supervisor — resident will be asked for flat'
   return 'No previous flat found'
