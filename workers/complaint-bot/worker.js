@@ -1059,21 +1059,21 @@ function workDoneConfirmationMessage(complaint) {
 }
 
 async function startComplaint(env, mobile) {
-  // Only reuse flats from registered complaints. Returning residents can
-  // optionally change the remembered flat from the category menu before
-  // selecting a category, because selection may complete registration.
-  const flatNo = await getRememberedFlat(env, mobile)
+  const mapping = await resolveResidentFlat(env, mobile)
   await deleteSession(env, mobile)
-  await createSession(env, mobile, flatNo)
-  await sendWhatsAppMessage(env, mobile, categoryMenu(flatNo))
+  await createSession(env, mobile, mapping.flat_no)
+  await sendWhatsAppMessage(env, mobile, categoryMenu(mapping.flat_no))
 }
 
-async function getRememberedFlat(env, mobile) {
-  const rows = await supabaseRequest(env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
-    { method: 'GET' })
-  const match = Array.isArray(rows) ? rows.find(row => isUsableFlat(row.flat_no)) : null
-  return match ? String(match.flat_no).trim().toUpperCase() : null
+async function rememberRegisteredFlat(env, mobile, flatNo) {
+  // After a cleared mapping, the next successfully registered complaint
+  // records the new flat so subsequent requests can reuse it.
+  await supabaseRequest(env,
+    '/rest/v1/whatsapp_resident_flat_mappings?on_conflict=mobile_no', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ mobile_no: mobile, flat_no: flatNo, updated_at: new Date().toISOString() })
+    })
 }
 
 function isUsableFlat(flatNo) {
@@ -1095,6 +1095,13 @@ async function registerComplaintImmediately(env, mobile) {
     throw new Error('Complaint registration is missing a valid category or flat.')
   }
   const complaint = await createComplaint(env, mobile, current)
+  try {
+    await rememberRegisteredFlat(env, mobile, current.flat_no)
+  } catch (error) {
+    // The complaint was successfully created; do not hold up registration
+    // merely because caching the flat failed.
+    console.error('Unable to remember registered flat:', error)
+  }
   const complaintsAhead = await getComplaintsAhead(env, complaint.id)
   await deleteSession(env, mobile)
   await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
@@ -1110,7 +1117,7 @@ async function registerComplaintImmediately(env, mobile) {
 }
 
 async function askComplaintStep(env, mobile, step, categoryId) {
-  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+  if (step === 'FLAT_NO') {
     await sendWhatsAppMessage(env, mobile, flatNumberQuestion(getCategoryById(categoryId)))
   } else if (step === 'INCIDENT_DATETIME') {
     await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
@@ -1145,21 +1152,6 @@ async function processConversation(env, mobile, originalText, session) {
   }
 
   if (step === 'CATEGORY') {
-    // Optional flat correction BEFORE selecting a category. This never
-    // modifies prior complaints; the corrected flat is stored on the next one.
-    const flatChange = text.match(/^flat\s+(.+)$/i)
-    if (flatChange) {
-      const corrected = flatChange[1].trim().toUpperCase()
-      if (!isUsableFlat(corrected)) {
-        await sendWhatsAppMessage(env, mobile,
-          'Invalid flat. Try *FLAT 36-D*. / फ्लैट नंबर गलत है। *FLAT 36-D* भेजें।')
-        return
-      }
-      await updateSession(env, mobile, { flat_no: corrected })
-      await sendWhatsAppMessage(env, mobile, categoryMenu(corrected))
-      return
-    }
-
     const category = getCategory(text)
     if (!category) {
       await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no))
@@ -1192,7 +1184,7 @@ async function processConversation(env, mobile, originalText, session) {
     return
   }
 
-  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+  if (step === 'FLAT_NO') {
     const flatNo = text.toUpperCase().slice(0, 25)
     if (!isUsableFlat(flatNo)) {
       await sendWhatsAppMessage(env, mobile,
@@ -1242,14 +1234,18 @@ async function processConversation(env, mobile, originalText, session) {
     return
   }
 
+  if (step === 'FLAT_CORRECTION') {
+    // An in-progress session from a previous Worker version must not
+    // retain resident-controlled flat correction.
+    await deleteSession(env, mobile)
+    await sendWhatsAppMessage(env, mobile,
+      'Please contact the RWA supervisor to correct your flat, then send *Hi*. / फ्लैट बदलने के लिए सुपरवाइज़र से संपर्क करें, फिर *Hi* भेजें।')
+    return
+  }
+
   if (step === 'CONFIRM') {
-    if (!['1', '2', '3'].includes(text)) {
+    if (!['1', '2'].includes(text)) {
       await sendWhatsAppMessage(env, mobile, confirmChoiceMessage())
-      return
-    }
-    if (text === '3') {
-      await updateSession(env, mobile, { step: 'FLAT_CORRECTION' })
-      await askComplaintStep(env, mobile, 'FLAT_CORRECTION', categoryId)
       return
     }
     if (text === '2') {
@@ -1279,7 +1275,7 @@ function categoryMenu(flatNo = null) {
     : menu.split('\n').filter(line => !line.startsWith('*6.*'))
       .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
   const saved = isUsableFlat(flatNo)
-    ? `\n\nSaved Flat / दर्ज फ्लैट: *${flatNo}*\nTo change BEFORE selecting, send *FLAT 36-D*. / बदलने के लिए श्रेणी चुनने से पहले *FLAT 36-D* भेजें।`
+    ? `\n\nRegistered Flat / दर्ज फ्लैट: *${flatNo}*`
     : ''
   return visibleMenu + saved +
     '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
@@ -1380,7 +1376,7 @@ async function sendConfirmation(env, mobile, session) {
 }
 
 function confirmChoiceMessage() {
-  return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें\n*3.* Change flat / फ्लैट बदलें'
+  return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें'
 }
 
 async function createComplaint(env, mobile, session) {
