@@ -21,10 +21,10 @@ function json(value, status = 200) {
   })
 }
 
-function mockServices({ priorFlats = [], workDoneComplaint = null } = {}) {
+function mockServices({ priorFlats = [], workDoneComplaint = null, supervisorRole = 'SUPERVISOR' } = {}) {
   const state = {
     claimedIds: new Set(), messagesSent: [], session: null,
-    previousFlats: priorFlats, complaints: [],
+    previousFlats: priorFlats, complaints: [], mapping: null, supervisorRole,
     workDoneComplaint: workDoneComplaint ? { ...workDoneComplaint } : null
   }
   const priorFetch = globalThis.fetch
@@ -38,8 +38,23 @@ function mockServices({ priorFlats = [], workDoneComplaint = null } = {}) {
       state.messagesSent.push({ recipient: payload.to, text: payload.text.body })
       return json({ messages: [{ id: 'wamid.mock.out' }] })
     }
+    if (uri.pathname === '/auth/v1/user') {
+      return json({ id: '6f218a36-f458-4549-957e-cbd5b29e8eb1' })
+    }
     assert.equal(uri.hostname, 'supabase.example.test')
 
+    if (uri.pathname === '/rest/v1/app_users') {
+      return json([{ role: state.supervisorRole }])
+    }
+    if (uri.pathname === '/rest/v1/whatsapp_resident_flat_mappings') {
+      if (method === 'GET') return json(state.mapping ? [state.mapping] : [])
+      if (method === 'POST') {
+        state.mapping = { ...state.mapping, ...payload }
+        return options.headers?.Prefer?.includes('return=representation')
+          ? json([state.mapping], 201)
+          : new Response(null, { status: 204 })
+      }
+    }
     if (uri.pathname === '/rest/v1/whatsapp_inbound_message_dedupe') {
       assert.equal(method, 'POST')
       if (state.claimedIds.has(payload.message_id)) return json([])
@@ -85,13 +100,13 @@ function mockServices({ priorFlats = [], workDoneComplaint = null } = {}) {
       }
     }
     if (uri.pathname === '/rest/v1/workers' && method === 'GET') {
-      return json([{ name: 'Plumber', mobile_no: '910000000002' }])
+      return json([{ name: 'Plumber', mobile_no: '919000000002' }])
     }
     throw new Error(`Unexpected request: ${method} ${uri.pathname} ${uri.search}`)
   }
   return {
     state, restore: () => { globalThis.fetch = priorFetch },
-    residentMessages: () => state.messagesSent.filter(x => x.recipient === '910000000001')
+    residentMessages: () => state.messagesSent.filter(x => x.recipient === '919000000001')
   }
 }
 
@@ -102,7 +117,7 @@ function inbound(message) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       entry: [{ changes: [{ value: { messages: [{
-        id, from: '910000000001', type: 'text', text: { body: message.body }
+        id, from: '919000000001', type: 'text', text: { body: message.body }
       }] } }] }]
     })
   })
@@ -140,7 +155,7 @@ test('new resident: registers immediately after flat, without a confirmation pro
     assert.match(mock.residentMessages()[2].text, /OTP/)
     assert.match(mock.residentMessages()[2].text, /Queue position/)
     bilingual(mock.residentMessages()[2].text)
-    assert.equal(mock.state.messagesSent.filter(x => x.recipient === '910000000002').length, 1)
+    assert.equal(mock.state.messagesSent.filter(x => x.recipient === '919000000002').length, 1)
   } finally { mock.restore() }
 })
 
@@ -151,7 +166,7 @@ test('returning resident registers immediately after category; no flat or confir
     assert.equal(mock.state.session.flat_no, '45-A')
     assert.equal(mock.state.session.step, 'CATEGORY')
     assert.match(mock.residentMessages()[0].text, /45-A/)
-    assert.match(mock.residentMessages()[0].text, /FLAT 36-D/)
+    assert.doesNotMatch(mock.residentMessages()[0].text, /FLAT 36-D/)
 
     await say('2') // Electrician, final required input with known flat
     assert.equal(mock.state.session, null)
@@ -164,18 +179,18 @@ test('returning resident registers immediately after category; no flat or confir
   } finally { mock.restore() }
 })
 
-test('optional flat correction before choosing category affects only the next complaint', async () => {
+test('resident cannot change a previously registered flat through chatbot', async () => {
   const mock = mockServices({ priorFlats: ['45-A'] })
   try {
     await say('Hi')
     await say('FLAT 46-D')
-    assert.equal(mock.state.session.flat_no, '46-D')
+    assert.equal(mock.state.session.flat_no, '45-A')
     assert.equal(mock.state.session.step, 'CATEGORY')
     assert.equal(mock.residentMessages().length, 2)
+    assert.match(mock.residentMessages()[1].text, /Please select a valid option/)
     await say('2')
     assert.equal(mock.state.complaints.length, 1)
-    assert.equal(mock.state.complaints[0].flat_no, '46-D')
-    assert.equal(mock.residentMessages().length, 3)
+    assert.equal(mock.state.complaints[0].flat_no, '45-A')
   } finally { mock.restore() }
 })
 
@@ -247,4 +262,90 @@ test('work done Yes closes without rating or thank-you; No reopens', async () =>
     assert.equal(second.residentMessages().length, 1)
     bilingual(second.residentMessages()[0].text)
   } finally { second.restore() }
+})
+
+
+function supervisorRequest(method, phone, body = undefined, token = 'test-token') {
+  const url = `https://worker.example.test/api/residents/flat` +
+    (method === 'GET' ? `?mobile=${encodeURIComponent(phone)}` : '')
+  return new Request(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body ? { 'Content-Type': 'application/json' } : {})
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  })
+}
+
+test('supervisor updates saved flat; clear suppresses history and next valid complaint stores new flat', async () => {
+  const mock = mockServices({ priorFlats: ['45-A'] })
+  try {
+    let response = await worker.fetch(supervisorRequest('GET', '9000000001'), env)
+    assert.equal(response.status, 200)
+    let result = await response.json()
+    assert.equal(result.flat_no, '45-A')
+    assert.equal(result.source, 'HISTORY')
+
+    response = await worker.fetch(supervisorRequest('POST', '9000000001', {
+      mobile_no: '9000000001', action: 'UPDATE', flat_no: '46-D'
+    }), env)
+    assert.equal(response.status, 200)
+    result = await response.json()
+    assert.equal(result.flat_no, '46-D')
+    assert.equal(mock.state.mapping.flat_no, '46-D')
+
+    await say('Hi')
+    assert.equal(mock.state.session.flat_no, '46-D')
+    assert.match(mock.residentMessages().at(-1).text, /46-D/)
+
+    response = await worker.fetch(supervisorRequest('POST', '9000000001', {
+      mobile_no: '9000000001', action: 'CLEAR'
+    }), env)
+    assert.equal(response.status, 200)
+    assert.equal(mock.state.mapping.flat_no, null)
+    assert.equal(mock.state.session, null)
+
+    response = await worker.fetch(supervisorRequest('GET', '9000000001'), env)
+    result = await response.json()
+    assert.equal(result.source, 'CLEARED')
+    assert.equal(result.flat_no, null)
+
+    await say('Hi')
+    assert.equal(mock.state.session.flat_no, null)
+    await say('2')
+    assert.equal(mock.state.session.step, 'FLAT_NO')
+    await say('48-B')
+    assert.equal(mock.state.complaints[0].flat_no, '48-B')
+    assert.equal(mock.state.mapping.flat_no, '48-B')
+    assert.equal(mock.state.complaints.length, 1)
+  } finally { mock.restore() }
+})
+
+test('non-supervisor and unauthenticated users cannot view or change mobile-flat mappings', async () => {
+  const mock = mockServices({ priorFlats: ['45-A'], supervisorRole: 'PLUMBER' })
+  try {
+    let response = await worker.fetch(supervisorRequest('GET', '9000000001'), env)
+    assert.equal(response.status, 403)
+    response = await worker.fetch(supervisorRequest('POST', '9000000001', {
+      mobile_no: '9000000001', action: 'UPDATE', flat_no: '12-A'
+    }), env)
+    assert.equal(response.status, 403)
+    response = await worker.fetch(new Request('https://worker.example.test/api/residents/flat?mobile=9000000001'), env)
+    assert.equal(response.status, 401)
+    assert.equal(mock.state.mapping, null)
+  } finally { mock.restore() }
+})
+
+test('supervisor rejects invalid mobile and invalid flat values', async () => {
+  const mock = mockServices({ priorFlats: ['45-A'] })
+  try {
+    let response = await worker.fetch(supervisorRequest('GET', '123'), env)
+    assert.equal(response.status, 400)
+    response = await worker.fetch(supervisorRequest('POST', '9000000001', {
+      mobile_no: '9000000001', action: 'UPDATE', flat_no: 'COMMON AREA'
+    }), env)
+    assert.equal(response.status, 400)
+    assert.equal(mock.state.mapping, null)
+  } finally { mock.restore() }
 })
