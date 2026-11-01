@@ -116,66 +116,66 @@ function bilingual(text) {
   assert.match(text, /[\u0900-\u097f]/)
 }
 
-test('new resident: bilingual menu, asks flat once, skips language and urgent, retains OTP + queue', async () => {
+test('new resident: registers immediately after flat, without a confirmation prompt', async () => {
   const mock = mockServices()
   try {
     await say('Hi')
     assert.equal(mock.state.session.step, 'CATEGORY')
     assert.equal(mock.residentMessages().length, 1)
     bilingual(mock.residentMessages()[0].text)
-    assert.doesNotMatch(mock.residentMessages()[0].text, /select your preferred language/i)
     assert.match(mock.residentMessages()[0].text, /Plumber \/ प्लंबर/)
 
-    await say('1') // plumbing
+    await say('1') // Plumbing
     assert.equal(mock.state.session.step, 'FLAT_NO')
     assert.equal(mock.residentMessages().length, 2)
-    bilingual(mock.residentMessages()[1].text)
 
-    await say('36-D')
-    assert.equal(mock.state.session.step, 'CONFIRM')
-    assert.equal(mock.residentMessages().length, 3)
-    assert.match(mock.residentMessages()[2].text, /36-D/)
-    assert.doesNotMatch(mock.residentMessages()[2].text, /Urgent:|अत्यावश्यक:/)
-
-    await say('1') // register
+    await say('36-D') // Last required input; immediately register
     assert.equal(mock.state.complaints.length, 1)
     assert.equal(mock.state.complaints[0].flat_no, '36-D')
     assert.equal(mock.state.complaints[0].is_urgent, false)
     assert.equal(mock.state.session, null)
-    assert.equal(mock.residentMessages().length, 4)
-    assert.match(mock.residentMessages()[3].text, /OTP/)
-    assert.match(mock.residentMessages()[3].text, /Queue position/)
-    bilingual(mock.residentMessages()[3].text)
+    assert.equal(mock.residentMessages().length, 3)
+    assert.doesNotMatch(mock.residentMessages()[2].text, /Register \/|Cancel \/|Review complaint/)
+    assert.match(mock.residentMessages()[2].text, /Complaint registered/)
+    assert.match(mock.residentMessages()[2].text, /OTP/)
+    assert.match(mock.residentMessages()[2].text, /Queue position/)
+    bilingual(mock.residentMessages()[2].text)
     assert.equal(mock.state.messagesSent.filter(x => x.recipient === '910000000002').length, 1)
   } finally { mock.restore() }
 })
 
-test('returning resident: remembered flat, no flat question, optional correction', async () => {
+test('returning resident registers immediately after category; no flat or confirmation question', async () => {
   const mock = mockServices({ priorFlats: ['45-A'] })
   try {
     await say('Hi')
     assert.equal(mock.state.session.flat_no, '45-A')
     assert.equal(mock.state.session.step, 'CATEGORY')
     assert.match(mock.residentMessages()[0].text, /45-A/)
+    assert.match(mock.residentMessages()[0].text, /FLAT 36-D/)
 
-    await say('2') // electrician
-    assert.equal(mock.state.session.step, 'CONFIRM')
+    await say('2') // Electrician, final required input with known flat
+    assert.equal(mock.state.session, null)
+    assert.equal(mock.state.complaints.length, 1)
+    assert.equal(mock.state.complaints[0].flat_no, '45-A')
+    assert.equal(mock.state.complaints[0].category_id, 2)
     assert.equal(mock.residentMessages().length, 2)
-    assert.match(mock.residentMessages()[1].text, /45-A/)
-    assert.doesNotMatch(mock.residentMessages()[1].text, /enter your flat number/i)
+    assert.match(mock.residentMessages()[1].text, /Complaint registered/)
+    assert.doesNotMatch(mock.residentMessages()[1].text, /Register \/|Cancel \/|Review complaint/)
+  } finally { mock.restore() }
+})
 
-    await say('3') // change saved flat
-    assert.equal(mock.state.session.step, 'FLAT_CORRECTION')
-    assert.equal(mock.residentMessages().length, 3)
-
-    await say('46-D')
-    assert.equal(mock.state.session.step, 'CONFIRM')
+test('optional flat correction before choosing category affects only the next complaint', async () => {
+  const mock = mockServices({ priorFlats: ['45-A'] })
+  try {
+    await say('Hi')
+    await say('FLAT 46-D')
     assert.equal(mock.state.session.flat_no, '46-D')
-    assert.match(mock.residentMessages()[3].text, /46-D/)
-
-    await say('1')
+    assert.equal(mock.state.session.step, 'CATEGORY')
+    assert.equal(mock.residentMessages().length, 2)
+    await say('2')
+    assert.equal(mock.state.complaints.length, 1)
     assert.equal(mock.state.complaints[0].flat_no, '46-D')
-    assert.equal(mock.residentMessages().length, 5)
+    assert.equal(mock.residentMessages().length, 3)
   } finally { mock.restore() }
 })
 
@@ -191,18 +191,34 @@ test('redelivered WhatsApp webhook ID produces only one outgoing reply', async (
   } finally { mock.restore() }
 })
 
-test('housekeeping category asks issue type but never asks urgent priority', async () => {
+test('housekeeping category registers directly after selecting required issue type', async () => {
   const mock = mockServices({ priorFlats: ['12-B'] })
   try {
     await say('Hi')
-    await say('6') // housekeeping: street-light is disabled
+    await say('6') // Housekeeping: street-light is disabled
     assert.equal(mock.state.session.category_id, 7)
     assert.equal(mock.state.session.step, 'ISSUE_TYPE')
     bilingual(mock.residentMessages()[1].text)
-    await say('1')
-    assert.equal(mock.state.session.step, 'CONFIRM')
-    assert.equal(mock.state.session.issue_type, 'GARBAGE_NOT_COLLECTED')
+    await say('1') // Garbage not collected
+    assert.equal(mock.state.session, null)
+    assert.equal(mock.state.complaints[0].issue_type, 'GARBAGE_NOT_COLLECTED')
     assert.equal(mock.residentMessages().length, 3)
+    assert.match(mock.residentMessages()[2].text, /Complaint registered/)
+  } finally { mock.restore() }
+})
+
+test('camera recording registers directly after date/time input', async () => {
+  const mock = mockServices({ priorFlats: ['7-C'] })
+  try {
+    await say('Hi')
+    await say('4')
+    assert.equal(mock.state.session.step, 'INCIDENT_DATETIME')
+    assert.equal(mock.residentMessages().length, 2)
+    await say('2 Nov, 8 PM')
+    assert.equal(mock.state.session, null)
+    assert.equal(mock.state.complaints[0].incident_datetime_text, '2 Nov, 8 PM')
+    assert.equal(mock.residentMessages().length, 3)
+    assert.match(mock.residentMessages()[2].text, /Complaint registered/)
   } finally { mock.restore() }
 })
 
