@@ -1,31 +1,50 @@
-# WhatsApp outbound message optimization (feature branch)
+# RWA Pocket-A — Bilingual, low-message WhatsApp complaint flow
 
-## Changes
+## Implemented resident flow
 
-- First-time resident: send the existing English/Hindi selection prompt.
-- Returning resident with a prior registered complaint: reuse their most recent saved language and immediately send the category menu (one fewer outgoing message per repeat registration).
-- At category selection, `H` changes to Hindi and `E` changes to English; this is optional and returns the menu in the selected language.
-- After the resident submits a 1–5 rating, save it without sending a purely ceremonial final thank-you message (one fewer outgoing message per completed rating).
-- Atomically ignore redelivered incoming WhatsApp webhook message IDs, preventing duplicate replies and duplicate complaint-processing side effects. No phone numbers or message bodies are stored in the dedupe table.
-- All registration confirmations, complaint number/queue position, urgency, plumber alerts/OTP, WORK_DONE requests, and reopening behavior remain intact.
+1. Send `Hi`: one **bilingual category menu**. There is no language-selection question.
+2. Select a category: new residents are asked once for their flat number; if a complaint was previously registered from the same WhatsApp mobile number, the most recently recorded valid flat is reused without a question.
+3. If required by category, the bot asks only for **camera-recording date/time** or **issue type**. There is no Normal/Urgent question.
+4. One bilingual review message includes **1 Register, 2 Cancel, 3 Change flat**. The saved flat is visible and editable, for residents who moved or share a phone.
+5. The registration acknowledgement includes the complaint number, bilingual category, flat, queue position, and **plumber OTP when applicable**.
+6. On plumber/supervisor work completion, send one bilingual **Is your problem resolved? 1 Yes / 2 No** message.
+7. Resident selects **1**: the complaint closes **silently**. There is no rating request and no closing thank-you.
+8. Resident selects **2**: the complaint reopens and receives a short bilingual reopen acknowledgement.
 
-## Deployment safety
+### Other notifications
 
-**Do not deploy this Worker until the migration is applied.** The new Worker expects
-`public.whatsapp_inbound_message_dedupe`.
+- Supervisor acknowledgement, supervisor resolved/reopen instructions, invalid input, cancel, and non-text notices are bilingual.
+- The plumber's operational notification remains available.
+- Existing records and OTP validation are unaffected. Database schema retains legacy `preferred_language` and rating fields for compatibility; newly registered complaints store `preferred_language='EN'` only as a legacy value while actual replies are bilingual.
+- New complaints default to `is_urgent=false`. The urgency question has been intentionally removed. Residents are instructed in the main menu to call society security/supervisor directly for immediate emergencies. **This change removes resident-selected urgent prioritization from the chatbot**; RWA should decide how to flag urgent cases through its staff workflow separately.
+- The same inbound provider message ID is atomically claimed before processing, preventing duplicate chatbot replies on webhook redelivery.
 
-1. Review and run `supabase/migrations/20261101070000_whatsapp_inbound_message_dedupe.sql` on the intended staging database first (never on the live database just to test).
-2. Run isolated automated checks locally: `node --test workers/complaint-bot/worker.optimization.test.mjs` (Node.js 22+).
-3. Test using a staging Worker with staging Supabase and WhatsApp configuration. Simulate two webhook POSTs with the same `messages[0].id`; only one outgoing reply should occur.
-4. Simulate a first-time resident and a returning Hindi resident: expect `LANGUAGE` and `CATEGORY` respectively. Confirm changing language with `E`/`H`.
-5. Register one test complaint and confirm the complaint number, category queue, urgent handling, and plumber OTP/alert still work. Complete, confirm, rate, and verify the database rating is stored without another WhatsApp reply.
-6. Compare the total outgoing service messages per completed complaint with baseline in Meta WhatsApp Manager Insights. Check delivery status webhooks for failed sends.
-7. When ready for production, apply the migration first and only then deploy the Worker. Keep the previous Worker deployment available for rollback.
+## Expected message savings, excluding any repeated webhooks
 
-## Operational notes
+| Scenario | Old workflow | New workflow |
+|---|---|---|
+| First-time plumber/electrician/sewerage resident | Language, category, flat, urgent, review, registration | Category, flat, review, registration |
+| Returning plumber/electrician/sewerage resident | Category, flat, urgent, review, registration (language was previously remembered) | Category, review, registration |
+| Resident confirms work is complete | Work done question, closing/rating request, rating thank-you | Work done question only |
 
-- Deduplication claims the WhatsApp inbound provider message ID before processing. If an outbound provider call fails after claiming an inbound ID, a replay of the *same* webhook ID will not retry it. The resident can send a new message, which has a new ID. Monitor Cloudflare Worker error logs and delivery status failures.
-- Meta usage and fees are determined by actual delivered message categories. The savings here are per omitted service reply; the monthly free tier should not be assumed to guarantee continuity if billing is ineligible.
-- This feature intentionally does not turn off supervisor acknowledgements, OTP messages, urgency questions, complaint registration confirmations, or resolved-status requests.
-- Retain dedupe IDs long enough for delayed retries. For housekeeping, records older than 35 days may be deleted using the optional SQL in the migration.
-- No production database migration, Worker deployment, or live message sends are performed by this branch alone.
+Actual billed usage depends on Meta's message categories and delivery, not only the number of sends.
+
+## Safe rollout
+
+**No Cloudflare production deployment and no Supabase schema changes are included in this implementation.**
+
+The existing branch's inbound-message deduplication still requires
+`supabase/migrations/20261101070000_whatsapp_inbound_message_dedupe.sql`.
+The SQL migration must be run on the relevant environment **before** the optimized Worker is deployed.
+
+1. Test in isolated staging using `node --test workers/complaint-bot/worker.optimization.test.mjs`.
+2. Apply the dedupe migration to staging; configure the staging Worker to use separate Supabase/WhatsApp test credentials.
+3. Confirm the bilingual category menu and flat-number reuse. For a saved flat, verify that option 3 changes it before submission.
+4. Confirm first-time registrations, category-specific issue/date steps, queue position, work-start OTP and plumber alert.
+5. Confirm both work-completion responses: **1 closes without another send**, and **2 reopens**.
+6. Verify no urgent or rating prompts, no decorative thank-you, and duplicate incoming message IDs produce only one response.
+7. Review service-delivery events, and only then apply the migration and deploy to production, keeping a rollback available.
+
+## Error handling
+
+The dedupe claim happens before downstream processing. If an external send fails afterward, a replay of the *same* webhook ID will not automatically retry; a new resident message uses a new ID. Monitor logs for failed sends. No resident phone number or message body is stored in the dedupe table. Old entries can be pruned after a suitable retention period.
