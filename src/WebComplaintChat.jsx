@@ -261,7 +261,7 @@ export default function WebComplaintChat() {
       {step === 'CATEGORY' && validFlat(profile.flat_no) && <p className="webchat-saved">Saved on this device / इस डिवाइस का फ्लैट: <strong>{profile.flat_no}</strong></p>}
       {options.length > 0 && <div className="webchat-options">
         {options.map(x => <button type="button" key={x.option} disabled={busy} onClick={() => choose(x.option)}>
-          <span className="webchat-number">{x.option}</span><span>{x.icon ? `${x.icon} ` : ''}{x.en}<small>{x.hi}</small></span>
+          <span className="webchat-option-content"><span className="webchat-option-main"><strong className="webchat-option-index">{x.option}.</strong> {x.icon ? `${x.icon} ` : ''}{x.en}</span><small>{x.hi}</small></span>
         </button>)}
       </div>}
       {receipt && <div className="webchat-receipt"><ClipboardCheck size={17}/> <strong>{receipt.complaint_no}</strong> • {statusLabel[receipt.status] || receipt.status}</div>}
