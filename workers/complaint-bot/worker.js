@@ -951,7 +951,7 @@ async function getRememberedFlat(env, mobile) {
 function isUsableFlat(flatNo) {
   const flat = String(flatNo || '').trim().toUpperCase()
   return flat.length >= 2 && flat.length <= 25
-    && /^[A-Z0-9][A-Z0-9 \\/-]*$/.test(flat)
+    && /^[A-Z0-9][A-Z0-9 \/-]*$/.test(flat)
     && !['COMMON AREA', 'UNKNOWN', 'N/A', 'NA', 'NONE', 'NOT GIVEN'].includes(flat)
 }
 
@@ -981,7 +981,7 @@ async function processConversation(env, mobile, originalText, session) {
   if (categoryId === 6 && !STREET_LIGHT_COMPLAINTS_ENABLED && !['LANGUAGE', 'CATEGORY'].includes(step)) {
     await updateSession(env, mobile, { category_id: null, step: 'CATEGORY' })
     await sendWhatsAppMessage(env, mobile,
-      'Street Light complaints are currently unavailable. / स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है।\\n\\n' +
+      'Street Light complaints are currently unavailable. / स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है।\n\n' +
       categoryMenu(session.flat_no))
     return
   }
@@ -996,7 +996,7 @@ async function processConversation(env, mobile, originalText, session) {
   if (step === 'CATEGORY') {
     const category = getCategory(text)
     if (!category) {
-      await sendWhatsAppMessage(env, mobile, invalidChoice() + '\\n\\n' + categoryMenu(session.flat_no))
+      await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no))
       return
     }
 
@@ -1104,7 +1104,7 @@ async function processConversation(env, mobile, originalText, session) {
 
   await deleteSession(env, mobile)
   await sendWhatsAppMessage(env, mobile,
-    'Please send *Hi* to restart. / दोबारा शुरू करने के लिए *Hi* भेजें।\\n\\n— RWA Pocket-A')
+    'Please send *Hi* to restart. / दोबारा शुरू करने के लिए *Hi* भेजें।\n\n— RWA Pocket-A')
 }
 
 // The category numbers remain stable when Street Light is disabled.
@@ -1114,26 +1114,26 @@ const STREET_LIGHT_COMPLAINTS_ENABLED = false
 function categoryMenu(flatNo = null) {
   const menu = fullCategoryMenu()
   const visibleMenu = STREET_LIGHT_COMPLAINTS_ENABLED ? menu
-    : menu.split('\\n').filter(line => !line.startsWith('*6.*'))
-      .map(line => line.replace(/^\\*7\\.\\*/, '*6.*').replace(/^\\*8\\.\\*/, '*7.*')).join('\\n')
+    : menu.split('\n').filter(line => !line.startsWith('*6.*'))
+      .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
   const saved = isUsableFlat(flatNo)
-    ? `\\n\\nSaved Flat / दर्ज फ्लैट: *${flatNo}* (change at review / पुष्टि के समय बदलें)`
+    ? `\n\nSaved Flat / दर्ज फ्लैट: *${flatNo}* (change at review / पुष्टि के समय बदलें)`
     : ''
   return visibleMenu + saved +
-    '\\n\\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
+    '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
 }
 
 function fullCategoryMenu() {
-  return '*RWA Pocket-A | Complaint / शिकायत*\\n' +
-    '*Select category / शिकायत का प्रकार चुनें:*\\n\\n' +
-    '*1.* 🔧 Plumber / प्लंबर\\n' +
-    '*2.* ⚡ Electrician / इलेक्ट्रीशियन\\n' +
-    '*3.* 🚰 Sewerage / सीवरेज\\n' +
-    '*4.* 📹 Camera Recording / कैमरा रिकॉर्डिंग\\n' +
-    '*5.* 🌿 Horticulture / हॉर्टिकल्चर\\n' +
-    '*6.* 💡 Street Light / स्ट्रीट लाइट\\n' +
-    '*7.* 🧹 Housekeeping / हाउसकीपिंग-कचरा\\n' +
-    '*8.* 📋 Other / अन्य\\n\\n' +
+  return '*RWA Pocket-A | Complaint / शिकायत*\n' +
+    '*Select category / शिकायत का प्रकार चुनें:*\n\n' +
+    '*1.* 🔧 Plumber / प्लंबर\n' +
+    '*2.* ⚡ Electrician / इलेक्ट्रीशियन\n' +
+    '*3.* 🚰 Sewerage / सीवरेज\n' +
+    '*4.* 📹 Camera Recording / कैमरा रिकॉर्डिंग\n' +
+    '*5.* 🌿 Horticulture / हॉर्टिकल्चर\n' +
+    '*6.* 💡 Street Light / स्ट्रीट लाइट\n' +
+    '*7.* 🧹 Housekeeping / हाउसकीपिंग-कचरा\n' +
+    '*8.* 📋 Other / अन्य\n\n' +
     'Reply with option number / विकल्प संख्या भेजें।'
 }
 
@@ -1157,21 +1157,21 @@ function getCategory(text) {
 function getCategoryById(id) { return CATEGORIES[id] || null }
 
 function flatNumberQuestion(category) {
-  return `Selected / चुनी गई श्रेणी: *${category?.label || 'Complaint'} / ${category?.hi || 'शिकायत'}*\\n\\nPlease enter your flat number / अपना फ्लैट नंबर भेजें।\\nExample / उदाहरण: *36-D*`
+  return `Selected / चुनी गई श्रेणी: *${category?.label || 'Complaint'} / ${category?.hi || 'शिकायत'}*\n\nPlease enter your flat number / अपना फ्लैट नंबर भेजें।\nExample / उदाहरण: *36-D*`
 }
 
 function incidentDateTimeQuestion() {
-  return 'Please provide the approximate date and time for camera recording.\\nकैमरा रिकॉर्डिंग के लिए अनुमानित दिनांक और समय भेजें।\\nExample / उदाहरण: *20 Sep, 8:30 PM*'
+  return 'Please provide the approximate date and time for camera recording.\nकैमरा रिकॉर्डिंग के लिए अनुमानित दिनांक और समय भेजें।\nExample / उदाहरण: *20 Sep, 8:30 PM*'
 }
 
 function issueTypeMenu(categoryId) {
   if (categoryId === 7) {
-    return '*Housekeeping / हाउसकीपिंग:*\\n\\n*1.* Garbage not collected / कचरा नहीं उठाया\\n*2.* Common area cleaning / कॉमन एरिया सफाई\\n*3.* Sweeping issue / झाड़ू-सफाई\\n*4.* Garbage dumping / कचरा फेंकना\\n*5.* Other / अन्य'
+    return '*Housekeeping / हाउसकीपिंग:*\n\n*1.* Garbage not collected / कचरा नहीं उठाया\n*2.* Common area cleaning / कॉमन एरिया सफाई\n*3.* Sweeping issue / झाड़ू-सफाई\n*4.* Garbage dumping / कचरा फेंकना\n*5.* Other / अन्य'
   }
   if (categoryId === 5) {
-    return '*Horticulture / हॉर्टिकल्चर:*\\n\\n*1.* Tree/branch cutting / पेड़-शाखा कटाई\\n*2.* Grass/plants / घास-पौधे\\n*3.* Watering / पानी देना\\n*4.* Fallen/damaged tree / गिरा-क्षतिग्रस्त पेड़\\n*5.* Other / अन्य'
+    return '*Horticulture / हॉर्टिकल्चर:*\n\n*1.* Tree/branch cutting / पेड़-शाखा कटाई\n*2.* Grass/plants / घास-पौधे\n*3.* Watering / पानी देना\n*4.* Fallen/damaged tree / गिरा-क्षतिग्रस्त पेड़\n*5.* Other / अन्य'
   }
-  return '*Street Light / स्ट्रीट लाइट:*\\n\\n*1.* Not working / बंद\\n*2.* Flickering / झपकना\\n*3.* On in daytime / दिन में चालू\\n*4.* Pole or wiring / पोल-वायरिंग\\n*5.* Other / अन्य'
+  return '*Street Light / स्ट्रीट लाइट:*\n\n*1.* Not working / बंद\n*2.* Flickering / झपकना\n*3.* On in daytime / दिन में चालू\n*4.* Pole or wiring / पोल-वायरिंग\n*5.* Other / अन्य'
 }
 
 function getIssueType(categoryId, text) {
@@ -1204,26 +1204,21 @@ function getIssueTypeLabel(categoryId, issueType, lang) {
 }
 
 async function sendConfirmation(env, mobile, session) {
-  const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
-  const rows = []
-  rows.push(lang === 'HI' ? '*कृपया जानकारी जाँच लें:*' : '*Please review the complaint:*')
-  rows.push('')
-  rows.push(`${lang === 'HI' ? '*श्रेणी:*' : '*Category:*'} ${lang === 'HI' ? c?.hi : c?.label}`)
-  if (session.flat_no) rows.push(`${lang === 'HI' ? '*फ्लैट:*' : '*Flat:*'} ${session.flat_no}`)
-  if (session.location_text) rows.push(`${lang === 'HI' ? '*स्थान:*' : '*Location:*'} ${session.location_text}`)
-  if (session.issue_type) rows.push(`${lang === 'HI' ? '*समस्या:*' : '*Issue:*'} ${getIssueTypeLabel(Number(session.category_id), session.issue_type, lang)}`)
-  if (session.incident_datetime_text) rows.push(`${lang === 'HI' ? '*दिनांक/समय:*' : '*Date/Time:*'} ${session.incident_datetime_text}`)
-  if (session.description) rows.push(`${lang === 'HI' ? '*विवरण:*' : '*Note:*'} ${session.description}`)
-  if ([1,2,3,6].includes(Number(session.category_id))) rows.push(`${lang === 'HI' ? '*अत्यावश्यक:*' : '*Urgent:*'} ${lang === 'HI' ? (session.is_urgent ? 'हाँ' : 'नहीं') : (session.is_urgent ? 'Yes' : 'No')}`)
-  rows.push(`${lang === 'HI' ? '*प्राथमिकता:*' : '*Priority:*'} ${getPriorityLabel(session, lang)}`)
-  rows.push('')
-  rows.push(lang === 'HI' ? '*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : '*1.* Register Complaint\n*2.* Cancel')
+  const rows = ['*Review complaint / शिकायत की पुष्टि करें:*', '']
+  rows.push(`*Category / श्रेणी:* ${c?.label || 'Other'} / ${c?.hi || 'अन्य'}`)
+  if (session.flat_no) rows.push(`*Flat / फ्लैट:* ${session.flat_no}`)
+  if (session.issue_type) {
+    rows.push(`*Issue / समस्या:* ${getIssueTypeLabel(Number(session.category_id), session.issue_type, 'EN')} / ${getIssueTypeLabel(Number(session.category_id), session.issue_type, 'HI')}`)
+  }
+  if (session.incident_datetime_text) rows.push(`*Date & Time / दिनांक-समय:* ${session.incident_datetime_text}`)
+  if (session.description) rows.push(`*Details / विवरण:* ${session.description}`)
+  rows.push('', confirmChoiceMessage())
   await sendWhatsAppMessage(env, mobile, rows.join('\n'))
 }
 
-function confirmChoiceMessage(lang) {
-  return lang === 'HI' ? 'कृपया चुनें:\n\n*1.* शिकायत दर्ज करें\n*2.* रद्द करें' : 'Please choose:\n\n*1.* Register Complaint\n*2.* Cancel'
+function confirmChoiceMessage() {
+  return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें\n*3.* Change flat / फ्लैट बदलें'
 }
 
 async function createComplaint(env, mobile, session) {
@@ -1336,42 +1331,23 @@ async function getComplaintsAhead(env, complaintId) {
 }
 
 function complaintCreatedMessage(complaint, session, complaintsAhead = 0) {
-  const lang = session.preferred_language || 'EN'
   const c = getCategoryById(Number(session.category_id))
-  const location = session.flat_no || session.location_text || ''
-  const priority = getPriorityLabel(session, lang)
-  const isPlumber = Number(session.category_id) === 1
-  const otpHi = isPlumber
-    ? `\n*कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\n\nप्लंबर के आपके पास पहुँचने पर ही यह OTP साझा करें। OTP सत्यापित होने के बाद कार्य प्रारंभ होगा।`
+  const otp = Number(session.category_id) === 1
+    ? `\n*Work Start OTP / कार्य प्रारंभ OTP:* *${complaint.work_start_otp}*\nShare only when the plumber arrives. / प्लंबर पहुँचने पर ही OTP दें।`
     : ''
-  const otpEn = isPlumber
-    ? `\n*Work Start OTP:* *${complaint.work_start_otp}*\n\nShare this OTP only when the plumber reaches you. Work will start after OTP verification.`
-    : ''
-
-  if (lang === 'HI') {
-    return `*आदरणीय महोदय/महोदया,*\n\nआपकी शिकायत सफलतापूर्वक दर्ज कर ली गई है। ✅\n\n*शिकायत संख्या:* ${complaint.complaint_no}\n*श्रेणी:* ${c?.hi}\n*फ्लैट/स्थान:* ${location}\n*प्राथमिकता:* ${priority}\n*कतार में आपका क्रम:* ${complaintsAhead + 1}${otpHi}\n\nधन्यवाद।\n\n*— RWA Pocket-A*`
-  }
-  return `*Dear Sir/Madam,*\n\nYour complaint has been registered successfully. ✅\n\n*Complaint No:* ${complaint.complaint_no}\n*Category:* ${c?.label}\n*Flat/Location:* ${location}\n*Priority:* ${priority}\n*Your sequence in queue:* ${complaintsAhead + 1}${otpEn}\n\nThank you.\n\n*— RWA Pocket-A*`
+  return `*Complaint registered / शिकायत दर्ज हुई* ✅\n\n*No / संख्या:* ${complaint.complaint_no}\n*Category / श्रेणी:* ${c?.label} / ${c?.hi}\n*Flat / फ्लैट:* ${session.flat_no}\n*Queue position / कतार क्रम:* ${complaintsAhead + 1}${otp}\n\n— RWA Pocket-A`
 }
 
-function getPriorityLabel(session, lang = 'EN') {
-  if (lang === 'HI') {
-    if (session.is_urgent) return 'अत्यावश्यक'
-    return 'सामान्य'
-  }
-  if (session.is_urgent) return 'URGENT'
-  return 'NORMAL'
-}
-async function createSession(env, mobile, preferredLanguage = null) {
+async function createSession(env, mobile, flatNo = null) {
   await supabaseRequest(env, '/rest/v1/whatsapp_complaint_sessions', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({
       mobile_no: mobile,
-      step: preferredLanguage ? 'CATEGORY' : 'LANGUAGE',
-      preferred_language: preferredLanguage,
+      step: 'CATEGORY',
+      preferred_language: 'EN', // Legacy database value; WhatsApp messages are bilingual.
       category_id: null,
-      flat_no: null,
+      flat_no: flatNo,
       location_text: null,
       issue_type: null,
       incident_datetime_text: null,
@@ -1645,14 +1621,14 @@ async function sendWhatsAppMessage(env, to, message) {
   }
 }
 
-function invalidChoice(lang) {
-  return lang === 'HI' ? 'कृपया सही विकल्प चुनें।' : 'Please select a valid option.'
+function invalidChoice() {
+  return 'Please select a valid option. / कृपया सही विकल्प चुनें।'
 }
-function cancelMessage(lang) {
-  return lang === 'HI'
-    ? 'शिकायत दर्ज नहीं की गई।\n\nनई शिकायत के लिए *Hi* भेजें।\n\n— RWA Pocket-A'
-    : 'The complaint was not registered.\n\nSend *Hi* to start a new complaint.\n\n— RWA Pocket-A'
+
+function cancelMessage() {
+  return 'Complaint not registered. Send *Hi* to start again. / शिकायत दर्ज नहीं हुई। नई शिकायत के लिए *Hi* भेजें।\n\n— RWA Pocket-A'
 }
+
 function normalizeMobile(mobile) { return mobile ? String(mobile).replace(/\D/g, '') : '' }
 function isStartCommand(text) {
   return ['hi', 'hello', 'hello rwa', 'complaint', 'शिकायत'].includes(text)
