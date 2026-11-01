@@ -15,6 +15,10 @@ export default {
       return htmlResponse(dataDeletionHtml())
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/residents/flat') {
+      return handleSupervisorFlatLookup(request, env, url)
+    }
+
     if (request.method === 'GET') {
       const mode = url.searchParams.get('hub.mode')
       const token = url.searchParams.get('hub.verify_token')
@@ -29,10 +33,15 @@ export default {
       request.method === 'OPTIONS' &&
       (
         url.pathname.startsWith('/api/complaints/') ||
+        url.pathname.startsWith('/api/residents/') ||
         url.pathname.startsWith('/api/street-lights/')
       )
     ) {
       return apiResponse({ ok: true }, 200)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/residents/flat') {
+      return handleSupervisorFlatUpdate(request, env)
     }
 
     if (request.method === 'POST' && url.pathname === '/api/complaints/acknowledge') {
@@ -145,7 +154,7 @@ function apiResponse(payload, status = 200) {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     }
   })
 }
@@ -205,6 +214,125 @@ async function getAuthenticatedUser(request, env) {
 
   if (!response.ok) return null
   return response.json()
+}
+
+
+async function requireSupervisor(request, env) {
+  const user = await getAuthenticatedUser(request, env)
+  if (!user?.id) return { error: apiResponse({ ok: false, error: 'Authentication required.' }, 401) }
+  const profiles = await supabaseRequest(env,
+    `/rest/v1/app_users?auth_user_id=eq.${encodeURIComponent(user.id)}&active=eq.true&select=role&limit=1`,
+    { method: 'GET' })
+  if (!Array.isArray(profiles) || String(profiles[0]?.role || '').toUpperCase() !== 'SUPERVISOR') {
+    return { error: apiResponse({ ok: false, error: 'Supervisor access required.' }, 403) }
+  }
+  return { user }
+}
+
+function normalizeResidentMobile(value) {
+  const digits = normalizeMobile(value)
+  const full = digits.length === 10 ? `91${digits}` : digits
+  return /^91[6-9][0-9]{9}$/.test(full) ? full : null
+}
+
+// A supervisor CLEAR is an existing row with null flat_no. It takes
+// precedence over old complaints even if they have a valid flat.
+async function resolveResidentFlat(env, mobile) {
+  const mappings = await supabaseRequest(env,
+    `/rest/v1/whatsapp_resident_flat_mappings?mobile_no=eq.${encodeURIComponent(mobile)}&select=flat_no,updated_at&limit=1`,
+    { method: 'GET' })
+  if (Array.isArray(mappings) && mappings.length) {
+    const mapped = mappings[0]
+    return {
+      flat_no: isUsableFlat(mapped.flat_no) ? mapped.flat_no.trim().toUpperCase() : null,
+      source: isUsableFlat(mapped.flat_no) ? 'SUPERVISOR' : 'CLEARED',
+      updated_at: mapped.updated_at
+    }
+  }
+  const history = await supabaseRequest(env,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
+    { method: 'GET' })
+  const latest = Array.isArray(history) ? history.find(row => isUsableFlat(row.flat_no)) : null
+  return {
+    flat_no: latest ? latest.flat_no.trim().toUpperCase() : null,
+    source: latest ? 'HISTORY' : 'NONE',
+    updated_at: null
+  }
+}
+
+async function handleSupervisorFlatLookup(request, env, url) {
+  try {
+    const auth = await requireSupervisor(request, env)
+    if (auth.error) return auth.error
+    const mobile = normalizeResidentMobile(url.searchParams.get('mobile'))
+    if (!mobile) return apiResponse({ ok: false, error: 'Enter a valid Indian WhatsApp mobile number.' }, 400)
+    const mapping = await resolveResidentFlat(env, mobile)
+    return apiResponse({ ok: true, mobile_no: mobile, ...mapping })
+  } catch (error) {
+    console.error('Supervisor flat lookup failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to load resident flat mapping.' }, 500)
+  }
+}
+
+async function handleSupervisorFlatUpdate(request, env) {
+  try {
+    const auth = await requireSupervisor(request, env)
+    if (auth.error) return auth.error
+    const body = await request.json()
+    const mobile = normalizeResidentMobile(body?.mobile_no)
+    if (!mobile) return apiResponse({ ok: false, error: 'Enter a valid Indian WhatsApp mobile number.' }, 400)
+    const action = String(body?.action || '').toUpperCase()
+    if (!['UPDATE', 'CLEAR'].includes(action)) {
+      return apiResponse({ ok: false, error: 'Action must be UPDATE or CLEAR.' }, 400)
+    }
+    const flatNo = action === 'CLEAR' ? null : String(body?.flat_no || '').trim().toUpperCase()
+    if (action === 'UPDATE' && !isUsableFlat(flatNo)) {
+      return apiResponse({ ok: false, error: 'Enter a valid flat number, e.g. 36-D.' }, 400)
+    }
+
+    const existing = await resolveResidentFlat(env, mobile)
+    if (existing.source === 'NONE') {
+      const sessions = await supabaseRequest(env,
+        `/rest/v1/whatsapp_complaint_sessions?mobile_no=eq.${encodeURIComponent(mobile)}&select=mobile_no&limit=1`,
+        { method: 'GET' })
+      if (!Array.isArray(sessions) || !sessions.length) {
+        return apiResponse({ ok: false, error: 'No prior chatbot record found for this mobile number.' }, 404)
+      }
+    }
+
+    const updatedAt = new Date().toISOString()
+    const updated = await supabaseRequest(env,
+      '/rest/v1/whatsapp_resident_flat_mappings?on_conflict=mobile_no',
+      {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({
+          mobile_no: mobile, flat_no: flatNo,
+          updated_at: updatedAt, updated_by: auth.user.id
+        })
+      })
+    if (!Array.isArray(updated) || !updated.length) {
+      throw new Error('Flat mapping write did not return the updated record.')
+    }
+
+    // Invalidate any active chat carrying an old cached flat. No resident
+    // message is sent: the next Hi starts with the new mapping.
+    let session_reset = true
+    try {
+      await deleteSession(env, mobile)
+    } catch (error) {
+      console.warn('Flat mapping changed but chat session reset failed.')
+      session_reset = false
+    }
+    return apiResponse({
+      ok: true, mobile_no: mobile, flat_no: flatNo,
+      source: action === 'CLEAR' ? 'CLEARED' : 'SUPERVISOR',
+      updated_at: updatedAt, session_reset
+    })
+  } catch (error) {
+    console.error('Supervisor flat update failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to change resident flat mapping.' }, 500)
+  }
 }
 
 function calculateStreetLightIssueDays(firstReportedDate, today) {
