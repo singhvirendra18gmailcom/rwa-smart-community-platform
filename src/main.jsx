@@ -64,7 +64,10 @@ rootElement.innerHTML = `
   </div>
 `
 
-import('./App.jsx')
+// Public complaint chat bypasses the supervisor login entirely. The authenticated
+// supervisor application stays unchanged at the normal website URL.
+const isPublicComplaintChat = new URLSearchParams(window.location.search).get('view') === 'complaint-chat'
+import(isPublicComplaintChat ? './WebComplaintChat.jsx' : './App.jsx')
   .then(({ default: App }) => {
     createRoot(rootElement).render(
       <StrictMode>
