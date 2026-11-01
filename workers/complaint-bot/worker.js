@@ -1282,12 +1282,12 @@ async function notifyPlumberOfNewComplaint(env, complaint, session) {
 
   const message =
     '*RWA POCKET-A*\n\n' +
-    '🔧 *New Plumber Complaint*\n\n' +
-    `*Complaint No.:* ${complaint.complaint_no}\n` +
-    `*Flat No.:* ${flat}\n` +
-    `*Time:* ${time}\n` +
-    `*Priority:* ${priority}\n\n` +
-    'Please check the RWA Pocket-A App for details.'
+    '🔧 *New Plumber Complaint / नई प्लंबर शिकायत*\n\n' +
+    `*Complaint No / शिकायत संख्या:* ${complaint.complaint_no}\n` +
+    `*Flat / फ्लैट:* ${flat}\n` +
+    `*Time / समय:* ${time}\n` +
+    `*Priority / प्राथमिकता:* ${priority === 'URGENT' ? 'URGENT / अत्यावश्यक' : 'NORMAL / सामान्य'}\n\n` +
+    'Please check the RWA Pocket-A App. / कृपया RWA Pocket-A ऐप देखें।'
 
   await sendWhatsAppMessage(env, mobile, message)
 }
