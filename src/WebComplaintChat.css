@@ -1,0 +1,45 @@
+:root{--chat-green:#075e54;--chat-accent:#0a806f;--chat-bubble:#d9fdd3}
+.webchat-root{width:100%;max-width:620px;min-width:320px;height:100dvh;min-height:480px;display:flex;flex-direction:column;margin:0 auto;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#efeae2;color:#202c33;box-shadow:0 0 24px #10182816}
+.webchat-header{height:74px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:10px 16px;background:#075e54;color:white;box-shadow:0 1px 8px #0002}
+.webchat-logo{display:grid;place-items:center;background:#fff2;border-radius:50%;width:47px;height:47px;flex:none}
+.webchat-title{display:flex;flex-direction:column;flex:1;gap:5px;min-width:0}
+.webchat-title strong{font-size:17px;letter-spacing:-.3px}
+.webchat-title small{font-size:11px;color:#d2eae4;display:flex;gap:7px;align-items:center}
+.webchat-title i{display:inline-block;width:7px;height:7px;background:#b2f4bf;border-radius:50%}
+.webchat-header button{width:38px;height:38px;border:0;border-radius:50%;color:white;background:#fff2;cursor:pointer;display:grid;place-items:center}
+.webchat-notice{padding:8px 12px;text-align:center;font-size:11px;font-weight:550;color:#4a665f;background:#e6f4ed;border-bottom:1px solid #d4e2d9}
+.webchat-messages{flex:1;overflow-y:auto;min-height:0;padding:18px 14px 22px;background-color:#efeae2;background-image:radial-gradient(#d1c7ba50 1px,transparent 1px);background-size:22px 22px}
+.webchat-today{background:#dce9f0;border-radius:8px;max-width:max-content;margin:0 auto 20px;padding:5px 12px;font-size:11px;color:#536b79;box-shadow:0 1px 3px #00000010}
+.webchat-row{display:flex;align-items:flex-end;gap:7px;margin:10px 0}
+.webchat-row.resident{justify-content:flex-end}
+.webchat-avatar{width:27px;height:27px;flex:none;border-radius:50%;display:grid;place-items:center;background:#075e54;color:#fff;font-weight:800;font-size:14px}
+.webchat-bubble{max-width:min(85%,440px);position:relative;background:#fff;border-radius:13px 13px 13px 3px;padding:11px 13px 8px;box-shadow:0 2px 2px #00000011;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.55}
+.webchat-row.resident .webchat-bubble{background:#d9fdd3;border-radius:13px 13px 3px 13px}
+.webchat-bubble small{display:flex;align-items:center;justify-content:flex-end;margin-top:6px;font-size:9px;color:#91a19a}
+.webchat-row.resident .webchat-bubble small{color:#35a3a1}
+.webchat-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0 15px 35px}
+.webchat-options button{border:1px solid #c6e6d6;border-radius:12px;padding:9px 10px;background:#fff;text-align:left;display:flex;align-items:center;gap:9px;color:#174a3f;cursor:pointer;box-shadow:0 1px 4px #00000015;min-width:0}
+.webchat-options button:active{transform:scale(.98);background:#e9f8f0}
+.webchat-options button:disabled{opacity:.6;cursor:wait}
+.webchat-number{min-width:25px;height:25px;padding:2px 6px;border-radius:8px;display:grid;place-items:center;color:white;background:#0c8871;font-weight:700;font-size:12px}
+.webchat-options button>span:last-child{display:block;font-weight:650;font-size:12px;line-height:1.3;min-width:0}
+.webchat-options small{display:block;color:#5d746d;font-size:11px;margin-top:2px;font-weight:450}
+.webchat-saved{font-size:11px;padding:9px;background:#f9fcf8;border:1px solid #d6e5d6;border-radius:9px;margin:8px 0 8px 35px;color:#406356}
+.webchat-receipt{display:flex;align-items:center;gap:8px;font-size:12px;padding:11px;background:#e5f6ea;color:#12624b;border:1px solid #bedec9;border-radius:11px;margin:12px 0 10px 35px;flex-wrap:wrap}
+.webchat-error{padding:10px 12px;border-radius:9px;background:#fff1f1;border:1px solid #f5bcbc;color:#ac2832;font-size:12px;margin:10px 0}
+.webchat-wait{margin:12px 0 0 35px;font-size:12px;color:#475b55}
+.webchat-action,.webchat-status{border:1px solid #8bc7b8;display:flex;gap:8px;align-items:center;justify-content:center;border-radius:11px;padding:11px 13px;cursor:pointer;font-weight:650;font-size:12px;margin:12px 0 0 35px}
+.webchat-action{background:#0b8069;color:#fff}
+.webchat-status{background:#fff;color:#116452}
+.webchat-action:disabled,.webchat-status:disabled{opacity:.5}
+.webchat-footer{flex-shrink:0;background:#f2f5f4;padding:5px 9px 7px;box-shadow:0 -2px 9px #00000010}
+.webchat-turnstile{display:flex;justify-content:center;min-height:30px;transform:scale(.82);transform-origin:center center}
+.webchat-warning{font-size:11px;text-align:center;color:#b45309}
+.webchat-composer{display:flex;align-items:center;gap:9px}
+.webchat-composer input{flex:1;min-width:0;border:1px solid #e1e4e7;border-radius:25px;background:#fff;padding:13px 17px;font-size:14px;color:#25343a;outline:none}
+.webchat-composer input:focus{border-color:#7dc5b5;box-shadow:0 0 0 3px #a7decf66}
+.webchat-composer input:disabled{background:#e8edef;color:#9da8a8}
+.webchat-composer button{width:46px;height:46px;border:0;border-radius:50%;flex:none;background:#0b8069;color:#fff;display:grid;place-items:center;cursor:pointer}
+.webchat-composer button:disabled{background:#a6c6bf;cursor:not-allowed}
+.webchat-credit{text-align:center;font-size:10px;color:#788c86;line-height:1.5;padding-top:5px}
+@media(max-width:380px){.webchat-messages{padding-left:8px;padding-right:8px}.webchat-options{margin-left:0;gap:5px}.webchat-options button{padding:8px 6px;gap:5px}.webchat-options button>span:last-child{font-size:11px}.webchat-title strong{font-size:16px}}
