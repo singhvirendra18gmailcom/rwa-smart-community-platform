@@ -6,12 +6,14 @@ on:
       - feature/whatsapp-message-optimization
       - feature/supervisor-resident-flat-management
       - feature/web-chat-complaint-backup
+      - feature/web-complaint-whatsapp-ui-redesign
     paths:
       - 'workers/complaint-bot/worker.js'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
       - 'workers/complaint-bot/worker.web-chat.test.mjs'
       - 'src/WebComplaintChat.jsx'
       - 'src/WebComplaintChat.css'
+      - 'scripts/verify-webchat-css.mjs'
       - 'src/main.jsx'
       - 'vite.config.js'
       - 'src/ResidentFlatManagement.jsx'
@@ -26,6 +28,7 @@ on:
       - 'workers/complaint-bot/worker.web-chat.test.mjs'
       - 'src/WebComplaintChat.jsx'
       - 'src/WebComplaintChat.css'
+      - 'scripts/verify-webchat-css.mjs'
       - 'src/main.jsx'
       - 'vite.config.js'
       - 'src/ResidentFlatManagement.jsx'
@@ -60,3 +63,5 @@ jobs:
         run: npm ci
       - name: Verify supervisor UI production build
         run: npm run build
+      - name: Confirm public chat CSS is linked from the entry HTML
+        run: node scripts/verify-webchat-css.mjs

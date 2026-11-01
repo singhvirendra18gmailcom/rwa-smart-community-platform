@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCheck, ClipboardCheck, MessageCircle, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { ClipboardCheck, LoaderCircle, MoreVertical, RefreshCw, Send, ShieldCheck, Trash2 } from 'lucide-react'
 import './WebComplaintChat.css'
 
 const API = __WEB_COMPLAINT_API_BASE_URL__
@@ -25,6 +25,120 @@ const statusLabel = {
   WORK_DONE:'Work completed / कार्य पूरा', RESOLVED:'Work completed / कार्य पूरा',
   CLOSED:'Closed / बंद', REOPENED:'Reopened / पुनः खुली'
 }
+function ChatHeader({ serviceReady, serviceUnavailable, menuOpen, onToggleMenu, onForget }) {
+  return (
+    <header className="webchat-header">
+      <div className="webchat-brand-avatar" aria-hidden="true">R</div>
+      <div className="webchat-brand-copy">
+        <strong>RWA Pocket-A</strong>
+        <span className="webchat-brand-subtitle">
+          <span className={`webchat-status-dot ${serviceReady ? 'ready' : serviceUnavailable ? 'unavailable' : 'loading'}`} />
+          Complaint Assistant • शिकायत सहायता
+        </span>
+      </div>
+      <div className="webchat-menu-wrap">
+        <button type="button" className="webchat-menu-trigger" onClick={onToggleMenu}
+          aria-label="Chat options" aria-expanded={menuOpen} aria-haspopup="menu">
+          <MoreVertical size={21} />
+        </button>
+        {menuOpen && (
+          <div className="webchat-menu-panel" role="menu">
+            <div className="webchat-menu-status">
+              {serviceReady ? 'Service available / सेवा उपलब्ध' : serviceUnavailable ? 'Service unavailable / सेवा बंद' : 'Connecting / कनेक्ट हो रहा है'}
+            </div>
+            <button type="button" role="menuitem" onClick={onForget}>
+              <Trash2 size={16} /> Forget saved details / विवरण हटाएं
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+  )
+}
+
+function ChatBubble({ message }) {
+  const time = new Date(message.time || Date.now()).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+  return (
+    <div className={`webchat-row ${message.side}`} role="listitem">
+      <div className="webchat-bubble">
+        <span className="webchat-bubble-content">{message.text}</span>
+        <span className="webchat-message-time">{time}</span>
+      </div>
+    </div>
+  )
+}
+
+function CategoryChoices({ choices, onChoose, disabled, label }) {
+  return (
+    <div className="webchat-choices" aria-label={label}>
+      {choices.map(option => (
+        <button type="button" className="webchat-choice" key={option.option}
+          disabled={disabled} onClick={() => onChoose(option.option)}
+          aria-label={`${option.option}. ${option.en} / ${option.hi}`}>
+          <span className="webchat-choice-index">{option.option}.</span>
+          <span className="webchat-choice-copy">
+            <strong><span aria-hidden="true">{option.icon || ''} </span>{option.en}</strong>
+            <span lang="hi">{option.hi}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ComplaintReceipt({ receipt, categories }) {
+  if (!receipt) return null
+  const category = categories?.find(item => item.id === Number(receipt.category_id))
+  return (
+    <section className="webchat-receipt" aria-label="Complaint receipt">
+      <div className="webchat-receipt-title"><ClipboardCheck size={19} /> Complaint details / शिकायत विवरण</div>
+      <div className="webchat-receipt-grid">
+        <span>Complaint No. / शिकायत संख्या</span><strong>{receipt.complaint_no}</strong>
+        {category && <><span>Category / श्रेणी</span><strong>{category.en} / {category.hi}</strong></>}
+        <span>Flat / फ्लैट</span><strong>{receipt.flat_no}</strong>
+        {receipt.queue_position != null && <><span>Queue / कतार क्रम</span><strong>{receipt.queue_position}</strong></>}
+        <span>Status / स्थिति</span><strong>{statusLabel[receipt.status] || receipt.status}</strong>
+      </div>
+      {receipt.work_start_otp && (
+        <div className="webchat-otp">
+          <small>Plumber work-start OTP / प्लंबर OTP</small>
+          <strong>{receipt.work_start_otp}</strong>
+          <span>Share only when plumber arrives / प्लंबर आने पर ही बताएं।</span>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function VerificationArea({ step, configured, widget }) {
+  if (step !== 'VERIFY') return null
+  return (
+    <div className="webchat-verify">
+      <div className="webchat-verify-heading"><ShieldCheck size={16} /> Secure verification / सुरक्षित सत्यापन</div>
+      {configured ? <div ref={widget} className="webchat-turnstile" aria-label="Cloudflare browser verification" /> :
+        <p>Security verification is not configured / सुरक्षा सत्यापन उपलब्ध नहीं है।</p>}
+    </div>
+  )
+}
+
+function ChatComposer({ step, entry, setEntry, busy, onSend }) {
+  const enabled = !busy && ['CATEGORY','FLAT','DATE','ISSUE','MOBILE','CONFIRM'].includes(step)
+  const optionsOnly = ['CATEGORY','ISSUE','CONFIRM'].includes(step)
+  return (
+    <form className="webchat-composer" onSubmit={e => { e.preventDefault(); onSend(entry) }}>
+      <input aria-label="Your reply / आपका जवाब" type="text"
+        inputMode={step === 'MOBILE' ? 'tel' : optionsOnly ? 'numeric' : 'text'}
+        enterKeyHint="send" autoComplete="off"
+        placeholder={optionsOnly ? 'Type option number / विकल्प चुनें' : step === 'FLAT' ? 'Flat number / फ्लैट नंबर' : 'Type a message / संदेश लिखें'}
+        value={entry} onChange={e => setEntry(e.target.value)}
+        maxLength={step === 'DATE' ? 100 : step === 'FLAT' ? 25 : step === 'MOBILE' ? 18 : optionsOnly ? 3 : 80}
+        disabled={!enabled}/>
+      <button className="webchat-send" type="submit" aria-label="Send reply / जवाब भेजें"
+        disabled={!enabled || !entry.trim()}><Send size={20}/></button>
+    </form>
+  )
+}
+
 export default function WebComplaintChat() {
   const [profile, setProfile] = useState(() => readSaved(PROFILE) || {})
   const [last, setLast] = useState(() => readSaved(LAST))
@@ -38,14 +152,17 @@ export default function WebComplaintChat() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [receipt, setReceipt] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const widget = useRef(null)
   const widgetId = useRef(null)
   const end = useRef(null)
+  const chatLog = useRef(null)
+  const root = useRef(null)
   const seq = useRef(0)
   const submitting = useRef(false)
   const add = (side, text) => {
     seq.current += 1
-    setMessages(current => [...current, { id:seq.current, side, text }])
+    setMessages(current => [...current, { id:seq.current, side, text, time:Date.now() }])
   }
   const bot = text => add('bot', text)
   const resident = text => add('resident', text)
@@ -55,7 +172,29 @@ export default function WebComplaintChat() {
     if (!response.ok || !data.ok) throw Error(data.error || 'Complaint service unavailable.')
     return data
   }
-  useEffect(() => { end.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, step])
+  useEffect(() => {
+    const scroller = chatLog.current
+    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' })
+  }, [messages, step, receipt, error])
+
+  // Android keyboard: track the visual viewport instead of scrolling the page
+  // underneath the fixed chat composer.
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return undefined
+    const sync = () => {
+      if (!root.current) return
+      root.current.style.setProperty('--webchat-visible-height', `${Math.round(viewport.height)}px`)
+      root.current.style.setProperty('--webchat-visible-top', `${Math.round(viewport.offsetTop)}px`)
+    }
+    sync()
+    viewport.addEventListener('resize', sync)
+    viewport.addEventListener('scroll', sync)
+    return () => {
+      viewport.removeEventListener('resize', sync)
+      viewport.removeEventListener('scroll', sync)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -79,41 +218,55 @@ export default function WebComplaintChat() {
     return () => { active = false }
   }, [])
 
+  // Only render the Turnstile challenge while it is needed, and clean up
+  // the widget on completion or retry. No permanent captcha takes up space.
   useEffect(() => {
-    if (!SITE_KEY || !widget.current) return
+    if (step !== 'VERIFY' || !SITE_KEY) return undefined
     let cancelled = false
     const mount = () => {
       if (cancelled || !window.turnstile || !widget.current || widgetId.current != null) return
-      widgetId.current = window.turnstile.render(widget.current, {
-        sitekey:SITE_KEY, theme:'light',
-        callback:t => { if (!cancelled) setToken(t) },
-        'expired-callback':() => { if (!cancelled) setToken('') },
-        'error-callback':() => { if (!cancelled) setToken('') }
-      })
+      try {
+        widgetId.current = window.turnstile.render(widget.current, {
+          sitekey: SITE_KEY,
+          theme: 'light',
+          callback: value => { if (!cancelled) setToken(value) },
+          'expired-callback': () => { if (!cancelled) setToken('') },
+          'error-callback': () => {
+            if (cancelled) return
+            setToken('')
+            setError('Browser verification failed. Please retry / ब्राउज़र सत्यापन विफल रहा।')
+            setStep('RETRY')
+          }
+        })
+      } catch {
+        if (!cancelled) {
+          setError('Unable to load verification / सत्यापन लोड नहीं हो सका।')
+          setStep('RETRY')
+        }
+      }
     }
-    if (window.turnstile) mount()
-    else {
-      const script = document.createElement('script')
+    let script = document.getElementById('rwa-webchat-turnstile')
+    if (!script && !window.turnstile) {
+      script = document.createElement('script')
+      script.id = 'rwa-webchat-turnstile'
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
       script.async = true
-      script.onload = mount
       document.head.appendChild(script)
     }
+    if (window.turnstile) mount()
+    else script?.addEventListener('load', mount)
     return () => {
       cancelled = true
+      script?.removeEventListener('load', mount)
       if (widgetId.current != null && window.turnstile) {
-        window.turnstile.remove(widgetId.current)
+        try { window.turnstile.remove(widgetId.current) } catch {}
         widgetId.current = null
       }
     }
-  }, [])
-  const resetCaptcha = () => {
-    setToken('')
-    if (window.turnstile && widgetId.current != null) window.turnstile.reset(widgetId.current)
-  }
+  }, [step])
 
   useEffect(() => {
-    if (!pending || !token || submitting.current) return
+    if (step !== 'VERIFY' || !pending || !token || submitting.current) return
     submitting.current = true
     setBusy(true)
     setError('')
@@ -130,7 +283,7 @@ export default function WebComplaintChat() {
         setProfile(saved)
         window.localStorage.setItem(PROFILE, JSON.stringify(saved))
         setStep('DONE')
-        bot(`✅ Complaint registered / शिकायत दर्ज हुई!\n\nNo / संख्या: ${result.complaint_no}\nFlat / फ्लैट: ${result.flat_no}\nQueue position / कतार: ${result.queue_position || '—'}${result.work_start_otp ? `\nWork-start OTP / कार्य शुरू करने का OTP: ${result.work_start_otp}\nOnly tell the plumber when they arrive. / प्लंबर आने पर ही बताएं।` : ''}\n\nKeep this complaint number for reference. / शिकायत नंबर संभालकर रखें।`)
+        bot('✅ Complaint registered successfully! / आपकी शिकायत सफलतापूर्वक दर्ज हो गई है।\nPlease keep your complaint number for reference. / शिकायत नंबर संभालकर रखें।')
         setPending(null)
       })
       .catch(e => {
@@ -138,17 +291,22 @@ export default function WebComplaintChat() {
         setStep('RETRY')
         bot('Complaint not registered. Please retry / शिकायत दर्ज नहीं हुई। फिर प्रयास करें।')
       })
-      .finally(() => { submitting.current = false; setBusy(false); resetCaptcha() })
-  }, [pending, token])
+      .finally(() => { submitting.current = false; setBusy(false); setToken('') })
+  }, [pending, token, step])
 
   const register = data => {
+    if (submitting.current) return
     const full = { ...data, ticket:window.crypto.randomUUID() }
     setPending(full)
+    setError('')
+    setToken('')
+    if (!SITE_KEY) {
+      setStep('UNAVAILABLE')
+      bot('Security verification is not configured. Registration is unavailable. / सुरक्षा सत्यापन उपलब्ध नहीं है। शिकायत दर्ज नहीं हो सकती।')
+      return
+    }
     setStep('VERIFY')
-    bot(SITE_KEY
-      ? 'Registering complaint securely... / शिकायत सुरक्षित रूप से दर्ज हो रही है…'
-      : 'Browser security is not configured. / ब्राउज़र सुरक्षा अभी कॉन्फ़िगर नहीं है।')
-    if (!SITE_KEY) setStep('UNAVAILABLE')
+    bot('Please complete secure browser verification below to register your complaint. / शिकायत दर्ज करने के लिए नीचे सुरक्षित सत्यापन पूरा करें।')
   }
   const afterDetails = data => {
     const mobile = mobileNumber(profile.mobile_no)
@@ -176,6 +334,7 @@ export default function WebComplaintChat() {
         body:JSON.stringify({ ticket:last.ticket, resolved })
       })
       setStep('DONE')
+      setReceipt(current => current ? { ...current, status: result.status } : current)
       bot(result.status === 'CLOSED' ? 'Complaint closed. / शिकायत बंद की गई है।' : 'Complaint reopened. / शिकायत फिर से खोली गई है।')
     } catch (e) { setError(e.message) }
     finally { setBusy(false) }
@@ -184,9 +343,15 @@ export default function WebComplaintChat() {
     if (busy || !config || !['CATEGORY','FLAT','DATE','ISSUE','MOBILE','CONFIRM'].includes(step)) return
     const v = String(text).trim()
     if (!v) return
-    resident(v); setEntry('')
+    const pickedCategory = step === 'CATEGORY' ? config.categories.find(x => x.option === v) : null
+    const pickedIssue = step === 'ISSUE' ? config.issue_types[String(draft.category_id)]?.find(x => x.option === v) : null
+    const displayValue = pickedCategory
+      ? `${v}. ${pickedCategory.icon || ''} ${pickedCategory.en}`
+      : pickedIssue ? `${v}. ${pickedIssue.en}` : v
+    resident(displayValue)
+    setEntry('')
     if (step === 'CATEGORY') {
-      const category = config.categories.find(x => x.option === v)
+      const category = pickedCategory
       if (!category) return bot('Please choose a valid option / सही विकल्प चुनें।')
       const next = { category_id:category.id, flat_no:validFlat(profile.flat_no) ? profile.flat_no : null }
       setDraft(next)
@@ -203,7 +368,7 @@ export default function WebComplaintChat() {
       const next = { ...draft, incident_datetime_text:v }
       setDraft(next); afterDetails(next)
     } else if (step === 'ISSUE') {
-      const issue = config.issue_types[String(draft.category_id)]?.find(x => x.option === v)
+      const issue = pickedIssue
       if (!issue) return bot('Choose a valid issue number / सही समस्या नंबर चुनें।')
       const next = { ...draft, issue_option:issue.option, issue_type:issue.code }
       setDraft(next); afterDetails(next)
@@ -236,6 +401,7 @@ export default function WebComplaintChat() {
     bot('Select complaint category / शिकायत का प्रकार चुनें:')
   }
   const forget = () => {
+    setMenuOpen(false)
     if (!window.confirm('Forget saved flat, contact number and complaint ticket from this browser?')) return
     window.localStorage.removeItem(PROFILE); window.localStorage.removeItem(LAST)
     setProfile({}); setLast(null); restart()
@@ -245,43 +411,103 @@ export default function WebComplaintChat() {
     : step === 'CONFIRM' ? [{ option:'1',en:'Yes',hi:'हाँ' },{ option:'2',en:'No',hi:'नहीं' }]
     : []
 
-  return <div className="webchat-root">
-    <header className="webchat-header">
-      <div className="webchat-logo"><MessageCircle size={25}/></div>
-      <div className="webchat-title"><strong>RWA Pocket-A</strong><small><i/> Complaint Assistant • शिकायत सहायता</small></div>
-      <button type="button" title="Forget saved details" onClick={forget}><Trash2 size={17}/></button>
-    </header>
-    <div className="webchat-notice">Private chat-style form • No login required / लॉगिन की जरूरत नहीं</div>
-    <main className="webchat-messages" aria-label="Complaint conversation" aria-live="polite">
-      <div className="webchat-today">Today • आज</div>
-      {messages.map(m => <div className={`webchat-row ${m.side}`} key={m.id}>
-        {m.side === 'bot' && <div className="webchat-avatar">R</div>}
-        <div className="webchat-bubble">{m.text}<small>{m.side === 'resident' ? <CheckCheck size={12}/> : 'RWA'}</small></div>
-      </div>)}
-      {step === 'CATEGORY' && validFlat(profile.flat_no) && <p className="webchat-saved">Saved on this device / इस डिवाइस का फ्लैट: <strong>{profile.flat_no}</strong></p>}
-      {options.length > 0 && <div className="webchat-options">
-        {options.map(x => <button type="button" key={x.option} disabled={busy} onClick={() => choose(x.option)}>
-          <span className="webchat-option-content"><span className="webchat-option-main"><strong className="webchat-option-index">{x.option}.</strong> {x.icon ? `${x.icon} ` : ''}{x.en}</span><small>{x.hi}</small></span>
-        </button>)}
-      </div>}
-      {receipt && <div className="webchat-receipt"><ClipboardCheck size={17}/> <strong>{receipt.complaint_no}</strong> • {statusLabel[receipt.status] || receipt.status}</div>}
-      {error && <p className="webchat-error" role="alert">{error}</p>}
-      {step === 'VERIFY' && <p className="webchat-wait">Browser verification / ब्राउज़र सत्यापन…</p>}
-      {step === 'RETRY' && <button className="webchat-action" type="button" onClick={() => { setStep('VERIFY'); resetCaptcha() }} disabled={busy}>Retry registration / फिर प्रयास करें</button>}
-      {step === 'DONE' && <button className="webchat-action" type="button" onClick={restart}>New complaint / नई शिकायत</button>}
-      {last && !['VERIFY','RETRY','CONFIRM'].includes(step) && <button className="webchat-status" onClick={checkStatus} type="button" disabled={busy}><RefreshCw size={15}/> Check last complaint / पिछली शिकायत देखें</button>}
-      <div ref={end}/>
-    </main>
-    <section className="webchat-footer">
-      {SITE_KEY ? <div className="webchat-turnstile" ref={widget}/> : <p className="webchat-warning">Security verification not configured / सुरक्षा सत्यापन उपलब्ध नहीं</p>}
-      <form onSubmit={e => { e.preventDefault(); choose(entry) }} className="webchat-composer">
-        <input aria-label="Your reply" type={step === 'MOBILE' ? 'tel' : 'text'}
-          value={entry} onChange={e => setEntry(e.target.value)} autoComplete="off" maxLength={step === 'DATE' ? 100 : 40}
-          placeholder={['CATEGORY','ISSUE','CONFIRM'].includes(step) ? 'Type option number / विकल्प चुनें' : 'Type a message / संदेश भेजें'}
-          disabled={busy || !['CATEGORY','FLAT','DATE','ISSUE','MOBILE','CONFIRM'].includes(step)}/>
-        <button type="submit" aria-label="Send reply" disabled={!entry.trim() || busy || !['CATEGORY','FLAT','DATE','ISSUE','MOBILE','CONFIRM'].includes(step)}><Send size={20}/></button>
-      </form>
-      <div className="webchat-credit">Developed and maintained by RWA Pocket-A.<br/>RWA Pocket-A द्वारा विकसित एवं रखरखाव।</div>
-    </section>
-  </div>
+const serviceUnavailable = step === 'UNAVAILABLE'
+  const serviceReady = Boolean(config) && !serviceUnavailable
+  const canCheckStatus = Boolean(last?.ticket) && ['CATEGORY', 'DONE', 'UNAVAILABLE'].includes(step)
+  const lastBot = [...messages].reverse().find(message => message.side === 'bot')
+  const choicesLabel = step === 'CATEGORY' ? 'Complaint categories' : step === 'ISSUE' ? 'Issue types' : 'Completion confirmation'
+
+  return (
+    <div className="webchat-root" ref={root}>
+      <ChatHeader
+        serviceReady={serviceReady}
+        serviceUnavailable={serviceUnavailable}
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen(value => !value)}
+        onForget={forget}
+      />
+      <div className="webchat-notice">
+        <ShieldCheck size={15} aria-hidden="true" />
+        <span>Private complaint chat • No login required / बिना लॉगिन शिकायत दर्ज करें</span>
+      </div>
+
+      <main className="webchat-messages" ref={chatLog} aria-label="Complaint conversation">
+        <div className="webchat-today">Today • आज</div>
+        <div role="log" aria-live="off" aria-label="Conversation messages" className="webchat-message-list">
+          {messages.map(message => <ChatBubble key={message.id} message={message} />)}
+        </div>
+
+        {step === 'CATEGORY' && validFlat(profile.flat_no) && (
+          <div className="webchat-saved">
+            <ShieldCheck size={15} aria-hidden="true" />
+            <span>Saved flat / दर्ज फ्लैट: <strong>{profile.flat_no}</strong></span>
+          </div>
+        )}
+
+        {options.length > 0 && (
+          <CategoryChoices
+            choices={options}
+            onChoose={choose}
+            disabled={busy}
+            label={choicesLabel}
+          />
+        )}
+
+        {receipt && <ComplaintReceipt receipt={receipt} categories={config?.categories} />}
+
+        {error && <div className="webchat-error" role="alert">{error}</div>}
+        {step === 'VERIFY' && busy && (
+          <div className="webchat-wait">
+            <LoaderCircle size={17} aria-hidden="true" />
+            Registering complaint / शिकायत दर्ज की जा रही है…
+          </div>
+        )}
+        <VerificationArea step={step} configured={Boolean(SITE_KEY)} widget={widget} />
+
+        {step === 'RETRY' && (
+          <button className="webchat-action" type="button" disabled={busy}
+            onClick={() => { setToken(''); setError(''); setStep('VERIFY') }}>
+            <RefreshCw size={16} aria-hidden="true" />
+            Retry registration / पुनः प्रयास करें
+          </button>
+        )}
+
+        {step === 'DONE' && (
+          <button className="webchat-action" type="button" onClick={restart}>
+            New complaint / नई शिकायत
+          </button>
+        )}
+
+        {canCheckStatus && (
+          <button className="webchat-status" type="button" disabled={busy} onClick={checkStatus}>
+            <RefreshCw size={15} aria-hidden="true" />
+            Check last complaint / पिछली शिकायत देखें
+          </button>
+        )}
+        <div ref={end} aria-hidden="true" />
+      </main>
+
+      <div className="webchat-announcer" aria-live="polite" aria-atomic="true">
+        {lastBot?.text || ''}
+      </div>
+
+      <footer className="webchat-footer">
+        {/* Composer and attribution are independent full-width rows.
+            The credit must never share horizontal space with the input. */}
+        <div className="webchat-input-row">
+          <ChatComposer
+            step={step}
+            entry={entry}
+            setEntry={setEntry}
+            busy={busy}
+            onSend={choose}
+          />
+        </div>
+        <div className="webchat-credit">
+          <span>Developed and maintained by RWA Pocket-A.</span>
+          <span lang="hi">RWA Pocket-A द्वारा विकसित एवं रखरखाव।</span>
+        </div>
+      </footer>
+    </div>
+  )
 }
