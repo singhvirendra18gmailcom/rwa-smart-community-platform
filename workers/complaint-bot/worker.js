@@ -1283,7 +1283,7 @@ function categoryMenu(flatNo = null) {
     ? `\n\nRegistered Flat / दर्ज फ्लैट: *${flatNo}*`
     : ''
   return visibleMenu + saved +
-    '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
+    '\n\nThis application has been developed and is maintained by RWA Pocket-A. / यह ऐप RWA Pocket-A द्वारा विकसित किया गया है तथा इसका रखरखाव भी RWA Pocket-A द्वारा किया जाता है।'
 }
 
 function fullCategoryMenu() {
