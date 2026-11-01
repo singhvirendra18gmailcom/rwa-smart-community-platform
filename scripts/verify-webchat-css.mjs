@@ -22,8 +22,29 @@ for (const selector of [
   '.webchat-choices',
   '.webchat-choice-index',
   '.webchat-composer',
+  '.webchat-input-row',
+  '.webchat-credit',
   '.webchat-send'
 ]) {
   assert.ok(styles.includes(selector), `Production CSS is missing ${selector}`)
 }
 console.log('Web complaint chat CSS is bundled and linked from production index.html.')
+
+const component = await readFile('src/WebComplaintChat.jsx', 'utf8')
+const stylesheet = await readFile('src/WebComplaintChat.css', 'utf8')
+assert.match(
+  component,
+  /<footer className="webchat-footer">[\s\S]*?<div className="webchat-input-row">[\s\S]*?<ChatComposer[\s\S]*?<\/div>[\s\S]*?<div className="webchat-credit">/,
+  'Composer and attribution must be separate, ordered footer rows'
+)
+assert.match(
+  stylesheet,
+  /grid-template-rows:\s*auto auto/,
+  'The footer must explicitly reserve a separate row for the credit'
+)
+assert.match(
+  stylesheet,
+  /\.webchat-root \.webchat-credit\s*\{[^}]*grid-row:\s*2/,
+  'The attribution must occupy row 2 below the input'
+)
+console.log('Web chat composer and attribution are independent full-width rows.')
