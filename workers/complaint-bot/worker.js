@@ -931,9 +931,9 @@ function workDoneConfirmationMessage(complaint) {
 }
 
 async function startComplaint(env, mobile) {
-  // Only reuse flats previously entered in a successfully registered complaint.
-  // New residents supply their flat once. Returning residents can correct it
-  // from the review screen (option 3), without a mandatory extra prompt.
+  // Only reuse flats from registered complaints. Returning residents can
+  // optionally change the remembered flat from the category menu before
+  // selecting a category, because selection may complete registration.
   const flatNo = await getRememberedFlat(env, mobile)
   await deleteSession(env, mobile)
   await createSession(env, mobile, flatNo)
@@ -958,7 +958,27 @@ function isUsableFlat(flatNo) {
 function nextStepForCategory(categoryId) {
   if (categoryId === 4) return 'INCIDENT_DATETIME'
   if ([5, 6, 7].includes(categoryId)) return 'ISSUE_TYPE'
-  return 'CONFIRM'
+  return 'REGISTER'
+}
+
+async function registerComplaintImmediately(env, mobile) {
+  const current = await getSession(env, mobile)
+  if (!current || !getCategoryById(Number(current.category_id)) || !isUsableFlat(current.flat_no)) {
+    throw new Error('Complaint registration is missing a valid category or flat.')
+  }
+  const complaint = await createComplaint(env, mobile, current)
+  const complaintsAhead = await getComplaintsAhead(env, complaint.id)
+  await deleteSession(env, mobile)
+  await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
+
+  if (Number(current.category_id) === 1) {
+    try {
+      await notifyPlumberOfNewComplaint(env, complaint, current)
+    } catch (error) {
+      // Plumber notification failure must never undo an already-created complaint.
+      console.error('Plumber WhatsApp notification failed:', error)
+    }
+  }
 }
 
 async function askComplaintStep(env, mobile, step, categoryId) {
@@ -968,7 +988,10 @@ async function askComplaintStep(env, mobile, step, categoryId) {
     await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
   } else if (step === 'ISSUE_TYPE') {
     await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId))
+  } else if (step === 'REGISTER') {
+    await registerComplaintImmediately(env, mobile)
   } else if (step === 'CONFIRM') {
+    // Only for older sessions that already received a review prompt.
     await sendConfirmation(env, mobile, await getSession(env, mobile))
   }
 }
@@ -994,6 +1017,21 @@ async function processConversation(env, mobile, originalText, session) {
   }
 
   if (step === 'CATEGORY') {
+    // Optional flat correction BEFORE selecting a category. This never
+    // modifies prior complaints; the corrected flat is stored on the next one.
+    const flatChange = text.match(/^flat\s+(.+)$/i)
+    if (flatChange) {
+      const corrected = flatChange[1].trim().toUpperCase()
+      if (!isUsableFlat(corrected)) {
+        await sendWhatsAppMessage(env, mobile,
+          'Invalid flat. Try *FLAT 36-D*. / फ्लैट नंबर गलत है। *FLAT 36-D* भेजें।')
+        return
+      }
+      await updateSession(env, mobile, { flat_no: corrected })
+      await sendWhatsAppMessage(env, mobile, categoryMenu(corrected))
+      return
+    }
+
     const category = getCategory(text)
     if (!category) {
       await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no))
@@ -1033,7 +1071,7 @@ async function processConversation(env, mobile, originalText, session) {
         'Please enter a valid flat number, e.g. *36-D*. / कृपया सही फ्लैट नंबर भेजें, जैसे *36-D*।')
       return
     }
-    const next = step === 'FLAT_CORRECTION' ? 'CONFIRM' : nextStepForCategory(categoryId)
+    const next = nextStepForCategory(categoryId)
     await updateSession(env, mobile, { flat_no: flatNo, location_text: null, step: next })
     await askComplaintStep(env, mobile, next, categoryId)
     return
@@ -1044,8 +1082,8 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
       return
     }
-    await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'CONFIRM' })
-    await askComplaintStep(env, mobile, 'CONFIRM', categoryId)
+    await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'REGISTER' })
+    await askComplaintStep(env, mobile, 'REGISTER', categoryId)
     return
   }
 
@@ -1055,17 +1093,24 @@ async function processConversation(env, mobile, originalText, session) {
       await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId))
       return
     }
-    await updateSession(env, mobile, { issue_type: issue, step: 'CONFIRM' })
-    await askComplaintStep(env, mobile, 'CONFIRM', categoryId)
+    await updateSession(env, mobile, { issue_type: issue, step: 'REGISTER' })
+    await askComplaintStep(env, mobile, 'REGISTER', categoryId)
     return
   }
 
-  // Legacy sessions created before the urgency question was removed.
+  // Legacy sessions created before removal of the urgency prompt proceed
+  // without a further review/confirmation.
   if (step === 'URGENT') {
     await updateSession(env, mobile, {
-      is_urgent: false, urgency_code: null, urgency_reason: null, step: 'CONFIRM'
+      is_urgent: false, urgency_code: null, urgency_reason: null, step: 'REGISTER'
     })
-    await askComplaintStep(env, mobile, 'CONFIRM', categoryId)
+    await askComplaintStep(env, mobile, 'REGISTER', categoryId)
+    return
+  }
+
+  // A partially completed session can resume safely after a transient failure.
+  if (step === 'REGISTER') {
+    await registerComplaintImmediately(env, mobile)
     return
   }
 
@@ -1085,20 +1130,9 @@ async function processConversation(env, mobile, originalText, session) {
       return
     }
 
-    const current = await getSession(env, mobile)
-    if (!current) throw new Error('Complaint session not found.')
-    const complaint = await createComplaint(env, mobile, current)
-    const complaintsAhead = await getComplaintsAhead(env, complaint.id)
-    await deleteSession(env, mobile)
-    await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
-
-    if (Number(current.category_id) === 1) {
-      try {
-        await notifyPlumberOfNewComplaint(env, complaint, current)
-      } catch (error) {
-        console.error('Plumber WhatsApp notification failed:', error)
-      }
-    }
+    // Compatibility only: confirm actions from sessions started on an older
+    // Worker. New sessions do not enter the CONFIRM step.
+    await registerComplaintImmediately(env, mobile)
     return
   }
 
@@ -1117,7 +1151,7 @@ function categoryMenu(flatNo = null) {
     : menu.split('\n').filter(line => !line.startsWith('*6.*'))
       .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
   const saved = isUsableFlat(flatNo)
-    ? `\n\nSaved Flat / दर्ज फ्लैट: *${flatNo}* (change at review / पुष्टि के समय बदलें)`
+    ? `\n\nSaved Flat / दर्ज फ्लैट: *${flatNo}*\nTo change BEFORE selecting, send *FLAT 36-D*. / बदलने के लिए श्रेणी चुनने से पहले *FLAT 36-D* भेजें।`
     : ''
   return visibleMenu + saved +
     '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
