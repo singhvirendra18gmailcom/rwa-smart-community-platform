@@ -152,14 +152,17 @@ export default function WebComplaintChat() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [receipt, setReceipt] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const widget = useRef(null)
   const widgetId = useRef(null)
   const end = useRef(null)
+  const chatLog = useRef(null)
+  const root = useRef(null)
   const seq = useRef(0)
   const submitting = useRef(false)
   const add = (side, text) => {
     seq.current += 1
-    setMessages(current => [...current, { id:seq.current, side, text }])
+    setMessages(current => [...current, { id:seq.current, side, text, time:Date.now() }])
   }
   const bot = text => add('bot', text)
   const resident = text => add('resident', text)
@@ -169,7 +172,29 @@ export default function WebComplaintChat() {
     if (!response.ok || !data.ok) throw Error(data.error || 'Complaint service unavailable.')
     return data
   }
-  useEffect(() => { end.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, step])
+  useEffect(() => {
+    const scroller = chatLog.current
+    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' })
+  }, [messages, step, receipt, error])
+
+  // Android keyboard: track the visual viewport instead of scrolling the page
+  // underneath the fixed chat composer.
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return undefined
+    const sync = () => {
+      if (!root.current) return
+      root.current.style.setProperty('--webchat-visible-height', `${Math.round(viewport.height)}px`)
+      root.current.style.setProperty('--webchat-visible-top', `${Math.round(viewport.offsetTop)}px`)
+    }
+    sync()
+    viewport.addEventListener('resize', sync)
+    viewport.addEventListener('scroll', sync)
+    return () => {
+      viewport.removeEventListener('resize', sync)
+      viewport.removeEventListener('scroll', sync)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -193,41 +218,55 @@ export default function WebComplaintChat() {
     return () => { active = false }
   }, [])
 
+  // Only render the Turnstile challenge while it is needed, and clean up
+  // the widget on completion or retry. No permanent captcha takes up space.
   useEffect(() => {
-    if (!SITE_KEY || !widget.current) return
+    if (step !== 'VERIFY' || !SITE_KEY) return undefined
     let cancelled = false
     const mount = () => {
       if (cancelled || !window.turnstile || !widget.current || widgetId.current != null) return
-      widgetId.current = window.turnstile.render(widget.current, {
-        sitekey:SITE_KEY, theme:'light',
-        callback:t => { if (!cancelled) setToken(t) },
-        'expired-callback':() => { if (!cancelled) setToken('') },
-        'error-callback':() => { if (!cancelled) setToken('') }
-      })
+      try {
+        widgetId.current = window.turnstile.render(widget.current, {
+          sitekey: SITE_KEY,
+          theme: 'light',
+          callback: value => { if (!cancelled) setToken(value) },
+          'expired-callback': () => { if (!cancelled) setToken('') },
+          'error-callback': () => {
+            if (cancelled) return
+            setToken('')
+            setError('Browser verification failed. Please retry / ब्राउज़र सत्यापन विफल रहा।')
+            setStep('RETRY')
+          }
+        })
+      } catch {
+        if (!cancelled) {
+          setError('Unable to load verification / सत्यापन लोड नहीं हो सका।')
+          setStep('RETRY')
+        }
+      }
     }
-    if (window.turnstile) mount()
-    else {
-      const script = document.createElement('script')
+    let script = document.getElementById('rwa-webchat-turnstile')
+    if (!script && !window.turnstile) {
+      script = document.createElement('script')
+      script.id = 'rwa-webchat-turnstile'
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
       script.async = true
-      script.onload = mount
       document.head.appendChild(script)
     }
+    if (window.turnstile) mount()
+    else script?.addEventListener('load', mount)
     return () => {
       cancelled = true
+      script?.removeEventListener('load', mount)
       if (widgetId.current != null && window.turnstile) {
-        window.turnstile.remove(widgetId.current)
+        try { window.turnstile.remove(widgetId.current) } catch {}
         widgetId.current = null
       }
     }
-  }, [])
-  const resetCaptcha = () => {
-    setToken('')
-    if (window.turnstile && widgetId.current != null) window.turnstile.reset(widgetId.current)
-  }
+  }, [step])
 
   useEffect(() => {
-    if (!pending || !token || submitting.current) return
+    if (step !== 'VERIFY' || !pending || !token || submitting.current) return
     submitting.current = true
     setBusy(true)
     setError('')
@@ -244,7 +283,7 @@ export default function WebComplaintChat() {
         setProfile(saved)
         window.localStorage.setItem(PROFILE, JSON.stringify(saved))
         setStep('DONE')
-        bot(`✅ Complaint registered / शिकायत दर्ज हुई!\n\nNo / संख्या: ${result.complaint_no}\nFlat / फ्लैट: ${result.flat_no}\nQueue position / कतार: ${result.queue_position || '—'}${result.work_start_otp ? `\nWork-start OTP / कार्य शुरू करने का OTP: ${result.work_start_otp}\nOnly tell the plumber when they arrive. / प्लंबर आने पर ही बताएं।` : ''}\n\nKeep this complaint number for reference. / शिकायत नंबर संभालकर रखें।`)
+        bot('✅ Complaint registered successfully! / आपकी शिकायत सफलतापूर्वक दर्ज हो गई है।\nPlease keep your complaint number for reference. / शिकायत नंबर संभालकर रखें।')
         setPending(null)
       })
       .catch(e => {
@@ -252,17 +291,22 @@ export default function WebComplaintChat() {
         setStep('RETRY')
         bot('Complaint not registered. Please retry / शिकायत दर्ज नहीं हुई। फिर प्रयास करें।')
       })
-      .finally(() => { submitting.current = false; setBusy(false); resetCaptcha() })
-  }, [pending, token])
+      .finally(() => { submitting.current = false; setBusy(false); setToken('') })
+  }, [pending, token, step])
 
   const register = data => {
+    if (submitting.current) return
     const full = { ...data, ticket:window.crypto.randomUUID() }
     setPending(full)
+    setError('')
+    setToken('')
+    if (!SITE_KEY) {
+      setStep('UNAVAILABLE')
+      bot('Security verification is not configured. Registration is unavailable. / सुरक्षा सत्यापन उपलब्ध नहीं है। शिकायत दर्ज नहीं हो सकती।')
+      return
+    }
     setStep('VERIFY')
-    bot(SITE_KEY
-      ? 'Registering complaint securely... / शिकायत सुरक्षित रूप से दर्ज हो रही है…'
-      : 'Browser security is not configured. / ब्राउज़र सुरक्षा अभी कॉन्फ़िगर नहीं है।')
-    if (!SITE_KEY) setStep('UNAVAILABLE')
+    bot('Please complete secure browser verification below to register your complaint. / शिकायत दर्ज करने के लिए नीचे सुरक्षित सत्यापन पूरा करें।')
   }
   const afterDetails = data => {
     const mobile = mobileNumber(profile.mobile_no)
@@ -290,6 +334,7 @@ export default function WebComplaintChat() {
         body:JSON.stringify({ ticket:last.ticket, resolved })
       })
       setStep('DONE')
+      setReceipt(current => current ? { ...current, status: result.status } : current)
       bot(result.status === 'CLOSED' ? 'Complaint closed. / शिकायत बंद की गई है।' : 'Complaint reopened. / शिकायत फिर से खोली गई है।')
     } catch (e) { setError(e.message) }
     finally { setBusy(false) }
@@ -298,9 +343,15 @@ export default function WebComplaintChat() {
     if (busy || !config || !['CATEGORY','FLAT','DATE','ISSUE','MOBILE','CONFIRM'].includes(step)) return
     const v = String(text).trim()
     if (!v) return
-    resident(v); setEntry('')
+    const pickedCategory = step === 'CATEGORY' ? config.categories.find(x => x.option === v) : null
+    const pickedIssue = step === 'ISSUE' ? config.issue_types[String(draft.category_id)]?.find(x => x.option === v) : null
+    const displayValue = pickedCategory
+      ? `${v}. ${pickedCategory.icon || ''} ${pickedCategory.en}`
+      : pickedIssue ? `${v}. ${pickedIssue.en}` : v
+    resident(displayValue)
+    setEntry('')
     if (step === 'CATEGORY') {
-      const category = config.categories.find(x => x.option === v)
+      const category = pickedCategory
       if (!category) return bot('Please choose a valid option / सही विकल्प चुनें।')
       const next = { category_id:category.id, flat_no:validFlat(profile.flat_no) ? profile.flat_no : null }
       setDraft(next)
@@ -317,7 +368,7 @@ export default function WebComplaintChat() {
       const next = { ...draft, incident_datetime_text:v }
       setDraft(next); afterDetails(next)
     } else if (step === 'ISSUE') {
-      const issue = config.issue_types[String(draft.category_id)]?.find(x => x.option === v)
+      const issue = pickedIssue
       if (!issue) return bot('Choose a valid issue number / सही समस्या नंबर चुनें।')
       const next = { ...draft, issue_option:issue.option, issue_type:issue.code }
       setDraft(next); afterDetails(next)
