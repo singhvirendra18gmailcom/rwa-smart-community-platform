@@ -1,0 +1,29 @@
+name: WhatsApp message optimization tests
+
+on:
+  push:
+    branches:
+      - feature/whatsapp-message-optimization
+    paths:
+      - 'workers/complaint-bot/worker.js'
+      - 'workers/complaint-bot/worker.optimization.test.mjs'
+      - '.github/workflows/whatsapp-message-optimization-tests.yml'
+  pull_request:
+    paths:
+      - 'workers/complaint-bot/worker.js'
+      - 'workers/complaint-bot/worker.optimization.test.mjs'
+      - '.github/workflows/whatsapp-message-optimization-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  worker-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run simulated WhatsApp/Supabase webhook tests
+        run: node --test workers/complaint-bot/worker.optimization.test.mjs
