@@ -94,6 +94,10 @@ export default {
     }
 
     if (request.method === 'POST') {
+      // Preserve the sender across failures, including failures before a
+      // conversation session can be loaded from Supabase.
+      let fromForFallback = null
+      let failedMessageId = null
       try {
         const body = await request.json()
         const value = body?.entry?.[0]?.changes?.[0]?.value
@@ -109,6 +113,15 @@ export default {
 
         const from = normalizeMobile(message.from)
         if (!from) return webhookResponse()
+        fromForFallback = from
+        failedMessageId = String(message.id || '')
+
+        // A configured persistent outage routes incoming messages directly
+        // to the web app, without relying on Supabase (which could be down).
+        if (await shouldUseWebComplaintFallback(env)) {
+          await sendWebComplaintFallbackOnce(env, from, failedMessageId)
+          return webhookResponse()
+        }
 
         // WhatsApp can redeliver the same webhook. Claim the provider message ID
         // before any reply or database side effect to avoid duplicate responses.
@@ -155,7 +168,19 @@ export default {
 
         await processConversation(env, from, originalText, session)
       } catch (error) {
-        console.error('Webhook error:', error)
+        console.error('Webhook error:', String(error?.message || error))
+        try {
+          // Do not switch to fallback for a single intermittent failure.
+          // A configured KV binding counts repeated processing failures.
+          const degraded = await recordChatbotProcessingFailure(env)
+          if (degraded && fromForFallback) {
+            await sendWebComplaintFallbackOnce(env, fromForFallback, failedMessageId)
+          }
+        } catch (fallbackError) {
+          // If Meta is blocking sends, no message can be delivered through
+          // this WhatsApp account, including this backup link.
+          console.error('WhatsApp fallback unavailable:', String(fallbackError?.message || fallbackError))
+        }
       }
       return webhookResponse()
     }
@@ -1305,7 +1330,7 @@ async function startComplaint(env, mobile) {
   const mapping = await resolveResidentFlat(env, mobile)
   await deleteSession(env, mobile)
   await createSession(env, mobile, mapping.flat_no)
-  await sendWhatsAppMessage(env, mobile, categoryMenu(mapping.flat_no))
+  await sendWhatsAppMessage(env, mobile, categoryMenu(mapping.flat_no, env))
 }
 
 async function rememberRegisteredFlat(env, mobile, flatNo) {
@@ -1350,7 +1375,7 @@ async function registerComplaintImmediately(env, mobile) {
   }
   const complaintsAhead = await getComplaintsAhead(env, complaint.id)
   await deleteSession(env, mobile)
-  await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead))
+  await sendWhatsAppMessage(env, mobile, complaintCreatedMessage(complaint, current, complaintsAhead) + webComplaintFallbackFooter(env))
 
   if (Number(current.category_id) === 1) {
     try {
@@ -1386,21 +1411,21 @@ async function processConversation(env, mobile, originalText, session) {
     await updateSession(env, mobile, { category_id: null, step: 'CATEGORY' })
     await sendWhatsAppMessage(env, mobile,
       'Street Light complaints are currently unavailable. / स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है।\n\n' +
-      categoryMenu(session.flat_no))
+      categoryMenu(session.flat_no, env))
     return
   }
 
   // Let an in-flight old session move safely to the new bilingual workflow.
   if (step === 'LANGUAGE') {
     await updateSession(env, mobile, { preferred_language: 'EN', step: 'CATEGORY' })
-    await sendWhatsAppMessage(env, mobile, categoryMenu(session.flat_no))
+    await sendWhatsAppMessage(env, mobile, categoryMenu(session.flat_no, env))
     return
   }
 
   if (step === 'CATEGORY') {
     const category = getCategory(text)
     if (!category) {
-      await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no))
+      await sendWhatsAppMessage(env, mobile, invalidChoice() + '\n\n' + categoryMenu(session.flat_no, env))
       return
     }
 
@@ -1515,7 +1540,7 @@ async function processConversation(env, mobile, originalText, session) {
  // Set to true only to restore Street Light complaint registration.
 const STREET_LIGHT_COMPLAINTS_ENABLED = false
 
-function categoryMenu(flatNo = null) {
+function categoryMenu(flatNo = null, env = {}) {
   const menu = fullCategoryMenu()
   const visibleMenu = STREET_LIGHT_COMPLAINTS_ENABLED ? menu
     : menu.split('\n').filter(line => !line.startsWith('*6.*'))
@@ -1524,7 +1549,8 @@ function categoryMenu(flatNo = null) {
     ? `\n\nRegistered Flat / दर्ज फ्लैट: *${flatNo}*`
     : ''
   return visibleMenu + saved +
-    '\n\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
+    '\n\nDeveloped and maintained by RWA Pocket-A. / RWA Pocket-A द्वारा विकसित एवं रखरखाव।' +
+    webComplaintFallbackFooter(env)
 }
 
 function fullCategoryMenu() {
@@ -1995,6 +2021,131 @@ async function sendSmsMessage(env, to, message) {
   }
 }
 
+
+const CHATBOT_FAILURE_KEY = 'whatsapp-chatbot:processing-failures'
+const CHATBOT_DEGRADED_KEY = 'whatsapp-chatbot:degraded'
+const FAILURE_WINDOW_MS = 10 * 60 * 1000
+const DEGRADED_TTL_SECONDS = 15 * 60
+const FALLBACK_COOLDOWN_SECONDS = 30 * 60
+
+function getWebComplaintPublicUrl(env = {}) {
+  const raw = String(env.WEB_COMPLAINT_PUBLIC_URL || '').trim()
+  if (!raw || raw.length > 400) return null
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
+        url.searchParams.get('view') !== 'complaint-chat' || url.hash) return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+// Inline footer adds no outgoing WhatsApp message to the normal flow.
+// A resident can still open their previous menu if the bot goes offline.
+function webComplaintFallbackFooter(env) {
+  const link = getWebComplaintPublicUrl(env)
+  if (!link) return ''
+  return `\n\n*Backup web complaint app / वैकल्पिक वेब शिकायत ऐप:*\n${link}`
+}
+
+function webComplaintFallbackMessage(env) {
+  const link = getWebComplaintPublicUrl(env)
+  if (!link) return null
+  return '*RWA Pocket-A | Web Complaint Alternative*\n\n' +
+    'The WhatsApp complaint chatbot is currently unavailable. Please register your complaint on our web app (no login):\n' +
+    'WhatsApp शिकायत चैटबॉट अभी उपलब्ध नहीं है। बिना लॉगिन के वेब ऐप पर शिकायत दर्ज करें:\n\n' +
+    link + '\n\n— RWA Pocket-A'
+}
+
+function chatbotFallbackKV(env) {
+  const kv = env.CHATBOT_FAILURE_KV
+  return kv && typeof kv.get === 'function' && typeof kv.put === 'function'
+    ? kv : null
+}
+
+// Manual emergency switch: WHATSAPP_FALLBACK_ONLY=true. The Worker still
+// receives a message and replies through WhatsApp while Meta works.
+// KV mode is triggered after repeated processing failures and auto-expires.
+async function shouldUseWebComplaintFallback(env) {
+  if (!getWebComplaintPublicUrl(env)) return false
+  if (String(env.WHATSAPP_FALLBACK_ONLY || '').toLowerCase() === 'true') return true
+  const kv = chatbotFallbackKV(env)
+  if (!kv) return false
+  try {
+    return Boolean(await kv.get(CHATBOT_DEGRADED_KEY))
+  } catch (error) {
+    console.error('Fallback circuit lookup failed:', String(error?.message || error))
+    return false
+  }
+}
+
+async function recordChatbotProcessingFailure(env) {
+  const kv = chatbotFallbackKV(env)
+  if (!kv || !getWebComplaintPublicUrl(env)) return false
+  try {
+    const now = Date.now()
+    const prior = JSON.parse((await kv.get(CHATBOT_FAILURE_KEY)) || 'null')
+    const stillInWindow = prior && Number.isFinite(prior.since) &&
+      now - prior.since >= 0 && now - prior.since < FAILURE_WINDOW_MS
+    const failures = stillInWindow ? (Number(prior.failures) || 0) + 1 : 1
+    const since = stillInWindow ? prior.since : now
+    if (failures >= 3) {
+      await kv.put(CHATBOT_DEGRADED_KEY, '1', { expirationTtl: DEGRADED_TTL_SECONDS })
+      console.error('Chatbot fallback circuit activated after repeated processing failures.')
+      return true
+    }
+    await kv.put(CHATBOT_FAILURE_KEY, JSON.stringify({ failures, since }), {
+      expirationTtl: Math.ceil(FAILURE_WINDOW_MS / 1000)
+    })
+  } catch (error) {
+    console.error('Fallback circuit update failed:', String(error?.message || error))
+  }
+  return false
+}
+
+async function clearChatbotProcessingFailureStreak(env) {
+  const kv = chatbotFallbackKV(env)
+  if (!kv || typeof kv.delete !== 'function') return
+  try { await kv.delete(CHATBOT_FAILURE_KEY) }
+  catch (error) { console.error('Fallback circuit reset failed:', String(error?.message || error)) }
+}
+
+async function fallbackRecipientKey(mobile) {
+  const bytes = new TextEncoder().encode(mobile)
+  const hash = await crypto.subtle.digest('SHA-256', bytes)
+  return 'whatsapp-chatbot:fallback-recipient:' +
+    Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function sendWebComplaintFallbackOnce(env, recipient, messageId) {
+  const message = webComplaintFallbackMessage(env)
+  if (!message) {
+    console.error('WEB_COMPLAINT_PUBLIC_URL must be configured with the public HTTPS web-chat link.')
+    return false
+  }
+  const kv = chatbotFallbackKV(env)
+  let key = null
+  if (kv) {
+    try {
+      key = await fallbackRecipientKey(recipient)
+      if (await kv.get(key)) return false // One link every 30 minutes per number.
+    } catch (error) {
+      key = null
+      console.error('Fallback cooldown lookup failed:', String(error?.message || error))
+    }
+  }
+  await sendWhatsAppMessage(env, recipient, message)
+  if (kv && key) {
+    try {
+      await kv.put(key, String(messageId || 'sent'), { expirationTtl: FALLBACK_COOLDOWN_SECONDS })
+    } catch (error) {
+      console.error('Fallback cooldown write failed:', String(error?.message || error))
+    }
+  }
+  return true
+}
+
 async function sendWhatsAppMessage(env, to, message) {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error('WhatsApp Worker secrets are not configured.')
@@ -2016,9 +2167,17 @@ async function sendWhatsAppMessage(env, to, message) {
       })
     })
   const resultText = await response.text()
-  console.log('WhatsApp send result:', resultText)
-  if (!response.ok) throw new Error(`WhatsApp API error: ${resultText}`)
-
+  if (!response.ok) {
+    // Never log body/recipient. The provider error code is sufficient for
+    // operators to distinguish billing/eligibility from Worker failures.
+    let code = null
+    try { code = JSON.parse(resultText)?.error?.code ?? null } catch {}
+    console.error('WhatsApp API send failed:', JSON.stringify({ status: response.status, code }))
+    throw new Error(`WhatsApp API error ${response.status} (code ${code ?? 'unknown'})`)
+  }
+  // A successful user-facing WhatsApp message demonstrates that the
+  // transport works. Reset the streak; existing degraded mode expires by TTL.
+  await clearChatbotProcessingFailureStreak(env)
   try {
     return JSON.parse(resultText)
   } catch {
