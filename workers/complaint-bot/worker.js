@@ -84,6 +84,12 @@ export default {
         const from = normalizeMobile(message.from)
         if (!from) return webhookResponse()
 
+        // WhatsApp can redeliver the same webhook. Claim the provider message ID
+        // before any reply or database side effect to avoid duplicate responses.
+        if (!await claimIncomingWhatsAppMessage(env, message.id)) {
+          return webhookResponse()
+        }
+
         if (message.type !== 'text') {
           const session = await getSession(env, from)
           await sendWhatsAppMessage(env, from,
@@ -988,9 +994,7 @@ async function handleResidentWorkDoneReply(env, mobile, originalText) {
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ resident_rating: Number(text), rated_at: now, updated_at: now })
     })
-    await sendWhatsAppMessage(env, mobile, lang === 'HI'
-      ? `आपकी *${text}/5* रेटिंग के लिए धन्यवाद। ⭐\n\n— RWA Pocket-A`
-      : `Thank you for your *${text}/5* rating. ⭐\n\n— RWA Pocket-A`)
+    // Rating is stored. Avoid a purely decorative final WhatsApp reply.
     return true
   }
 
@@ -998,9 +1002,21 @@ async function handleResidentWorkDoneReply(env, mobile, originalText) {
 }
 
 async function startComplaint(env, mobile) {
+  // Use the language from the resident's most recent registered complaint.
+  // First-time residents still choose English/Hindi explicitly.
+  const preferredLanguage = await getPreferredResidentLanguage(env, mobile)
   await deleteSession(env, mobile)
-  await createSession(env, mobile)
-  await sendWhatsAppMessage(env, mobile, languageMenu())
+  await createSession(env, mobile, preferredLanguage)
+  await sendWhatsAppMessage(env, mobile,
+    preferredLanguage ? categoryMenu(preferredLanguage, true) : languageMenu())
+}
+
+async function getPreferredResidentLanguage(env, mobile) {
+  const rows = await supabaseRequest(env,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&preferred_language=in.(EN,HI)&select=preferred_language&order=created_at.desc&limit=1`,
+    { method: 'GET' })
+  const lang = rows?.[0]?.preferred_language
+  return lang === 'EN' || lang === 'HI' ? lang : null
 }
 
 async function processConversation(env, mobile, originalText, session) {
@@ -1029,6 +1045,14 @@ async function processConversation(env, mobile, originalText, session) {
   }
 
   if (step === 'CATEGORY') {
+    // An abbreviated opt-in switch keeps returning residents in control.
+    if (text.toLowerCase() === 'h' || text.toLowerCase() === 'e') {
+      const nextLanguage = text.toLowerCase() === 'h' ? 'HI' : 'EN'
+      await updateSession(env, mobile, { preferred_language: nextLanguage })
+      await sendWhatsAppMessage(env, mobile, categoryMenu(nextLanguage, true))
+      return
+    }
+
     const category = getCategory(text)
     if (!category) {
       await sendWhatsAppMessage(env, mobile, invalidChoice(lang) + '\n\n' + categoryMenu(lang))
@@ -1176,11 +1200,15 @@ function languageMenu() {
 // Set to true to restore Street Light complaint registration.
 const STREET_LIGHT_COMPLAINTS_ENABLED = false
 
-function categoryMenu(lang) {
+function categoryMenu(lang, includeLanguageHint = false) {
   const menu = fullCategoryMenu(lang)
-  return STREET_LIGHT_COMPLAINTS_ENABLED ? menu
+  const visibleMenu = STREET_LIGHT_COMPLAINTS_ENABLED ? menu
     : menu.split('\n').filter(line => !line.startsWith('*6.*'))
       .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
+  if (!includeLanguageHint) return visibleMenu
+  return visibleMenu + (lang === 'HI'
+    ? '\n\nभाषा बदलने के लिए *E* भेजें (English)।'
+    : '\n\nTo change language, reply *H* (हिंदी).')
 }
 
 function fullCategoryMenu(lang) {
@@ -1458,14 +1486,14 @@ function getPriorityLabel(session, lang = 'EN') {
   if (session.is_urgent) return 'URGENT'
   return 'NORMAL'
 }
-async function createSession(env, mobile) {
+async function createSession(env, mobile, preferredLanguage = null) {
   await supabaseRequest(env, '/rest/v1/whatsapp_complaint_sessions', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({
       mobile_no: mobile,
-      step: 'LANGUAGE',
-      preferred_language: null,
+      step: preferredLanguage ? 'CATEGORY' : 'LANGUAGE',
+      preferred_language: preferredLanguage,
       category_id: null,
       flat_no: null,
       location_text: null,
@@ -1504,6 +1532,24 @@ async function deleteSession(env, mobile) {
   await supabaseRequest(env,
     `/rest/v1/whatsapp_complaint_sessions?mobile_no=eq.${encodeURIComponent(mobile)}`,
     { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+}
+
+async function claimIncomingWhatsAppMessage(env, messageId) {
+  if (!messageId || typeof messageId !== 'string') {
+    // Do not silently discard unusual webhook deliveries without an ID.
+    console.warn('Incoming WhatsApp message has no provider ID; dedupe skipped.')
+    return true
+  }
+  // Ignore conflicts atomically on the message_id primary key. A second
+  // delivery returns [] and does not initiate any additional WhatsApp sends.
+  const rows = await supabaseRequest(env,
+    '/rest/v1/whatsapp_inbound_message_dedupe?on_conflict=message_id',
+    {
+      method: 'POST',
+      headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ message_id: messageId })
+    })
+  return Array.isArray(rows) && rows.length === 1
 }
 
 async function supabaseRequest(env, path, options = {}) {
