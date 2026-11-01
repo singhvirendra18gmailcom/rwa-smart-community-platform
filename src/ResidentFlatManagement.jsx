@@ -164,7 +164,7 @@ export default function ResidentFlatManagement({ onBack }) {
             <h2>Flat linked to mobile</h2>
             <div className="resident-flat-detail">
               <span>WhatsApp number</span>
-              <strong>+${found.mobile_no}</strong>
+              <strong>+{found.mobile_no}</strong>
             </div>
             <div className="resident-flat-detail">
               <span>Current flat</span>
