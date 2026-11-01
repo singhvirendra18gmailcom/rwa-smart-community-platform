@@ -93,9 +93,7 @@ export default {
         if (message.type !== 'text') {
           const session = await getSession(env, from)
           await sendWhatsAppMessage(env, from,
-            session?.preferred_language === 'EN'
-              ? 'Please send a text message.'
-              : 'कृपया टेक्स्ट संदेश भेजें।')
+            'Please send a text message. / कृपया टेक्स्ट संदेश भेजें।')
           return webhookResponse()
         }
 
@@ -1002,67 +1000,80 @@ async function handleResidentWorkDoneReply(env, mobile, originalText) {
 }
 
 async function startComplaint(env, mobile) {
-  // Use the language from the resident's most recent registered complaint.
-  // First-time residents still choose English/Hindi explicitly.
-  const preferredLanguage = await getPreferredResidentLanguage(env, mobile)
+  // Only reuse flats previously entered in a successfully registered complaint.
+  // New residents supply their flat once. Returning residents can correct it
+  // from the review screen (option 3), without a mandatory extra prompt.
+  const flatNo = await getRememberedFlat(env, mobile)
   await deleteSession(env, mobile)
-  await createSession(env, mobile, preferredLanguage)
-  await sendWhatsAppMessage(env, mobile,
-    preferredLanguage ? categoryMenu(preferredLanguage, true) : languageMenu())
+  await createSession(env, mobile, flatNo)
+  await sendWhatsAppMessage(env, mobile, categoryMenu(flatNo))
 }
 
-async function getPreferredResidentLanguage(env, mobile) {
+async function getRememberedFlat(env, mobile) {
   const rows = await supabaseRequest(env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&preferred_language=in.(EN,HI)&select=preferred_language&order=created_at.desc&limit=1`,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
     { method: 'GET' })
-  const lang = rows?.[0]?.preferred_language
-  return lang === 'EN' || lang === 'HI' ? lang : null
+  const match = Array.isArray(rows) ? rows.find(row => isUsableFlat(row.flat_no)) : null
+  return match ? String(match.flat_no).trim().toUpperCase() : null
+}
+
+function isUsableFlat(flatNo) {
+  const flat = String(flatNo || '').trim().toUpperCase()
+  return flat.length >= 2 && flat.length <= 25
+    && /^[A-Z0-9][A-Z0-9 \\/-]*$/.test(flat)
+    && !['COMMON AREA', 'UNKNOWN', 'N/A', 'NA', 'NONE', 'NOT GIVEN'].includes(flat)
+}
+
+function nextStepForCategory(categoryId) {
+  if (categoryId === 4) return 'INCIDENT_DATETIME'
+  if ([5, 6, 7].includes(categoryId)) return 'ISSUE_TYPE'
+  return 'CONFIRM'
+}
+
+async function askComplaintStep(env, mobile, step, categoryId) {
+  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(getCategoryById(categoryId)))
+  } else if (step === 'INCIDENT_DATETIME') {
+    await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
+  } else if (step === 'ISSUE_TYPE') {
+    await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId))
+  } else if (step === 'CONFIRM') {
+    await sendConfirmation(env, mobile, await getSession(env, mobile))
+  }
 }
 
 async function processConversation(env, mobile, originalText, session) {
   const text = originalText.trim()
   const step = session.step
-  const lang = session.preferred_language || 'EN'
   const categoryId = Number(session.category_id)
 
   if (categoryId === 6 && !STREET_LIGHT_COMPLAINTS_ENABLED && !['LANGUAGE', 'CATEGORY'].includes(step)) {
     await updateSession(env, mobile, { category_id: null, step: 'CATEGORY' })
-    await sendWhatsAppMessage(env, mobile, (lang === 'HI'
-      ? 'स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है। कृपया दूसरी श्रेणी चुनें।'
-      : 'Street Light complaints are currently unavailable. Please choose another category.') + '\n\n' + categoryMenu(lang))
+    await sendWhatsAppMessage(env, mobile,
+      'Street Light complaints are currently unavailable. / स्ट्रीट लाइट शिकायत सेवा अभी उपलब्ध नहीं है।\\n\\n' +
+      categoryMenu(session.flat_no))
     return
   }
 
+  // Let an in-flight old session move safely to the new bilingual workflow.
   if (step === 'LANGUAGE') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, languageMenu())
-      return
-    }
-    const language = text === '1' ? 'EN' : 'HI'
-    await updateSession(env, mobile, { preferred_language: language, step: 'CATEGORY' })
-    await sendWhatsAppMessage(env, mobile, categoryMenu(language))
+    await updateSession(env, mobile, { preferred_language: 'EN', step: 'CATEGORY' })
+    await sendWhatsAppMessage(env, mobile, categoryMenu(session.flat_no))
     return
   }
 
   if (step === 'CATEGORY') {
-    // An abbreviated opt-in switch keeps returning residents in control.
-    if (text.toLowerCase() === 'h' || text.toLowerCase() === 'e') {
-      const nextLanguage = text.toLowerCase() === 'h' ? 'HI' : 'EN'
-      await updateSession(env, mobile, { preferred_language: nextLanguage })
-      await sendWhatsAppMessage(env, mobile, categoryMenu(nextLanguage, true))
-      return
-    }
-
     const category = getCategory(text)
     if (!category) {
-      await sendWhatsAppMessage(env, mobile, invalidChoice(lang) + '\n\n' + categoryMenu(lang))
+      await sendWhatsAppMessage(env, mobile, invalidChoice() + '\\n\\n' + categoryMenu(session.flat_no))
       return
     }
 
-    const nextStep = 'FLAT_NO'
+    const rememberedFlat = isUsableFlat(session.flat_no) ? String(session.flat_no).trim().toUpperCase() : null
+    const next = rememberedFlat ? nextStepForCategory(category.id) : 'FLAT_NO'
     await updateSession(env, mobile, {
       category_id: category.id,
-      flat_no: null,
+      flat_no: rememberedFlat,
       location_text: null,
       issue_type: null,
       incident_datetime_text: null,
@@ -1072,100 +1083,74 @@ async function processConversation(env, mobile, originalText, session) {
       urgency_code: null,
       urgency_reason: null,
       elderly_citizen_70_plus: false,
-      step: nextStep
+      step: next
     })
-
-    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, category))
+    await askComplaintStep(env, mobile, next, category.id)
     return
   }
 
-  if (step === 'FLAT_NO') {
-    const flatNo = text.toUpperCase().slice(0, 50)
-    if (flatNo.length < 2) {
-      await sendWhatsAppMessage(env, mobile, lang === 'HI'
-        ? 'कृपया सही Flat Number भेजें।\nउदाहरण: *36-D*'
-        : 'Please enter a valid Flat Number.\nExample: *36-D*')
-      return
-    }
-    const nextStep = [1, 2, 3].includes(categoryId) ? 'URGENT'
-      : categoryId === 4 ? 'INCIDENT_DATETIME'
-      : [5, 6, 7].includes(categoryId) ? 'ISSUE_TYPE' : 'CONFIRM'
-    await updateSession(env, mobile, { flat_no: flatNo, location_text: null, step: nextStep })
-    if (nextStep === 'URGENT') await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-    if (nextStep === 'INCIDENT_DATETIME') await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
-    if (nextStep === 'ISSUE_TYPE') await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
-    if (nextStep === 'CONFIRM') await sendConfirmation(env, mobile, await getSession(env, mobile))
-    return
-  }
-
-  // Move conversations started before this change to the flat-number question.
   if (step === 'LOCATION') {
     await updateSession(env, mobile, { location_text: null, step: 'FLAT_NO' })
-    await sendWhatsAppMessage(env, mobile, flatNumberQuestion(lang, getCategoryById(categoryId)))
+    await askComplaintStep(env, mobile, 'FLAT_NO', categoryId)
+    return
+  }
+
+  if (step === 'FLAT_NO' || step === 'FLAT_CORRECTION') {
+    const flatNo = text.toUpperCase().slice(0, 25)
+    if (!isUsableFlat(flatNo)) {
+      await sendWhatsAppMessage(env, mobile,
+        'Please enter a valid flat number, e.g. *36-D*. / कृपया सही फ्लैट नंबर भेजें, जैसे *36-D*।')
+      return
+    }
+    const next = step === 'FLAT_CORRECTION' ? 'CONFIRM' : nextStepForCategory(categoryId)
+    await updateSession(env, mobile, { flat_no: flatNo, location_text: null, step: next })
+    await askComplaintStep(env, mobile, next, categoryId)
     return
   }
 
   if (step === 'INCIDENT_DATETIME') {
     if (text.length < 3) {
-      await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion(lang))
+      await sendWhatsAppMessage(env, mobile, incidentDateTimeQuestion())
       return
     }
     await updateSession(env, mobile, { incident_datetime_text: text.slice(0, 100), step: 'CONFIRM' })
-    await sendConfirmation(env, mobile, await getSession(env, mobile))
+    await askComplaintStep(env, mobile, 'CONFIRM', categoryId)
     return
   }
 
   if (step === 'ISSUE_TYPE') {
     const issue = getIssueType(categoryId, text)
     if (!issue) {
-      await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId, lang))
+      await sendWhatsAppMessage(env, mobile, issueTypeMenu(categoryId))
       return
     }
-    const next = categoryId === 6 ? 'URGENT' : 'CONFIRM'
-    await updateSession(env, mobile, { issue_type: issue, step: next })
-    if (next === 'URGENT') {
-      await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-    } else {
-      await sendConfirmation(env, mobile, await getSession(env, mobile))
-    }
+    await updateSession(env, mobile, { issue_type: issue, step: 'CONFIRM' })
+    await askComplaintStep(env, mobile, 'CONFIRM', categoryId)
     return
   }
 
+  // Legacy sessions created before the urgency question was removed.
   if (step === 'URGENT') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, urgentQuestion(categoryId, lang))
-      return
-    }
-
-    if (text === '2') {
-      const urgent = defaultUrgency(categoryId)
-      const next = 'CONFIRM'
-      await updateSession(env, mobile, {
-        is_urgent: true,
-        urgency_code: urgent.code,
-        urgency_reason: urgent.reason,
-        step: next
-      })
-      await sendConfirmation(env, mobile, await getSession(env, mobile))
-      return
-    }
-
-    const next = 'CONFIRM'
     await updateSession(env, mobile, {
-      is_urgent: false, urgency_code: null, urgency_reason: null, step: next
+      is_urgent: false, urgency_code: null, urgency_reason: null, step: 'CONFIRM'
     })
-    await sendConfirmation(env, mobile, await getSession(env, mobile))
+    await askComplaintStep(env, mobile, 'CONFIRM', categoryId)
     return
   }
 
   if (step === 'CONFIRM') {
-    if (!['1', '2'].includes(text)) {
-      await sendWhatsAppMessage(env, mobile, confirmChoiceMessage(lang))
+    if (!['1', '2', '3'].includes(text)) {
+      await sendWhatsAppMessage(env, mobile, confirmChoiceMessage())
+      return
+    }
+    if (text === '3') {
+      await updateSession(env, mobile, { step: 'FLAT_CORRECTION' })
+      await askComplaintStep(env, mobile, 'FLAT_CORRECTION', categoryId)
       return
     }
     if (text === '2') {
       await deleteSession(env, mobile)
-      await sendWhatsAppMessage(env, mobile, cancelMessage(lang))
+      await sendWhatsAppMessage(env, mobile, cancelMessage())
       return
     }
 
@@ -1180,7 +1165,6 @@ async function processConversation(env, mobile, originalText, session) {
       try {
         await notifyPlumberOfNewComplaint(env, complaint, current)
       } catch (error) {
-        // Resident registration must still succeed if the plumber notification fails.
         console.error('Plumber WhatsApp notification failed:', error)
       }
     }
@@ -1188,34 +1172,38 @@ async function processConversation(env, mobile, originalText, session) {
   }
 
   await deleteSession(env, mobile)
-  await sendWhatsAppMessage(env, mobile, lang === 'HI'
-    ? 'शिकायत प्रक्रिया दोबारा शुरू करने के लिए *Hi* भेजें।\n\n— RWA Pocket-A'
-    : 'Please send *Hi* to restart the complaint process.\n\n— RWA Pocket-A')
+  await sendWhatsAppMessage(env, mobile,
+    'Please send *Hi* to restart. / दोबारा शुरू करने के लिए *Hi* भेजें।\\n\\n— RWA Pocket-A')
 }
 
-function languageMenu() {
-  return '*Welcome to RWA Pocket-A Complaint Service* 🙏\n\nPlease select your preferred language.\nकृपया अपनी भाषा चुनें।\n\n*1.* English\n*2.* हिंदी\n\nPlease send only the option number.'
-}
-
-// Set to true to restore Street Light complaint registration.
+// The category numbers remain stable when Street Light is disabled.
+ // Set to true only to restore Street Light complaint registration.
 const STREET_LIGHT_COMPLAINTS_ENABLED = false
 
-function categoryMenu(lang, includeLanguageHint = false) {
-  const menu = fullCategoryMenu(lang)
+function categoryMenu(flatNo = null) {
+  const menu = fullCategoryMenu()
   const visibleMenu = STREET_LIGHT_COMPLAINTS_ENABLED ? menu
-    : menu.split('\n').filter(line => !line.startsWith('*6.*'))
-      .map(line => line.replace(/^\*7\.\*/, '*6.*').replace(/^\*8\.\*/, '*7.*')).join('\n')
-  if (!includeLanguageHint) return visibleMenu
-  return visibleMenu + (lang === 'HI'
-    ? '\n\nभाषा बदलने के लिए *E* भेजें (English)।'
-    : '\n\nTo change language, reply *H* (हिंदी).')
+    : menu.split('\\n').filter(line => !line.startsWith('*6.*'))
+      .map(line => line.replace(/^\\*7\\.\\*/, '*6.*').replace(/^\\*8\\.\\*/, '*7.*')).join('\\n')
+  const saved = isUsableFlat(flatNo)
+    ? `\\n\\nSaved Flat / दर्ज फ्लैट: *${flatNo}* (change at review / पुष्टि के समय बदलें)`
+    : ''
+  return visibleMenu + saved +
+    '\\n\\nFor immediate danger, call society security/supervisor directly. / आपात स्थिति में सीधे सुरक्षा गार्ड/सुपरवाइज़र को फोन करें।'
 }
 
-function fullCategoryMenu(lang) {
-  if (lang === 'HI') {
-    return '*शिकायत का प्रकार चुनें:*\n\n*1.* 🔧 प्लंबर\n*2.* ⚡ इलेक्ट्रीशियन\n*3.* 🚰 सीवरेज समस्या\n*4.* 📹 कैमरा रिकॉर्डिंग\n*5.* 🌿 हॉर्टिकल्चर\n*6.* 💡 स्ट्रीट लाइट\n*7.* 🧹 हाउसकीपिंग/कचरा\n*8.* 📋 अन्य\n\nकृपया केवल विकल्प संख्या भेजें।'
-  }
-  return '*Please select the complaint category:*\n\n*1.* 🔧 Plumber\n*2.* ⚡ Electrician\n*3.* 🚰 Sewerage Issue\n*4.* 📹 Camera Recording\n*5.* 🌿 Horticulture\n*6.* 💡 Street Light\n*7.* 🧹 Housekeeping/Garbage\n*8.* 📋 Other\n\nPlease send only the option number.'
+function fullCategoryMenu() {
+  return '*RWA Pocket-A | Complaint / शिकायत*\\n' +
+    '*Select category / शिकायत का प्रकार चुनें:*\\n\\n' +
+    '*1.* 🔧 Plumber / प्लंबर\\n' +
+    '*2.* ⚡ Electrician / इलेक्ट्रीशियन\\n' +
+    '*3.* 🚰 Sewerage / सीवरेज\\n' +
+    '*4.* 📹 Camera Recording / कैमरा रिकॉर्डिंग\\n' +
+    '*5.* 🌿 Horticulture / हॉर्टिकल्चर\\n' +
+    '*6.* 💡 Street Light / स्ट्रीट लाइट\\n' +
+    '*7.* 🧹 Housekeeping / हाउसकीपिंग-कचरा\\n' +
+    '*8.* 📋 Other / अन्य\\n\\n' +
+    'Reply with option number / विकल्प संख्या भेजें।'
 }
 
 const CATEGORIES = {
@@ -1237,65 +1225,22 @@ function getCategory(text) {
 }
 function getCategoryById(id) { return CATEGORIES[id] || null }
 
-function flatNumberQuestion(lang, category) {
-  return lang === 'HI'
-    ? `आपने *${category.hi}* चुना है।\n\nकृपया अपना *फ्लैट नंबर* भेजें।\nउदाहरण: *36-D*`
-    : `You selected *${category.label}*.\n\nPlease enter your *Flat Number*.\nExample: *36-D*`
+function flatNumberQuestion(category) {
+  return `Selected / चुनी गई श्रेणी: *${category?.label || 'Complaint'} / ${category?.hi || 'शिकायत'}*\\n\\nPlease enter your flat number / अपना फ्लैट नंबर भेजें।\\nExample / उदाहरण: *36-D*`
 }
 
-function urgentQuestion(categoryId, lang) {
-  return lang === 'HI'
-    ? 'शिकायत की प्राथमिकता चुनें:\n\n*1.* सामान्य\n*2.* अत्यावश्यक'
-    : 'Select complaint priority:\n\n*1.* Normal\n*2.* Urgent'
+function incidentDateTimeQuestion() {
+  return 'Please provide the approximate date and time for camera recording.\\nकैमरा रिकॉर्डिंग के लिए अनुमानित दिनांक और समय भेजें।\\nExample / उदाहरण: *20 Sep, 8:30 PM*'
 }
 
-function defaultUrgency(categoryId) {
-  return {
-    1: { code: 'PLUMBING_URGENT', reason: 'Urgent plumbing condition confirmed by resident' },
-    2: { code: 'ELECTRICAL_URGENT', reason: 'Urgent electrical condition confirmed by resident' },
-    3: { code: 'SEWERAGE_URGENT', reason: 'Urgent sewerage condition confirmed by resident' },
-    6: { code: 'STREET_LIGHT_HAZARD', reason: 'Hazardous street-light electrical condition confirmed by resident' }
-  }[categoryId] || { code: 'URGENT', reason: 'Urgent condition confirmed by resident' }
-}
-
-function elderlyQuestion(lang) {
-  return lang === 'HI'
-    ? 'क्या आपकी आयु *70 वर्ष या उससे अधिक* है?\n\n*1.* नहीं\n*2.* हाँ'
-    : 'Are you an *Elderly Citizen (70 years or above)*?\n\n*1.* No\n*2.* Yes'
-}
-
-function addNoteQuestion(lang) {
-  return lang === 'HI'
-    ? 'क्या आप समस्या के बारे में कोई *टिप्पणी/विवरण* जोड़ना चाहते हैं?\n\n*1.* नहीं\n*2.* हाँ'
-    : 'Would you like to add any *note/description* about the problem?\n\n*1.* No\n*2.* Yes'
-}
-
-function descriptionQuestion(lang) {
-  return lang === 'HI'
-    ? `कृपया संक्षिप्त विवरण भेजें। अधिकतम *${MAX_DESCRIPTION} अक्षर*।`
-    : `Please enter a short description. Maximum *${MAX_DESCRIPTION} characters*.`
-}
-
-function incidentDateTimeQuestion(lang) {
-  return lang === 'HI'
-    ? 'कृपया कैमरा रिकॉर्डिंग के लिए अनुमानित *दिनांक और समय* बताएं।\nउदाहरण: *20 सितम्बर, रात लगभग 8:30 बजे*'
-    : 'Please enter the approximate *Date & Time* for the camera recording.\nExample: *20 Sep, around 8:30 PM*'
-}
-
-function issueTypeMenu(categoryId, lang) {
+function issueTypeMenu(categoryId) {
   if (categoryId === 7) {
-    return lang === 'HI'
-      ? '*हाउसकीपिंग/कचरा समस्या चुनें:*\n\n*1.* कचरा नहीं उठाया गया\n*2.* कॉमन एरिया की सफाई\n*3.* झाड़ू/सफाई की समस्या\n*4.* कचरा फेंकने की समस्या\n*5.* अन्य'
-      : '*Select Housekeeping/Garbage issue:*\n\n*1.* Garbage Not Collected\n*2.* Common Area Cleaning\n*3.* Sweeping/Cleaning Issue\n*4.* Garbage Dumping\n*5.* Other'
+    return '*Housekeeping / हाउसकीपिंग:*\\n\\n*1.* Garbage not collected / कचरा नहीं उठाया\\n*2.* Common area cleaning / कॉमन एरिया सफाई\\n*3.* Sweeping issue / झाड़ू-सफाई\\n*4.* Garbage dumping / कचरा फेंकना\\n*5.* Other / अन्य'
   }
   if (categoryId === 5) {
-    return lang === 'HI'
-      ? '*हॉर्टिकल्चर समस्या चुनें:*\n\n*1.* पेड़/शाखा की कटाई\n*2.* घास/पौधों का रखरखाव\n*3.* पानी देने की समस्या\n*4.* गिरा/क्षतिग्रस्त पेड़ या शाखा\n*5.* अन्य'
-      : '*Select Horticulture issue:*\n\n*1.* Tree/Branch Cutting\n*2.* Grass/Plant Maintenance\n*3.* Watering Issue\n*4.* Fallen/Damaged Tree or Branch\n*5.* Other'
+    return '*Horticulture / हॉर्टिकल्चर:*\\n\\n*1.* Tree/branch cutting / पेड़-शाखा कटाई\\n*2.* Grass/plants / घास-पौधे\\n*3.* Watering / पानी देना\\n*4.* Fallen/damaged tree / गिरा-क्षतिग्रस्त पेड़\\n*5.* Other / अन्य'
   }
-  return lang === 'HI'
-    ? '*स्ट्रीट लाइट समस्या चुनें:*\n\n*1.* लाइट काम नहीं कर रही\n*2.* लाइट झपक रही है\n*3.* दिन में लाइट चालू है\n*4.* पोल/वायरिंग की समस्या\n*5.* अन्य'
-    : '*Select Street Light issue:*\n\n*1.* Light Not Working\n*2.* Light Blinking/Flickering\n*3.* Light ON During Daytime\n*4.* Pole/Wiring Issue\n*5.* Other'
+  return '*Street Light / स्ट्रीट लाइट:*\\n\\n*1.* Not working / बंद\\n*2.* Flickering / झपकना\\n*3.* On in daytime / दिन में चालू\\n*4.* Pole or wiring / पोल-वायरिंग\\n*5.* Other / अन्य'
 }
 
 function getIssueType(categoryId, text) {
