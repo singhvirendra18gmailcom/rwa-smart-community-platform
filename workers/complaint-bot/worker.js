@@ -15,6 +15,14 @@ export default {
       return htmlResponse(dataDeletionHtml())
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/web-complaints/config') {
+      return handleWebComplaintConfig()
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/web-complaints/status') {
+      return handleWebComplaintStatus(request, env, url)
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/residents/flat') {
       return handleSupervisorFlatLookup(request, env, url)
     }
@@ -32,12 +40,21 @@ export default {
     if (
       request.method === 'OPTIONS' &&
       (
+        url.pathname.startsWith('/api/web-complaints/') ||
         url.pathname.startsWith('/api/complaints/') ||
         url.pathname.startsWith('/api/residents/') ||
         url.pathname.startsWith('/api/street-lights/')
       )
     ) {
       return apiResponse({ ok: true }, 200)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/web-complaints/register') {
+      return handleWebComplaintRegistration(request, env)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/web-complaints/confirm') {
+      return handleWebComplaintConfirmation(request, env)
     }
 
     if (request.method === 'POST' && url.pathname === '/api/residents/flat') {
@@ -152,6 +169,7 @@ function apiResponse(payload, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
@@ -217,6 +235,219 @@ async function getAuthenticatedUser(request, env) {
 }
 
 
+
+const WEB_COMPLAINT_CATEGORIES = [
+  { option: '1', id: 1, en: 'Plumber', hi: 'प्लंबर', icon: '🔧' },
+  { option: '2', id: 2, en: 'Electrician', hi: 'इलेक्ट्रीशियन', icon: '⚡' },
+  { option: '3', id: 3, en: 'Sewerage', hi: 'सीवरेज', icon: '🚰' },
+  { option: '4', id: 4, en: 'Camera Recording', hi: 'कैमरा रिकॉर्डिंग', icon: '📹' },
+  { option: '5', id: 5, en: 'Horticulture', hi: 'हॉर्टिकल्चर', icon: '🌿' },
+  { option: '6', id: 7, en: 'Housekeeping', hi: 'हाउसकीपिंग', icon: '🧹' },
+  { option: '7', id: 8, en: 'Other', hi: 'अन्य', icon: '📋' }
+]
+
+// All public responses are informational only; no authentication or
+// privileged Supabase credentials are made available to the browser.
+function handleWebComplaintConfig() {
+  return apiResponse({
+    ok: true,
+    categories: WEB_COMPLAINT_CATEGORIES,
+    issue_types: {
+      5: [
+        { option: '1', code: 'TREE_BRANCH_CUTTING', en: 'Tree / branch cutting', hi: 'पेड़/शाखा कटाई' },
+        { option: '2', code: 'GRASS_PLANT_MAINTENANCE', en: 'Grass / plants', hi: 'घास/पौधे' },
+        { option: '3', code: 'WATERING_ISSUE', en: 'Watering', hi: 'पानी देना' },
+        { option: '4', code: 'FALLEN_DAMAGED_TREE_BRANCH', en: 'Fallen / damaged tree', hi: 'गिरा/क्षतिग्रस्त पेड़' },
+        { option: '5', code: 'OTHER', en: 'Other', hi: 'अन्य' }
+      ],
+      7: [
+        { option: '1', code: 'GARBAGE_NOT_COLLECTED', en: 'Garbage not collected', hi: 'कचरा नहीं उठाया' },
+        { option: '2', code: 'COMMON_AREA_CLEANING', en: 'Common area cleaning', hi: 'कॉमन एरिया सफाई' },
+        { option: '3', code: 'SWEEPING_CLEANING_ISSUE', en: 'Sweeping issue', hi: 'झाड़ू-सफाई' },
+        { option: '4', code: 'GARBAGE_DUMPING', en: 'Garbage dumping', hi: 'कचरा फेंकना' },
+        { option: '5', code: 'OTHER', en: 'Other', hi: 'अन्य' }
+      ]
+    },
+    notice: 'Developed and maintained by RWA Pocket-A. / RWA Pocket-A द्वारा विकसित एवं रखरखाव।'
+  })
+}
+
+function parseWebTicket(value) {
+  const raw = String(value || '')
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw)
+    ? raw.toLowerCase() : null
+}
+
+async function findWebComplaint(env, ticket) {
+  const rows = await supabaseRequest(env,
+    `/rest/v1/complaints?web_request_id=eq.${encodeURIComponent(ticket)}&source=eq.WEB&select=id,complaint_no,category_id,flat_no,status,work_start_otp,resident_confirmation,created_at&limit=1`,
+    { method: 'GET' })
+  return Array.isArray(rows) && rows.length ? rows[0] : null
+}
+
+function webComplaintReceipt(complaint, ahead) {
+  return {
+    ok: true,
+    ticket: complaint.web_request_id || null,
+    complaint_no: complaint.complaint_no,
+    category_id: complaint.category_id,
+    flat_no: complaint.flat_no,
+    status: complaint.status,
+    work_start_otp: Number(complaint.category_id) === 1 ? complaint.work_start_otp : null,
+    ...(Number.isInteger(ahead) ? { queue_position: ahead + 1 } : {})
+  }
+}
+
+async function handleWebComplaintStatus(_request, env, url) {
+  try {
+    const ticket = parseWebTicket(url.searchParams.get('ticket'))
+    if (!ticket) return apiResponse({ ok: false, error: 'Invalid complaint ticket.' }, 400)
+    const complaint = await findWebComplaint(env, ticket)
+    if (!complaint) return apiResponse({ ok: false, error: 'Complaint not found on this device.' }, 404)
+    return apiResponse({
+      ...webComplaintReceipt(complaint),
+      ticket,
+      resident_confirmation: complaint.resident_confirmation,
+      created_at: complaint.created_at
+    })
+  } catch (error) {
+    console.error('Web complaint status failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to load complaint status.' }, 500)
+  }
+}
+
+async function validateWebTurnstile(env, token, request) {
+  const secret = env.WEB_TURNSTILE_SECRET_KEY
+  const allowedHostnames = String(env.WEB_TURNSTILE_HOSTNAMES || '')
+    .toLowerCase().split(',').map(v => v.trim()).filter(Boolean)
+  if (!secret || !allowedHostnames.length) return { ok: false, unavailable: true }
+  if (!token || typeof token !== 'string' || token.length > 2048) return { ok: false }
+  const params = new URLSearchParams({ secret, response: token })
+  const ip = request.headers.get('CF-Connecting-IP')
+  if (ip) params.set('remoteip', ip)
+  const check = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  })
+  if (!check.ok) return { ok: false, unavailable: true }
+  const result = await check.json()
+  return { ok: result.success === true &&
+    allowedHostnames.includes(String(result.hostname || '').toLowerCase()) }
+}
+
+async function handleWebComplaintRegistration(request, env) {
+  try {
+    if (!env.WEB_TURNSTILE_SECRET_KEY || !env.WEB_TURNSTILE_HOSTNAMES) {
+      return apiResponse({ ok: false, error: 'Web complaints are not yet configured.' }, 503)
+    }
+    const body = await request.json()
+    const ticket = parseWebTicket(body?.ticket)
+    const category = WEB_COMPLAINT_CATEGORIES.find(c => c.id === Number(body?.category_id))
+    const flat = String(body?.flat_no || '').trim().toUpperCase()
+    const mobile = normalizeResidentMobile(body?.mobile_no)
+    const incidentDateTime = typeof body?.incident_datetime_text === 'string'
+      ? body.incident_datetime_text.trim() : ''
+    const issueType = String(body?.issue_type || '').trim().toUpperCase()
+    if (!ticket || !category || !isUsableFlat(flat) || !mobile) {
+      return apiResponse({ ok: false, error: 'Enter a valid category, flat and contact mobile number.' }, 400)
+    }
+    if (category.id === 4 && (incidentDateTime.length < 3 || incidentDateTime.length > 100)) {
+      return apiResponse({ ok: false, error: 'Camera recording date and time are required.' }, 400)
+    }
+    if ([5, 7].includes(category.id) &&
+        !getIssueType(category.id, String(body?.issue_option || ''))) {
+      return apiResponse({ ok: false, error: 'Choose the issue type.' }, 400)
+    }
+    if (![5, 7].includes(category.id) && issueType) {
+      return apiResponse({ ok: false, error: 'Unexpected issue type.' }, 400)
+    }
+    const selectedIssue = [5, 7].includes(category.id)
+      ? getIssueType(category.id, String(body.issue_option)) : null
+    if (selectedIssue && issueType && selectedIssue !== issueType) {
+      return apiResponse({ ok: false, error: 'Invalid issue type.' }, 400)
+    }
+
+    // Safe retry after a network failure: a random UUID acts as an
+    // unguessable receipt. A prior submission does not create a second row.
+    const existing = await findWebComplaint(env, ticket)
+    if (existing) return apiResponse({ ...webComplaintReceipt(existing), ticket })
+
+    const captcha = await validateWebTurnstile(env, body?.turnstile_token, request)
+    if (!captcha.ok) {
+      return apiResponse({ ok: false, error: captcha.unavailable
+        ? 'Verification unavailable. Please try again later.'
+        : 'Browser verification failed. Please retry the challenge.' }, captcha.unavailable ? 503 : 403)
+    }
+
+    // Small additional limit by the provided contact number. Turnstile is
+    // the primary protection; Cloudflare API rate-limit rules are advised.
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    const recent = await supabaseRequest(env,
+      `/rest/v1/complaints?source=eq.WEB&mobile_no=eq.${encodeURIComponent(mobile)}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=3`,
+      { method: 'GET' })
+    if (Array.isArray(recent) && recent.length >= 3) {
+      return apiResponse({ ok: false, error: 'Too many recent complaints. Please contact the supervisor.' }, 429)
+    }
+
+    const session = {
+      category_id: category.id, flat_no: flat, preferred_language: 'EN',
+      description: null, is_urgent: false, urgency_code: null,
+      urgency_reason: null, elderly_citizen_70_plus: false,
+      issue_type: selectedIssue,
+      incident_datetime_text: category.id === 4 ? incidentDateTime : null,
+      location_text: null
+    }
+    let complaint
+    try {
+      complaint = await createComplaint(env, mobile, session, { source: 'WEB', webRequestId: ticket })
+    } catch (error) {
+      // Unique web_request_id ensures concurrent double-clicks cannot
+      // register duplicate complaints.
+      const concurrent = await findWebComplaint(env, ticket)
+      if (!concurrent) throw error
+      complaint = concurrent
+    }
+    const ahead = await getComplaintsAhead(env, complaint.id)
+    // Do not send WhatsApp notifications: this is the independent fallback
+    // for Meta outages, and the contact number is not verified.
+    return apiResponse({ ...webComplaintReceipt(complaint, ahead), ticket }, 201)
+  } catch (error) {
+    console.error('Web complaint registration failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to register complaint. Please retry.' }, 500)
+  }
+}
+
+async function handleWebComplaintConfirmation(request, env) {
+  try {
+    const body = await request.json()
+    const ticket = parseWebTicket(body?.ticket)
+    if (!ticket || typeof body?.resolved !== 'boolean') {
+      return apiResponse({ ok: false, error: 'Valid complaint ticket and Yes/No response required.' }, 400)
+    }
+    const existing = await findWebComplaint(env, ticket)
+    if (!existing) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
+    if (existing.status !== 'WORK_DONE' && existing.status !== 'RESOLVED') {
+      return apiResponse({ ok: false, error: 'This complaint is not waiting for resident confirmation.' }, 409)
+    }
+    const now = new Date().toISOString()
+    const changes = body.resolved
+      ? { status: 'CLOSED', resident_confirmation: true, resident_confirmed_at: now, closed_at: now, updated_at: now }
+      : { status: 'REOPENED', resident_confirmation: false, resident_confirmed_at: now, reopened_at: now, updated_at: now }
+    const updates = await supabaseRequest(env,
+      `/rest/v1/complaints?id=eq.${existing.id}&status=in.(WORK_DONE,RESOLVED)&source=eq.WEB`, {
+        method: 'PATCH', headers: { Prefer: 'return=representation' },
+        body: JSON.stringify(changes)
+      })
+    if (!Array.isArray(updates) || !updates.length) {
+      return apiResponse({ ok: false, error: 'Complaint was already updated.' }, 409)
+    }
+    return apiResponse({ ok: true, status: changes.status })
+  } catch (error) {
+    console.error('Web complaint confirmation failed:', error)
+    return apiResponse({ ok: false, error: 'Unable to save confirmation.' }, 500)
+  }
+}
+
 async function requireSupervisor(request, env) {
   const user = await getAuthenticatedUser(request, env)
   if (!user?.id) return { error: apiResponse({ ok: false, error: 'Authentication required.' }, 401) }
@@ -252,7 +483,7 @@ async function resolveResidentFlat(env, mobile) {
     }
   }
   const history = await supabaseRequest(env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&source=eq.WHATSAPP&flat_no=not.is.null&select=flat_no&order=created_at.desc&limit=5`,
     { method: 'GET' })
   const latest = Array.isArray(history) ? history.find(row => isUsableFlat(row.flat_no)) : null
   return {
@@ -846,7 +1077,7 @@ async function handleSupervisorDone(request, env) {
     const body = await request.json()
     const complaintId = Number(body?.complaint_id)
     const rows = await supabaseRequest(env,
-      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,category_id,preferred_language`,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,category_id,preferred_language,source`,
       { method: 'GET' })
     if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
     const complaint = rows[0]
@@ -861,6 +1092,11 @@ async function handleSupervisorDone(request, env) {
       body: JSON.stringify({ status: 'WORK_DONE', work_done_at: now, updated_at: now })
     })
 
+    // A web-only complaint must not require Meta WhatsApp availability.
+    // Its resident uses the same public web chat ticket to confirm work.
+    if (complaint.source === 'WEB') {
+      return apiResponse({ ok: true, status: 'WORK_DONE', confirmation_channel: 'WEB', whatsapp_sent: false }, 200)
+    }
     const message = workDoneConfirmationMessage(complaint)
     await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
     return apiResponse({ ok: true, status: 'WORK_DONE', whatsapp_sent: true }, 200)
@@ -877,7 +1113,7 @@ async function handleWorkerDone(request, env) {
     const body = await request.json()
     const complaintId = Number(body?.complaint_id)
     const rows = await supabaseRequest(env,
-      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,category_id,preferred_language`,
+      `/rest/v1/complaints?id=eq.${complaintId}&select=id,complaint_no,mobile_no,status,category_id,preferred_language,source`,
       { method: 'GET' })
     if (!Array.isArray(rows) || !rows.length) return apiResponse({ ok: false, error: 'Complaint not found.' }, 404)
     const complaint = rows[0]
@@ -889,6 +1125,11 @@ async function handleWorkerDone(request, env) {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ status: 'WORK_DONE', work_done_at: now, updated_at: now })
     })
+    // A web-only complaint must not require Meta WhatsApp availability.
+    // Its resident uses the same public web chat ticket to confirm work.
+    if (complaint.source === 'WEB') {
+      return apiResponse({ ok: true, status: 'WORK_DONE', confirmation_channel: 'WEB', whatsapp_sent: false }, 200)
+    }
     const message = workDoneConfirmationMessage(complaint)
     await sendWhatsAppMessage(env, normalizeMobile(complaint.mobile_no), message)
     return apiResponse({ ok: true, status: 'WORK_DONE', whatsapp_sent: true }, 200)
@@ -1384,7 +1625,7 @@ function confirmChoiceMessage() {
   return '*1.* Register / शिकायत दर्ज करें\n*2.* Cancel / रद्द करें'
 }
 
-async function createComplaint(env, mobile, session) {
+async function createComplaint(env, mobile, session, options = {}) {
   const now = new Date().toISOString()
   const description = session.description || buildDefaultDescription(session)
   const payload = {
@@ -1393,7 +1634,8 @@ async function createComplaint(env, mobile, session) {
     mobile_no: mobile,
     description,
     status: 'OPEN',
-    source: 'WHATSAPP',
+    source: options.source || 'WHATSAPP',
+    ...(options.webRequestId ? { web_request_id: options.webRequestId } : {}),
     opened_at: now,
     created_at: now,
     updated_at: now,
