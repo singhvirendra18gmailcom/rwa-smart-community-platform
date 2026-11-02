@@ -158,10 +158,18 @@ export default {
         }
 
         const session = await getSession(env, from)
-        if (!session) {
-          const handled = await handleResidentWorkDoneReply(env, from, originalText)
-          if (handled) return webhookResponse()
 
+        // Numeric replies to "Is your problem resolved?" must be routed to
+        // the completed complaint BEFORE a stale CATEGORY/CONFIRM session can
+        // interpret "1" as "Plumber" and register an unrelated complaint.
+        // If the resident explicitly sent Hi AFTER the work-done prompt,
+        // the newer registration session takes precedence instead.
+        if ((!session || ['1', '2'].includes(originalText)) &&
+            await handleResidentWorkDoneReply(env, from, originalText, session)) {
+          return webhookResponse()
+        }
+
+        if (!session) {
           await sendWhatsAppMessage(env, from, 'Please send *Hi* to register a complaint.\n\nशिकायत दर्ज करने के लिए *Hi* भेजें।\n\n— RWA Pocket-A')
           return webhookResponse()
         }
@@ -1283,42 +1291,67 @@ async function reopenComplaint(env, mobile, complaintNo) {
     `Complaint *${complaintNo}* reopened. / शिकायत *${complaintNo}* दोबारा खोली गई है। 🔄\n\n— RWA Pocket-A`)
 }
 
-async function handleResidentWorkDoneReply(env, mobile, originalText) {
+// Replies "1" (Yes) and "2" (No) share their numbers with complaint
+// categories. A work-done prompt beats an *older* registration session,
+// but a newer explicit Hi creates a fresh session and remains selectable.
+function isNewerRegistrationSession(session, complaint) {
+  if (!session) return false
+  const sessionAt = Date.parse(session.updated_at || '')
+  const promptedAt = Date.parse(complaint.confirmation_sent_at || complaint.work_done_at || '')
+  return Number.isFinite(sessionAt) && Number.isFinite(promptedAt) && sessionAt > promptedAt
+}
+
+async function handleResidentWorkDoneReply(env, mobile, originalText, session = null) {
   const reply = String(originalText || '').trim()
-  // Rating is no longer requested or collected.
+  if (session && !['1', '2'].includes(reply)) return false
+
+  // WEB complaints have an unverified contact number and must ONLY be
+  // confirmed by their browser-held ticket, never via WhatsApp.
   const rows = await supabaseRequest(env,
-    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&status=eq.WORK_DONE&order=updated_at.desc&limit=1&select=id,complaint_no,status`,
+    `/rest/v1/complaints?mobile_no=eq.${encodeURIComponent(mobile)}&source=eq.WHATSAPP&status=eq.WORK_DONE&order=updated_at.desc&limit=1&select=id,complaint_no,status,work_done_at,confirmation_sent_at`,
     { method: 'GET' })
   if (!Array.isArray(rows) || !rows.length) return false
 
   const complaint = rows[0]
-  const now = new Date().toISOString()
+  if (isNewerRegistrationSession(session, complaint)) {
+    return false
+  }
+
   if (!['1', '2'].includes(reply)) {
     await sendWhatsAppMessage(env, mobile, workDoneConfirmationMessage(complaint))
     return true
   }
 
-  if (reply === '2') {
-    await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
-      method: 'PATCH', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        status: 'REOPENED', resident_confirmation: false,
-        resident_confirmed_at: now, reopened_at: now, updated_at: now
-      })
+  const now = new Date().toISOString()
+  const updates = reply === '1'
+    ? { status: 'CLOSED', resident_confirmation: true,
+        resident_confirmed_at: now, closed_at: now, updated_at: now }
+    : { status: 'REOPENED', resident_confirmation: false,
+        resident_confirmed_at: now, reopened_at: now, updated_at: now }
+
+  // Conditional update prevents two numeric replies from changing the
+  // outcome once the complaint leaves WORK_DONE. Always consume the reply
+  // even when another request processed it concurrently.
+  const changed = await supabaseRequest(env,
+    `/rest/v1/complaints?id=eq.${complaint.id}&source=eq.WHATSAPP&status=eq.WORK_DONE`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify(updates)
     })
-    await sendWhatsAppMessage(env, mobile,
-      `Complaint *${complaint.complaint_no}* reopened. / शिकायत *${complaint.complaint_no}* दोबारा खोली गई है। 🔄\n\n— RWA Pocket-A`)
-    return true
+
+  if (session) {
+    // A stale in-flight category session must never catch a second "1"
+    // after the completed complaint has been acknowledged.
+    await deleteSession(env, mobile)
   }
 
-  await supabaseRequest(env, `/rest/v1/complaints?id=eq.${complaint.id}`, {
-    method: 'PATCH', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      status: 'CLOSED', resident_confirmation: true, resident_confirmed_at: now,
-      closed_at: now, updated_at: now
-    })
-  })
-  // No rating question, no closure thank-you, no extra outgoing message.
+  if (Array.isArray(changed) && !changed.length) return true
+
+  if (reply === '2') {
+    await sendWhatsAppMessage(env, mobile,
+      `Complaint *${complaint.complaint_no}* reopened. / शिकायत *${complaint.complaint_no}* दोबारा खोली गई है। 🔄\n\n— RWA Pocket-A`)
+  }
+  // Yes closes silently: no rating, thank-you or extra WhatsApp send.
   return true
 }
 
