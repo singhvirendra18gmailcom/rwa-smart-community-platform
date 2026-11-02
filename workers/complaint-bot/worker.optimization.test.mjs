@@ -82,7 +82,9 @@ function mockServices({ priorFlats = [], workDoneComplaint = null, supervisorRol
         return json(state.previousFlats.map(flat_no => ({ flat_no })))
       }
       if (method === 'GET' && select.includes('status') && select.includes('complaint_no')) {
-        return json(state.workDoneComplaint?.status === 'WORK_DONE' ? [state.workDoneComplaint] : [])
+        const pending = state.workDoneComplaint
+        return json(pending?.status === 'WORK_DONE' &&
+          (pending.source || 'WHATSAPP') === 'WHATSAPP' ? [pending] : [])
       }
       if (method === 'GET' && select.includes('category_id') && uri.searchParams.has('id')) {
         return json(state.complaints.filter(c => String(c.id) === uri.searchParams.get('id')?.slice(3)))
@@ -95,8 +97,15 @@ function mockServices({ priorFlats = [], workDoneComplaint = null, supervisorRol
       }
       if (method === 'PATCH') {
         const target = state.workDoneComplaint || state.complaints[0]
-        if (target) Object.assign(target, payload)
-        return new Response(null, { status: 204 })
+        const expectedStatus = uri.searchParams.get('status')?.slice(3)
+        const expectedSource = uri.searchParams.get('source')?.slice(3)
+        const canUpdate = target &&
+          (!expectedStatus || target.status === expectedStatus) &&
+          (!expectedSource || (target.source || 'WHATSAPP') === expectedSource)
+        if (canUpdate) Object.assign(target, payload)
+        return options.headers?.Prefer?.includes('return=representation')
+          ? json(canUpdate ? [target] : [])
+          : new Response(null, { status: 204 })
       }
     }
     if (uri.pathname === '/rest/v1/workers' && method === 'GET') {
@@ -234,6 +243,78 @@ test('camera recording registers directly after date/time input', async () => {
     assert.equal(mock.state.complaints[0].incident_datetime_text, '2 Nov, 8 PM')
     assert.equal(mock.residentMessages().length, 3)
     assert.match(mock.residentMessages()[2].text, /Complaint registered/)
+  } finally { mock.restore() }
+})
+
+
+test('work completion Yes wins over a stale category session and never creates a new plumber complaint', async () => {
+  const mock = mockServices({ priorFlats: ['36-D'], workDoneComplaint: {
+    id: 301, complaint_no: 'P301', source: 'WHATSAPP',
+    status: 'WORK_DONE', work_done_at: new Date().toISOString()
+  } })
+  try {
+    await say('Hi')
+    assert.equal(mock.state.session.step, 'CATEGORY')
+    assert.equal(mock.state.session.flat_no, '36-D')
+
+    // Reproduce the real-world bug: the resident already had a Hi/menu
+    // session open when the work-completion question arrived later.
+    mock.state.session.updated_at = new Date(Date.now() - 60000).toISOString()
+    const sentBefore = mock.residentMessages().length
+    await say('1')
+
+    assert.equal(mock.state.workDoneComplaint.status, 'CLOSED')
+    assert.equal(mock.state.workDoneComplaint.resident_confirmation, true)
+    assert.equal(mock.state.complaints.length, 0, 'No second plumber complaint is created')
+    assert.equal(mock.state.session, null, 'Old menu is invalidated')
+    assert.equal(mock.residentMessages().length, sentBefore, 'Yes closes silently')
+
+    await say('1') // A separate/duplicated Yes must also not register.
+    assert.equal(mock.state.complaints.length, 0)
+  } finally { mock.restore() }
+})
+
+test('work completion No wins over an older active category session and reopens only the original complaint', async () => {
+  const mock = mockServices({ priorFlats: ['36-D'], workDoneComplaint: {
+    id: 302, complaint_no: 'P302', source: 'WHATSAPP',
+    status: 'WORK_DONE', work_done_at: new Date().toISOString()
+  } })
+  try {
+    await say('Hi')
+    mock.state.session.updated_at = new Date(Date.now() - 60000).toISOString()
+    await say('2')
+    assert.equal(mock.state.workDoneComplaint.status, 'REOPENED')
+    assert.equal(mock.state.workDoneComplaint.resident_confirmation, false)
+    assert.equal(mock.state.complaints.length, 0)
+    assert.equal(mock.state.session, null)
+    assert.match(mock.residentMessages().at(-1).text, /reopened/)
+  } finally { mock.restore() }
+})
+
+test('explicit Hi after an old completion prompt starts a new complaint normally', async () => {
+  const mock = mockServices({ priorFlats: ['36-D'], workDoneComplaint: {
+    id: 303, complaint_no: 'P303', source: 'WHATSAPP',
+    status: 'WORK_DONE', work_done_at: new Date(Date.now() - 3600000).toISOString()
+  } })
+  try {
+    await say('Hi') // Deliberate new registration after old work-done prompt.
+    assert.equal(mock.state.session.step, 'CATEGORY')
+    await say('1')
+    assert.equal(mock.state.complaints.length, 1)
+    assert.equal(mock.state.complaints[0].category_id, 1)
+    assert.equal(mock.state.workDoneComplaint.status, 'WORK_DONE')
+  } finally { mock.restore() }
+})
+
+test('WhatsApp acknowledgement cannot close an unverified WEB-only complaint for the same mobile number', async () => {
+  const mock = mockServices({ workDoneComplaint: {
+    id: 304, complaint_no: 'P304', source: 'WEB', status: 'WORK_DONE'
+  } })
+  try {
+    await say('1')
+    assert.equal(mock.state.workDoneComplaint.status, 'WORK_DONE')
+    assert.equal(mock.state.complaints.length, 0)
+    assert.match(mock.residentMessages().at(-1).text, /Hi/)
   } finally { mock.restore() }
 })
 
