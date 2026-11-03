@@ -167,7 +167,7 @@ function bilingual(text) {
 }
 
 
-test('returning resident gets a short bilingual WhatsApp CTA button, not a raw URL', async () => {
+test('returning resident gets CTA first, then bilingual explanation without a raw link', async () => {
   const mock = mockServices({
     priorFlats: ['36-D'], todaysWhatsappFlats: ['36D']
   })
@@ -175,17 +175,24 @@ test('returning resident gets a short bilingual WhatsApp CTA button, not a raw U
     await say('Hi')
     assert.equal(mock.state.complaints.length, 0)
     assert.equal(mock.state.session, null)
-    assert.equal(mock.residentMessages().length, 1)
-    const msg = mock.residentMessages()[0]
-    assert.equal(msg.type, 'interactive')
-    assert.equal(msg.interactive.type, 'cta_url')
-    assert.equal(msg.interactive.action.name, 'cta_url')
-    assert.equal(msg.interactive.action.parameters.display_text, 'Open Complaint App')
-    assert.equal(msg.interactive.action.parameters.url, 'https://rwa-ai.pages.dev/?view=complaint-chat')
-    assert.equal(msg.interactive.footer.text, 'RWA Pocket-A')
-    assert.match(msg.text, /A complaint from your flat has already been registered/i)
-    assert.doesNotMatch(msg.text, /https?:\/\//, 'Never expose a raw URL in the message')
-    bilingual(msg.text)
+    const messages = mock.residentMessages()
+    assert.equal(messages.length, 2)
+    const [cta, explanation] = messages
+    assert.equal(cta.type, 'interactive')
+    assert.equal(cta.interactive.type, 'cta_url')
+    assert.equal(cta.interactive.action.name, 'cta_url')
+    assert.equal(cta.interactive.action.parameters.display_text, 'Register Complaint')
+    assert.ok(cta.interactive.action.parameters.display_text.length <= 20)
+    assert.equal(cta.interactive.action.parameters.url, 'https://rwa-ai.pages.dev/?view=complaint-chat')
+    assert.equal(cta.interactive.header, undefined, 'Do not add a header above CTA')
+    assert.match(cta.text, /Register complaint here/)
+    assert.doesNotMatch(cta.text, /https?:\/\//)
+
+    assert.equal(explanation.type, 'text')
+    assert.match(explanation.text, /Complaint already registered/)
+    assert.match(explanation.text, /button above/)
+    assert.doesNotMatch(explanation.text, /https?:\/\//)
+    bilingual(explanation.text)
     assert.equal(mock.state.dailyQueries.length, 1)
     assert.match(mock.state.dailyQueries[0].from, /T18:30:00.000Z$/)
     assert.match(mock.state.dailyQueries[0].to, /T18:30:00.000Z$/)
@@ -200,12 +207,13 @@ test('new mobile cannot submit another WhatsApp complaint against same flat toda
     await say('36-D')
     assert.equal(mock.state.complaints.length, 0)
     assert.equal(mock.state.session, null)
-    const msg = mock.residentMessages().at(-1)
-    assert.equal(msg.type, 'interactive')
-    assert.equal(msg.interactive.action.parameters.display_text, 'Open Complaint App')
-    assert.match(msg.text, /Need to register another complaint/)
-    assert.doesNotMatch(msg.text, /https?:\/\//)
-    assert.match(msg.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
+    const [cta, explanation] = mock.residentMessages().slice(-2)
+    assert.equal(cta.type, 'interactive')
+    assert.equal(cta.interactive.action.parameters.display_text, 'Register Complaint')
+    assert.match(cta.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
+    assert.equal(explanation.type, 'text')
+    assert.match(explanation.text, /button above/)
+    assert.doesNotMatch(explanation.text, /https?:\/\//)
     assert.equal(mock.state.messagesSent.filter(x=>x.recipient==='919000000002').length,0)
   } finally { mock.restore() }
 })
@@ -218,11 +226,13 @@ test('database race conflict is translated to bilingual web link, never a webhoo
     await say('36-D')
     assert.equal(mock.state.complaints.length,0)
     assert.equal(mock.state.session,null)
-    const msg = mock.residentMessages().at(-1)
-    assert.equal(msg.type, 'interactive')
-    assert.match(msg.text, /A complaint from your flat/)
-    assert.doesNotMatch(msg.text, /https?:\/\//)
-    assert.match(msg.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
+    const [cta, explanation] = mock.residentMessages().slice(-2)
+    assert.equal(cta.type, 'interactive')
+    assert.match(cta.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
+    assert.equal(cta.interactive.action.parameters.display_text, 'Register Complaint')
+    assert.equal(explanation.type, 'text')
+    assert.match(explanation.text, /Your flat has already registered/)
+    assert.doesNotMatch(explanation.text, /https?:\/\//)
   } finally { mock.restore() }
 })
 
