@@ -1,6 +1,7 @@
 // RWA Pocket-A WhatsApp Complaint Bot
 // Source-controlled Cloudflare Worker. Secrets are configured in Cloudflare, never in this file.
 // Deployment is managed from GitHub through Cloudflare Builds.
+// Keep the web complaint Turnstile bindings configured in wrangler.jsonc when deploying.
 
 const GRAPH_API_VERSION = 'v26.0'
 
