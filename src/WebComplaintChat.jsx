@@ -91,7 +91,7 @@ function ComplaintReceipt({ receipt, categories }) {
   const category = categories?.find(item => item.id === Number(receipt.category_id))
   return (
     <section className="webchat-receipt" aria-label="Complaint receipt">
-      <div className="webchat-receipt-title"><ClipboardCheck size={19} /> Complaint details / शिकायत विवरण</div>
+      <div className="webchat-receipt-title"><ClipboardCheck size={19} /> Registered complaint details / दर्ज शिकायत का विवरण</div>
       <div className="webchat-receipt-grid">
         <span>Complaint No. / शिकायत संख्या</span><strong>{receipt.complaint_no}</strong>
         {category && <><span>Category / श्रेणी</span><strong>{category.en} / {category.hi}</strong></>}
@@ -400,6 +400,15 @@ export default function WebComplaintChat() {
     setMessages([]); setError(''); setStep('CATEGORY')
     bot('Select complaint category / शिकायत का प्रकार चुनें:')
   }
+  const registerAnotherComplaint = () => {
+    // The previous complaint is already saved. Require a conscious decision
+    // before clearing the on-screen receipt and beginning a new conversation.
+    if (!window.confirm(
+      'Your current complaint has already been registered. Do you want to register a separate complaint?\n\n' +
+      'आपकी वर्तमान शिकायत दर्ज हो चुकी है। क्या आप एक अलग शिकायत दर्ज करना चाहते हैं?'
+    )) return
+    restart()
+  }
   const forget = () => {
     setMenuOpen(false)
     if (!window.confirm('Forget saved flat, contact number and complaint ticket from this browser?')) return
@@ -472,16 +481,22 @@ const serviceUnavailable = step === 'UNAVAILABLE'
           </button>
         )}
 
-        {step === 'DONE' && (
-          <button className="webchat-action" type="button" onClick={restart}>
-            New complaint / नई शिकायत
+        {canCheckStatus && (
+          <button
+            className={step === 'DONE' ? 'webchat-status webchat-status-primary' : 'webchat-status'}
+            type="button" disabled={busy} onClick={checkStatus}
+          >
+            <RefreshCw size={15} aria-hidden="true" />
+            {step === 'DONE'
+              ? 'Track registered complaint / दर्ज शिकायत की स्थिति देखें'
+              : 'Check last complaint / पिछली शिकायत देखें'}
           </button>
         )}
 
-        {canCheckStatus && (
-          <button className="webchat-status" type="button" disabled={busy} onClick={checkStatus}>
-            <RefreshCw size={15} aria-hidden="true" />
-            Check last complaint / पिछली शिकायत देखें
+        {step === 'DONE' && (
+          <button className="webchat-new-secondary" type="button" disabled={busy}
+            onClick={registerAnotherComplaint}>
+            Register another complaint / दूसरी शिकायत दर्ज करें
           </button>
         )}
         <div ref={end} aria-hidden="true" />
