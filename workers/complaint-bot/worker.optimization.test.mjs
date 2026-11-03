@@ -84,7 +84,8 @@ function mockServices({
     if (uri.pathname === '/rest/v1/complaints') {
       const select = uri.searchParams.get('select') || ''
       if (method === 'GET' && select === 'flat_no') {
-        if (uri.searchParams.get('source') === 'eq.WHATSAPP') {
+        if (uri.searchParams.get('source') === 'eq.WHATSAPP' &&
+            uri.searchParams.getAll('created_at').length === 2) {
           state.dailyQueries.push({
             from: uri.searchParams.get('created_at')?.slice(4),
             to: uri.searchParams.getAll('created_at')[1]?.slice(3)
