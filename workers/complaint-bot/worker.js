@@ -1428,24 +1428,29 @@ async function hasWhatsappComplaintToday(env, flatNo) {
 }
 
 function whatsappDailyLimitMessage() {
-  return 'A complaint from your flat has already been registered on WhatsApp today.\n' +
-    'आपके फ्लैट से आज व्हाट्सऐप पर शिकायत पहले ही दर्ज हो चुकी है।\n\n' +
-    'Need to register another complaint? Tap the button below (no login).\n' +
-    'एक और शिकायत दर्ज करनी है? नीचे बटन दबाएँ (लॉगिन नहीं चाहिए)।'
+  return '*Complaint already registered / शिकायत पहले से दर्ज है*\n\n' +
+    'Your flat has already registered a WhatsApp complaint today. ' +
+    'For another complaint, use the button above.\n' +
+    'आपके फ्लैट से आज व्हाट्सऐप पर शिकायत पहले ही दर्ज हो चुकी है। ' +
+    'दूसरी शिकायत के लिए ऊपर दिए गए बटन का उपयोग करें।\n\n' +
+    '— RWA Pocket-A'
 }
 
 async function sendWhatsappDailyLimitMessage(env, mobile) {
   await deleteSession(env, mobile)
-  // A WhatsApp CTA URL button makes the public app a single tap away;
-  // the raw link is deliberately absent from the chat message text.
   const url = getWebComplaintPublicUrl(env) ||
     'https://rwa-ai.pages.dev/?view=complaint-chat'
+
+  // Native URL buttons are always shown BELOW their own message body.
+  // Send a short CTA first, then a separate explanation so the button
+  // appears ABOVE the explanation in the resident's conversation.
+  // Meta limits button display_text to 20 characters.
   await sendWhatsAppCtaUrlButton(env, mobile, {
-    header: 'Complaint Already Registered',
-    body: whatsappDailyLimitMessage(),
-    button: 'Open Complaint App',
+    body: 'Register complaint here / यहाँ शिकायत दर्ज करें',
+    button: 'Register Complaint',
     url
   })
+  await sendWhatsAppMessage(env, mobile, whatsappDailyLimitMessage())
 }
 
 function nextStepForCategory(categoryId) {
