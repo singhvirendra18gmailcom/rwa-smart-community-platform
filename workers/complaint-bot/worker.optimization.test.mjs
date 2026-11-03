@@ -189,11 +189,11 @@ test('returning resident gets CTA first, then bilingual explanation without a ra
     assert.doesNotMatch(cta.text, /https?:\/\//)
 
     assert.equal(explanation.type, 'text')
-    assert.match(explanation.text, /WhatsApp daily limit reached/)
-    assert.match(explanation.text, /additional complaints/)
+    assert.match(explanation.text, /WhatsApp allows/)
+    assert.match(explanation.text, /For more, tap/)
     assert.match(explanation.text, /Register Complaint/)
-    assert.match(explanation.text, /एक फ्लैट की प्रतिदिन केवल एक शिकायत/)
-    assert.match(explanation.text, /one complaint per flat per day/)
+    assert.match(explanation.text, /हर फ्लैट से रोज़ केवल 1 शिकायत/)
+    assert.match(explanation.text, /1 complaint per flat per day/)
     assert.doesNotMatch(explanation.text, /https?:\/\//)
     bilingual(explanation.text)
     assert.equal(mock.state.dailyQueries.length, 1)
@@ -215,7 +215,7 @@ test('new mobile cannot submit another WhatsApp complaint against same flat toda
     assert.equal(cta.interactive.action.parameters.display_text, 'Register Complaint')
     assert.match(cta.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
     assert.equal(explanation.type, 'text')
-    assert.match(explanation.text, /one complaint per flat per day/)
+    assert.match(explanation.text, /1 complaint per flat per day/)
     assert.doesNotMatch(explanation.text, /https?:\/\//)
     assert.equal(mock.state.messagesSent.filter(x=>x.recipient==='919000000002').length,0)
   } finally { mock.restore() }
@@ -234,7 +234,7 @@ test('database race conflict is translated to bilingual web link, never a webhoo
     assert.match(cta.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
     assert.equal(cta.interactive.action.parameters.display_text, 'Register Complaint')
     assert.equal(explanation.type, 'text')
-    assert.match(explanation.text, /Your flat has reached this limit today/)
+    assert.match(explanation.text, /WhatsApp allows/)
     assert.doesNotMatch(explanation.text, /https?:\/\//)
   } finally { mock.restore() }
 })

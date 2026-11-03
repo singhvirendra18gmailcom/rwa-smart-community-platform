@@ -1428,13 +1428,9 @@ async function hasWhatsappComplaintToday(env, flatNo) {
 }
 
 function whatsappDailyLimitMessage() {
-  return '*WhatsApp daily limit reached / व्हाट्सऐप की दैनिक सीमा पूरी*\n\n' +
-    'Only *one complaint per flat per day* is allowed through WhatsApp. ' +
-    'Your flat has reached this limit today.\n' +
-    'व्हाट्सऐप से *एक फ्लैट की प्रतिदिन केवल एक शिकायत* दर्ज की जा सकती है। ' +
-    'आपके फ्लैट की आज की सीमा पूरी हो चुकी है।\n\n' +
-    'For *additional complaints*, please tap the *Register Complaint* button above to use the web app.\n' +
-    '*अतिरिक्त शिकायतें* दर्ज करने के लिए ऊपर दिए गए *Register Complaint* बटन पर टैप करके वेब ऐप खोलें।\n\n' +
+  return 'WhatsApp allows *1 complaint per flat per day*. For more, tap *Register Complaint* above.\n\n' +
+    'व्हाट्सऐप पर *हर फ्लैट से रोज़ केवल 1 शिकायत* दर्ज होगी। ' +
+    'अन्य शिकायत के लिए ऊपर *Register Complaint* दबाएँ।\n\n' +
     '— RWA Pocket-A'
 }
 
