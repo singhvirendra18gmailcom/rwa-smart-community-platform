@@ -9,6 +9,7 @@ on:
       - feature/web-complaint-whatsapp-ui-redesign
     paths:
       - 'workers/complaint-bot/worker.js'
+      - 'workers/complaint-bot/wrangler.jsonc'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
       - 'workers/complaint-bot/worker.web-chat.test.mjs'
       - 'src/WebComplaintChat.jsx'
@@ -24,6 +25,7 @@ on:
   pull_request:
     paths:
       - 'workers/complaint-bot/worker.js'
+      - 'workers/complaint-bot/wrangler.jsonc'
       - 'workers/complaint-bot/worker.optimization.test.mjs'
       - 'workers/complaint-bot/worker.web-chat.test.mjs'
       - 'src/WebComplaintChat.jsx'
@@ -48,6 +50,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify Worker web-complaint configuration
+        run: |
+          node -e "const fs=require('node:fs');const assert=require('node:assert/strict');const c=JSON.parse(fs.readFileSync('workers/complaint-bot/wrangler.jsonc','utf8'));assert.equal(c.keep_vars,true);assert.equal(c.vars.WEB_TURNSTILE_HOSTNAMES,'rwa-ai.pages.dev');assert.equal(c.vars.WEB_COMPLAINT_PUBLIC_URL,'https://rwa-ai.pages.dev/?view=complaint-chat');assert.equal(c.WEB_TURNSTILE_SECRET_KEY,undefined);assert.equal(c.vars.WEB_TURNSTILE_SECRET_KEY,undefined);"
       - name: Run simulated WhatsApp and Supabase tests
         run: node --test workers/complaint-bot/worker.optimization.test.mjs workers/complaint-bot/worker.web-chat.test.mjs
 

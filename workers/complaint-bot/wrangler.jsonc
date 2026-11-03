@@ -3,5 +3,10 @@
   "name": "rwa-complaint-bot",
   "main": "worker.js",
   "compatibility_date": "2026-09-20",
-  "workers_dev": true
+  "workers_dev": true,
+  "keep_vars": true,
+  "vars": {
+    "WEB_TURNSTILE_HOSTNAMES": "rwa-ai.pages.dev",
+    "WEB_COMPLAINT_PUBLIC_URL": "https://rwa-ai.pages.dev/?view=complaint-chat"
+  }
 }
