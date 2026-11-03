@@ -12,7 +12,8 @@ const env = {
   SUPABASE_URL: 'https://supabase.example.test',
   SUPABASE_SERVICE_ROLE_KEY: 'not-a-real-key',
   WHATSAPP_ACCESS_TOKEN: 'not-a-real-token',
-  WHATSAPP_PHONE_NUMBER_ID: 'test-phone-id'
+  WHATSAPP_PHONE_NUMBER_ID: 'test-phone-id',
+  WEB_COMPLAINT_PUBLIC_URL: 'https://rwa-ai.pages.dev/?view=complaint-chat'
 }
 
 function json(value, status = 200) {
@@ -21,10 +22,14 @@ function json(value, status = 200) {
   })
 }
 
-function mockServices({ priorFlats = [], workDoneComplaint = null, supervisorRole = 'SUPERVISOR' } = {}) {
+function mockServices({
+  priorFlats = [], workDoneComplaint = null, supervisorRole = 'SUPERVISOR',
+  todaysWhatsappFlats = [], forceDailyDbConflict = false
+} = {}) {
   const state = {
     claimedIds: new Set(), messagesSent: [], session: null,
     previousFlats: priorFlats, complaints: [], mapping: null, supervisorRole,
+    todaysWhatsappFlats, forceDailyDbConflict, dailyQueries: [],
     workDoneComplaint: workDoneComplaint ? { ...workDoneComplaint } : null
   }
   const priorFetch = globalThis.fetch
@@ -79,6 +84,18 @@ function mockServices({ priorFlats = [], workDoneComplaint = null, supervisorRol
     if (uri.pathname === '/rest/v1/complaints') {
       const select = uri.searchParams.get('select') || ''
       if (method === 'GET' && select === 'flat_no') {
+        if (uri.searchParams.get('source') === 'eq.WHATSAPP' &&
+            uri.searchParams.getAll('created_at').length === 2) {
+          state.dailyQueries.push({
+            from: uri.searchParams.get('created_at')?.slice(4),
+            to: uri.searchParams.getAll('created_at')[1]?.slice(3)
+          })
+          return json([
+            ...state.todaysWhatsappFlats.map(flat_no => ({ flat_no })),
+            ...state.complaints.filter(x => x.source === 'WHATSAPP')
+              .map(x => ({ flat_no: x.flat_no }))
+          ])
+        }
         return json(state.previousFlats.map(flat_no => ({ flat_no })))
       }
       if (method === 'GET' && select.includes('status') && select.includes('complaint_no')) {
@@ -91,6 +108,9 @@ function mockServices({ priorFlats = [], workDoneComplaint = null, supervisorRol
       }
       if (method === 'GET' && select.includes('category_id')) return json(state.complaints)
       if (method === 'POST') {
+        if (payload.source === 'WHATSAPP' && state.forceDailyDbConflict) {
+          return json({ code:'23505', message:'RWA_WHATSAPP_DAILY_FLAT_LIMIT' }, 409)
+        }
         const row = { id: 101 + state.complaints.length, complaint_no: 'P999', work_start_otp: '1234', ...payload }
         state.complaints.push(row)
         return json([row], 201)
@@ -139,6 +159,63 @@ function bilingual(text) {
   assert.match(text, /[a-zA-Z]{3,}/)
   assert.match(text, /[\u0900-\u097f]/)
 }
+
+
+test('returning resident with WhatsApp complaint today receives only the web link', async () => {
+  const mock = mockServices({
+    priorFlats: ['36-D'], todaysWhatsappFlats: ['36D']
+  })
+  try {
+    await say('Hi')
+    assert.equal(mock.state.complaints.length, 0)
+    assert.equal(mock.state.session, null)
+    assert.equal(mock.residentMessages().length, 1)
+    assert.match(mock.residentMessages()[0].text, /one WhatsApp complaint per flat/i)
+    assert.match(mock.residentMessages()[0].text, /https:\/\/rwa-ai\.pages\.dev\/\?view=complaint-chat/)
+    bilingual(mock.residentMessages()[0].text)
+    assert.equal(mock.state.dailyQueries.length, 1)
+    assert.match(mock.state.dailyQueries[0].from, /T18:30:00.000Z$/)
+    assert.match(mock.state.dailyQueries[0].to, /T18:30:00.000Z$/)
+  } finally { mock.restore() }
+})
+
+test('new mobile cannot submit another WhatsApp complaint against same flat today', async () => {
+  const mock = mockServices({ todaysWhatsappFlats: ['36 D'] })
+  try {
+    await say('Hi')
+    await say('1')
+    await say('36-D')
+    assert.equal(mock.state.complaints.length, 0)
+    assert.equal(mock.state.session, null)
+    assert.match(mock.residentMessages().at(-1).text, /web complaint app/i)
+    assert.match(mock.residentMessages().at(-1).text, /rwa-ai\.pages\.dev/)
+    assert.equal(mock.state.messagesSent.filter(x=>x.recipient==='919000000002').length,0)
+  } finally { mock.restore() }
+})
+
+test('database race conflict is translated to bilingual web link, never a webhook failure', async () => {
+  const mock = mockServices({ forceDailyDbConflict:true })
+  try {
+    await say('Hi')
+    await say('1')
+    await say('36-D')
+    assert.equal(mock.state.complaints.length,0)
+    assert.equal(mock.state.session,null)
+    assert.match(mock.residentMessages().at(-1).text, /one WhatsApp complaint per flat/i)
+    assert.match(mock.residentMessages().at(-1).text, /rwa-ai\.pages\.dev/)
+  } finally { mock.restore() }
+})
+
+test('a WhatsApp daily complaint from a previous India day does not block new entry', async () => {
+  const mock = mockServices({ priorFlats: ['36-D'] })
+  try {
+    await say('Hi')
+    assert.equal(mock.state.session.step,'CATEGORY')
+    await say('2')
+    assert.equal(mock.state.complaints.length,1)
+    assert.equal(mock.state.complaints[0].source,'WHATSAPP')
+  } finally { mock.restore() }
+})
 
 test('new resident: registers immediately after flat, without a confirmation prompt', async () => {
   const mock = mockServices()

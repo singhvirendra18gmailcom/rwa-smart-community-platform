@@ -125,6 +125,24 @@ test('no login: create real plumbing complaint in shared queue, obtain OTP and a
   } finally { m.restore() }
 })
 
+test('web app accepts a second complaint for the same flat on the same day', async () => {
+  const m = mock()
+  try {
+    const first = await post('/api/web-complaints/register', complaint())
+    assert.equal(first.status, 201)
+    const second = await post('/api/web-complaints/register', complaint({
+      ticket:'d43d8487-314f-4e0a-a3bd-e1fd9fa2e787',
+      category_id:2
+    }))
+    assert.equal(second.status, 201)
+    assert.equal(m.data.complaints.length,2)
+    assert.deepEqual(m.data.complaints.map(x=>x.source),['WEB','WEB'])
+    assert.deepEqual(m.data.complaints.map(x=>x.flat_no),['36-D','36-D'])
+    assert.equal(m.data.messages,0)
+    assert.equal(m.data.turnstile,2)
+  } finally { m.restore() }
+})
+
 test('worker rejects invalid data, unconfigured verification, and unexpected Turnstile host', async () => {
   const m = mock({ captchaHost:'malicious.example' })
   try {

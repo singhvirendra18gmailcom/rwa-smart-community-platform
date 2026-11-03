@@ -1362,6 +1362,15 @@ function workDoneConfirmationMessage(complaint) {
 async function startComplaint(env, mobile) {
   const mapping = await resolveResidentFlat(env, mobile)
   await deleteSession(env, mobile)
+
+  // Returning residents should get the web link immediately instead of a
+  // category menu when their flat has used today's WhatsApp allocation.
+  if (isUsableFlat(mapping.flat_no) &&
+      await hasWhatsappComplaintToday(env, mapping.flat_no)) {
+    await sendWhatsappDailyLimitMessage(env, mobile)
+    return
+  }
+
   await createSession(env, mobile, mapping.flat_no)
   await sendWhatsAppMessage(env, mobile, categoryMenu(mapping.flat_no, env))
 }
@@ -1387,6 +1396,54 @@ function isUsableFlat(flatNo) {
     && !['COMMON AREA', 'UNKNOWN', 'N/A', 'NA', 'NONE', 'NOT GIVEN'].includes(flat)
 }
 
+// "36-D", "36 D" and "36D" designate the same flat.
+function normalizedWhatsappFlat(flatNo) {
+  return String(flatNo || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+// India has a fixed UTC+05:30 offset and no daylight-saving transition.
+// Use this clock for daily limits, never the Worker server's UTC date.
+function istDayWindow(now = new Date()) {
+  const offset = 330 * 60 * 1000
+  const day = new Date(now.getTime() + offset).toISOString().slice(0, 10)
+  const start = Date.parse(day + 'T00:00:00.000Z') - offset
+  return {
+    start: new Date(start).toISOString(),
+    end: new Date(start + 24 * 60 * 60 * 1000).toISOString()
+  }
+}
+
+async function hasWhatsappComplaintToday(env, flatNo) {
+  const { start, end } = istDayWindow()
+  const rows = await supabaseRequest(env,
+    '/rest/v1/complaints?source=eq.WHATSAPP' +
+    '&created_at=gte.' + encodeURIComponent(start) +
+    '&created_at=lt.' + encodeURIComponent(end) +
+    '&select=flat_no&limit=1000',
+    { method: 'GET' })
+  const key = normalizedWhatsappFlat(flatNo)
+  return Array.isArray(rows) &&
+    rows.some(row => normalizedWhatsappFlat(row.flat_no) === key)
+}
+
+function whatsappDailyLimitMessage(env) {
+  const link = getWebComplaintPublicUrl(env) ||
+    'https://rwa-ai.pages.dev/?view=complaint-chat'
+  return '*WhatsApp complaint limit / व्हाट्सऐप शिकायत सीमा*\n\n' +
+    'One WhatsApp complaint per flat is allowed each day (India time). ' +
+    'A complaint has already been registered today for this flat.\n' +
+    'एक फ्लैट से एक दिन में केवल एक व्हाट्सऐप शिकायत दर्ज की जा सकती है। ' +
+    'इस फ्लैट की आज की शिकायत पहले ही दर्ज हो चुकी है।\n\n' +
+    'For another complaint, use the web complaint app (no login):\n' +
+    'अन्य शिकायत के लिए वेब ऐप का उपयोग करें (लॉगिन नहीं चाहिए):\n' +
+    link + '\n\n— RWA Pocket-A'
+}
+
+async function sendWhatsappDailyLimitMessage(env, mobile) {
+  await deleteSession(env, mobile)
+  await sendWhatsAppMessage(env, mobile, whatsappDailyLimitMessage(env))
+}
+
 function nextStepForCategory(categoryId) {
   if (categoryId === 4) return 'INCIDENT_DATETIME'
   if ([5, 6, 7].includes(categoryId)) return 'ISSUE_TYPE'
@@ -1398,7 +1455,22 @@ async function registerComplaintImmediately(env, mobile) {
   if (!current || !getCategoryById(Number(current.category_id)) || !isUsableFlat(current.flat_no)) {
     throw new Error('Complaint registration is missing a valid category or flat.')
   }
-  const complaint = await createComplaint(env, mobile, current)
+  // Final check handles legacy sessions, direct REGISTER steps and races.
+  // Database trigger is the authoritative concurrent-write protection.
+  if (await hasWhatsappComplaintToday(env, current.flat_no)) {
+    await sendWhatsappDailyLimitMessage(env, mobile)
+    return
+  }
+  let complaint
+  try {
+    complaint = await createComplaint(env, mobile, current)
+  } catch (error) {
+    if (error?.code === 'RWA_WHATSAPP_DAILY_FLAT_LIMIT') {
+      await sendWhatsappDailyLimitMessage(env, mobile)
+      return
+    }
+    throw error
+  }
   try {
     await rememberRegisteredFlat(env, mobile, current.flat_no)
   } catch (error) {
@@ -1493,6 +1565,10 @@ async function processConversation(env, mobile, originalText, session) {
     if (!isUsableFlat(flatNo)) {
       await sendWhatsAppMessage(env, mobile,
         'Please enter a valid flat number, e.g. *36-D*. / कृपया सही फ्लैट नंबर भेजें, जैसे *36-D*।')
+      return
+    }
+    if (await hasWhatsappComplaintToday(env, flatNo)) {
+      await sendWhatsappDailyLimitMessage(env, mobile)
       return
     }
     const next = nextStepForCategory(categoryId)
@@ -1883,6 +1959,16 @@ async function supabaseRequest(env, path, options = {}) {
   })
   const raw = await response.text()
   if (!response.ok) {
+    // Expected SQL constraint refusal: no generic webhook failure and no
+    // fallback circuit outage; give the resident the web-app link instead.
+    let apiError = null
+    try { apiError = JSON.parse(raw) } catch {}
+    if (response.status === 409 &&
+        apiError?.message === 'RWA_WHATSAPP_DAILY_FLAT_LIMIT') {
+      const conflict = new Error('WhatsApp daily flat complaint limit')
+      conflict.code = 'RWA_WHATSAPP_DAILY_FLAT_LIMIT'
+      throw conflict
+    }
     console.error('Supabase API error:', raw)
     throw new Error(`Supabase API error ${response.status}`)
   }
