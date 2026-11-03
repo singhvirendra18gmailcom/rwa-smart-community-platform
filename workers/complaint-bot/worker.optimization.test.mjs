@@ -40,7 +40,13 @@ function mockServices({
 
     if (uri.hostname === 'graph.facebook.com') {
       assert.equal(method, 'POST')
-      state.messagesSent.push({ recipient: payload.to, text: payload.text.body })
+      state.messagesSent.push({
+        recipient: payload.to,
+        type: payload.type,
+        text: payload.type === 'interactive'
+          ? payload.interactive?.body?.text : payload.text?.body,
+        interactive: payload.interactive || null
+      })
       return json({ messages: [{ id: 'wamid.mock.out' }] })
     }
     if (uri.pathname === '/auth/v1/user') {
@@ -161,7 +167,7 @@ function bilingual(text) {
 }
 
 
-test('returning resident with WhatsApp complaint today receives only the web link', async () => {
+test('returning resident gets a short bilingual WhatsApp CTA button, not a raw URL', async () => {
   const mock = mockServices({
     priorFlats: ['36-D'], todaysWhatsappFlats: ['36D']
   })
@@ -170,9 +176,16 @@ test('returning resident with WhatsApp complaint today receives only the web lin
     assert.equal(mock.state.complaints.length, 0)
     assert.equal(mock.state.session, null)
     assert.equal(mock.residentMessages().length, 1)
-    assert.match(mock.residentMessages()[0].text, /one WhatsApp complaint per flat/i)
-    assert.match(mock.residentMessages()[0].text, /https:\/\/rwa-ai\.pages\.dev\/\?view=complaint-chat/)
-    bilingual(mock.residentMessages()[0].text)
+    const msg = mock.residentMessages()[0]
+    assert.equal(msg.type, 'interactive')
+    assert.equal(msg.interactive.type, 'cta_url')
+    assert.equal(msg.interactive.action.name, 'cta_url')
+    assert.equal(msg.interactive.action.parameters.display_text, 'Open Complaint App')
+    assert.equal(msg.interactive.action.parameters.url, 'https://rwa-ai.pages.dev/?view=complaint-chat')
+    assert.equal(msg.interactive.footer.text, 'RWA Pocket-A')
+    assert.match(msg.text, /A complaint from your flat has already been registered/i)
+    assert.doesNotMatch(msg.text, /https?:\/\//, 'Never expose a raw URL in the message')
+    bilingual(msg.text)
     assert.equal(mock.state.dailyQueries.length, 1)
     assert.match(mock.state.dailyQueries[0].from, /T18:30:00.000Z$/)
     assert.match(mock.state.dailyQueries[0].to, /T18:30:00.000Z$/)
@@ -187,8 +200,12 @@ test('new mobile cannot submit another WhatsApp complaint against same flat toda
     await say('36-D')
     assert.equal(mock.state.complaints.length, 0)
     assert.equal(mock.state.session, null)
-    assert.match(mock.residentMessages().at(-1).text, /web complaint app/i)
-    assert.match(mock.residentMessages().at(-1).text, /rwa-ai\.pages\.dev/)
+    const msg = mock.residentMessages().at(-1)
+    assert.equal(msg.type, 'interactive')
+    assert.equal(msg.interactive.action.parameters.display_text, 'Open Complaint App')
+    assert.match(msg.text, /Need to register another complaint/)
+    assert.doesNotMatch(msg.text, /https?:\/\//)
+    assert.match(msg.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
     assert.equal(mock.state.messagesSent.filter(x=>x.recipient==='919000000002').length,0)
   } finally { mock.restore() }
 })
@@ -201,8 +218,11 @@ test('database race conflict is translated to bilingual web link, never a webhoo
     await say('36-D')
     assert.equal(mock.state.complaints.length,0)
     assert.equal(mock.state.session,null)
-    assert.match(mock.residentMessages().at(-1).text, /one WhatsApp complaint per flat/i)
-    assert.match(mock.residentMessages().at(-1).text, /rwa-ai\.pages\.dev/)
+    const msg = mock.residentMessages().at(-1)
+    assert.equal(msg.type, 'interactive')
+    assert.match(msg.text, /A complaint from your flat/)
+    assert.doesNotMatch(msg.text, /https?:\/\//)
+    assert.match(msg.interactive.action.parameters.url, /rwa-ai\.pages\.dev/)
   } finally { mock.restore() }
 })
 
