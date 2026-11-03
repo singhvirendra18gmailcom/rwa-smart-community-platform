@@ -2288,7 +2288,7 @@ async function sendWhatsAppCtaUrlButton(env, to, { header, body, button, url }) 
     type: 'interactive',
     interactive: {
       type: 'cta_url',
-      header: { type: 'text', text: header },
+      ...(header ? { header: { type: 'text', text: header } } : {}),
       body: { text: body },
       footer: { text: 'RWA Pocket-A' },
       action: {
