@@ -1427,22 +1427,25 @@ async function hasWhatsappComplaintToday(env, flatNo) {
     rows.some(row => normalizedWhatsappFlat(row.flat_no) === key)
 }
 
-function whatsappDailyLimitMessage(env) {
-  const link = getWebComplaintPublicUrl(env) ||
-    'https://rwa-ai.pages.dev/?view=complaint-chat'
-  return '*WhatsApp complaint limit / व्हाट्सऐप शिकायत सीमा*\n\n' +
-    'One WhatsApp complaint per flat is allowed each day (India time). ' +
-    'A complaint has already been registered today for this flat.\n' +
-    'एक फ्लैट से एक दिन में केवल एक व्हाट्सऐप शिकायत दर्ज की जा सकती है। ' +
-    'इस फ्लैट की आज की शिकायत पहले ही दर्ज हो चुकी है।\n\n' +
-    'For another complaint, use the web complaint app (no login):\n' +
-    'अन्य शिकायत के लिए वेब ऐप का उपयोग करें (लॉगिन नहीं चाहिए):\n' +
-    link + '\n\n— RWA Pocket-A'
+function whatsappDailyLimitMessage() {
+  return 'A complaint from your flat has already been registered on WhatsApp today.\n' +
+    'आपके फ्लैट से आज व्हाट्सऐप पर शिकायत पहले ही दर्ज हो चुकी है।\n\n' +
+    'Need to register another complaint? Tap the button below (no login).\n' +
+    'एक और शिकायत दर्ज करनी है? नीचे बटन दबाएँ (लॉगिन नहीं चाहिए)।'
 }
 
 async function sendWhatsappDailyLimitMessage(env, mobile) {
   await deleteSession(env, mobile)
-  await sendWhatsAppMessage(env, mobile, whatsappDailyLimitMessage(env))
+  // A WhatsApp CTA URL button makes the public app a single tap away;
+  // the raw link is deliberately absent from the chat message text.
+  const url = getWebComplaintPublicUrl(env) ||
+    'https://rwa-ai.pages.dev/?view=complaint-chat'
+  await sendWhatsAppCtaUrlButton(env, mobile, {
+    header: 'Complaint Already Registered',
+    body: whatsappDailyLimitMessage(),
+    button: 'Open Complaint App',
+    url
+  })
 }
 
 function nextStepForCategory(categoryId) {
@@ -2267,6 +2270,31 @@ async function sendWebComplaintFallbackOnce(env, recipient, messageId) {
 }
 
 async function sendWhatsAppMessage(env, to, message) {
+  return sendWhatsAppPayload(env, to, {
+    type: 'text',
+    text: { preview_url: false, body: message }
+  })
+}
+
+// A user-initiated Hi keeps this interactive CTA inside WhatsApp's
+// customer service window. No pre-approved template is needed here.
+async function sendWhatsAppCtaUrlButton(env, to, { header, body, button, url }) {
+  return sendWhatsAppPayload(env, to, {
+    type: 'interactive',
+    interactive: {
+      type: 'cta_url',
+      header: { type: 'text', text: header },
+      body: { text: body },
+      footer: { text: 'RWA Pocket-A' },
+      action: {
+        name: 'cta_url',
+        parameters: { display_text: button, url }
+      }
+    }
+  })
+}
+
+async function sendWhatsAppPayload(env, to, payload) {
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error('WhatsApp Worker secrets are not configured.')
   }
@@ -2282,8 +2310,7 @@ async function sendWhatsAppMessage(env, to, message) {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to,
-        type: 'text',
-        text: { preview_url: false, body: message }
+        ...payload
       })
     })
   const resultText = await response.text()
